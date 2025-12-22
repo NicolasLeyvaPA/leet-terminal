@@ -17,8 +17,7 @@ import { useWatchlist } from './utils/useWatchlist';
 
 const Terminal = () => {
   const { watchlist } = useWatchlist();
-  const [markets, setMarkets] = useState([]);
-  const [loadingMarkets, setLoadingMarkets] = useState(false);
+  const [markets] = useState(MARKETS_DATABASE);
   const [platformFilter, setPlatformFilter] = useState("all");
   const [selectedMarket, setSelectedMarket] = useState(null);
   const [command, setCommand] = useState("");
@@ -30,11 +29,10 @@ const Terminal = () => {
   const dragStateRef = useRef({ type: null, startX: 0, startY: 0, startVal: 0 });
 
   useEffect(() => {
-    // Set selected market from watchlist if available
-    if (!selectedMarket && watchlist.length > 0) {
-      setSelectedMarket(watchlist[0]);
+    if (!selectedMarket && markets.length > 0) {
+      setSelectedMarket(markets[0]);
     }
-  }, [watchlist]);
+  }, [markets]);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -44,7 +42,7 @@ const Terminal = () => {
   const handleCommand = (e) => {
     if (e.key === "Enter" && command) {
       const cmd = command.toUpperCase().trim();
-      const market = watchlist.find((m) => m.ticker === cmd);
+      const market = markets.find((m) => m.ticker === cmd);
       if (market) {
         setSelectedMarket(market);
         setCommand("");
@@ -60,17 +58,24 @@ const Terminal = () => {
   };
 
   const filteredMarkets = useMemo(() => {
-    // Only show watchlist items, filter by platform if needed
-    let filtered = watchlist;
+    // Combine markets database with watchlist items
+    const allMarkets = [...markets, ...watchlist];
+    // Remove duplicates by id
+    const uniqueMarkets = Array.from(
+      new Map(allMarkets.map((m) => [m.id, m])).values()
+    );
+    let filtered = uniqueMarkets;
     if (platformFilter !== "all") {
-      filtered = watchlist.filter(m => m.platform.toLowerCase() === platformFilter);
+      filtered = uniqueMarkets.filter(
+        (m) => m.platform?.toLowerCase() === platformFilter
+      );
     }
     return filtered;
-  }, [watchlist, platformFilter]);
+  }, [markets, watchlist, platformFilter]);
 
   const handleNewsSelect = (newsItem) => {
     const tickers = newsItem.markets || [];
-    const targetMarket = watchlist.find(m => tickers.includes(m.ticker));
+    const targetMarket = markets.find((m) => tickers.includes(m.ticker));
 
     if (targetMarket) {
       const platform = targetMarket.platform.toLowerCase();
@@ -132,9 +137,9 @@ const Terminal = () => {
     };
   }, []);
 
-  const tickerItems = watchlist.slice(0, 12).map((m) => {
+  const tickerItems = markets.slice(0, 12).map((m) => {
     const edge = m.model_prob - m.market_prob;
-    const change = m.market_prob - (m.prev_prob || m.market_prob);
+    const change = m.market_prob - m.prev_prob;
     return (
       <span key={m.id} className="inline-flex items-center gap-1 mx-3 text-xs">
         <span className="text-orange-500 font-bold">{m.ticker}</span>
@@ -191,7 +196,7 @@ const Terminal = () => {
       return (
         <div className="h-full grid grid-cols-10 grid-rows-6 gap-1.5">
           <div className="col-span-3 row-span-6">
-            <PortfolioPanel positions={PORTFOLIO_POSITIONS} markets={watchlist} />
+            <PortfolioPanel positions={PORTFOLIO_POSITIONS} markets={MARKETS_DATABASE} />
           </div>
           <div className="col-span-4 row-span-3">
             <PriceChartPanel market={selectedMarket} />
@@ -213,7 +218,7 @@ const Terminal = () => {
       return (
         <div className="h-full grid grid-cols-10 grid-rows-6 gap-1.5">
           <div className="col-span-3 row-span-6">
-            <QuantumLabPanel markets={watchlist} />
+            <QuantumLabPanel markets={MARKETS_DATABASE} />
           </div>
           <div className="col-span-4 row-span-3">
             <MonteCarloPanel market={selectedMarket} />
@@ -355,9 +360,9 @@ const Terminal = () => {
             <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
             <span className="text-gray-600">Connected</span>
           </span>
-          <span className="text-gray-600">Markets: {watchlist.length}</span>
+          <span className="text-gray-600">Markets: {markets.length}</span>
           <span className="text-gray-600">
-            Signals: {watchlist.filter((m) => Math.abs(m.model_prob - m.market_prob) > 0.03).length}
+            Signals: {markets.filter((m) => Math.abs(m.model_prob - m.market_prob) > 0.03).length}
           </span>
         </div>
         <div className="flex items-center gap-4">
