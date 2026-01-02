@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { MARKETS_DATABASE, PORTFOLIO_POSITIONS, NEWS_FEED } from './data/constants';
 import { WatchlistPanel } from './components/panels/WatchlistPanel';
 import { MarketOverviewPanel } from './components/panels/MarketOverviewPanel';
@@ -85,19 +85,12 @@ const Terminal = () => {
     }
   };
 
-  const startDrag = (type, event) => {
-    if (type === "left") {
-      dragStateRef.current = { type, startX: event.clientX, startVal: leftWidth };
-    } else if (type === "detail") {
-      dragStateRef.current = { type, startY: event.clientY, startVal: detailHeight };
-    } else if (type === "analytics") {
-      dragStateRef.current = { type, startX: event.clientX, startVal: analyticsWidth };
-    }
-    window.addEventListener("mousemove", onDrag);
-    window.addEventListener("mouseup", stopDrag);
-  };
+  // Use refs to store handler functions to avoid stale closures in event listeners
+  const onDragRef = useRef(null);
+  const stopDragRef = useRef(null);
 
-  const onDrag = (event) => {
+  // Memoized drag handler to prevent memory leaks
+  const onDrag = useCallback((event) => {
     const state = dragStateRef.current;
     if (!state.type) return;
 
@@ -122,18 +115,46 @@ const Terminal = () => {
       next = Math.max(260, Math.min(maxWidth, next));
       setAnalyticsWidth(next);
     }
-  };
+  }, []);
 
-  const stopDrag = () => {
+  // Memoized stop drag handler
+  const stopDrag = useCallback(() => {
     dragStateRef.current = { type: null, startX: 0, startY: 0, startVal: 0 };
-    window.removeEventListener("mousemove", onDrag);
-    window.removeEventListener("mouseup", stopDrag);
-  };
+    if (onDragRef.current) {
+      window.removeEventListener("mousemove", onDragRef.current);
+    }
+    if (stopDragRef.current) {
+      window.removeEventListener("mouseup", stopDragRef.current);
+    }
+  }, []);
 
+  // Store refs to handlers
+  onDragRef.current = onDrag;
+  stopDragRef.current = stopDrag;
+
+  const startDrag = useCallback((type, event) => {
+    if (type === "left") {
+      dragStateRef.current = { type, startX: event.clientX, startVal: leftWidth };
+    } else if (type === "detail") {
+      dragStateRef.current = { type, startY: event.clientY, startVal: detailHeight };
+    } else if (type === "analytics") {
+      dragStateRef.current = { type, startX: event.clientX, startVal: analyticsWidth };
+    }
+    window.addEventListener("mousemove", onDrag);
+    window.addEventListener("mouseup", stopDrag);
+  }, [leftWidth, detailHeight, analyticsWidth, onDrag, stopDrag]);
+
+  // Cleanup on unmount
   useEffect(() => {
+    const currentOnDrag = onDragRef.current;
+    const currentStopDrag = stopDragRef.current;
     return () => {
-      window.removeEventListener("mousemove", onDrag);
-      window.removeEventListener("mouseup", stopDrag);
+      if (currentOnDrag) {
+        window.removeEventListener("mousemove", currentOnDrag);
+      }
+      if (currentStopDrag) {
+        window.removeEventListener("mouseup", currentStopDrag);
+      }
     };
   }, []);
 

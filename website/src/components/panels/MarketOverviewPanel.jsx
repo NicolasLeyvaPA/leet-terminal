@@ -3,6 +3,17 @@ import { DataRow } from '../DataRow';
 import { Tag } from '../Tag';
 import { QuantEngine } from '../../utils/quantEngine';
 
+// Validate probability is a valid number between 0 and 1
+const isValidProbability = (prob) => {
+  return typeof prob === 'number' && !isNaN(prob) && prob >= 0 && prob <= 1;
+};
+
+// Safe number formatting helper
+const formatValue = (value, decimals = 2, prefix = '', suffix = '') => {
+  if (value === undefined || value === null || isNaN(value)) return 'N/A';
+  return `${prefix}${Number(value).toFixed(decimals)}${suffix}`;
+};
+
 export const MarketOverviewPanel = ({ market }) => {
   if (!market)
     return (
@@ -11,9 +22,25 @@ export const MarketOverviewPanel = ({ market }) => {
       </div>
     );
 
-  const edge = market.model_prob - market.market_prob;
-  const kelly = QuantEngine.kelly(market.model_prob, market.market_prob);
-  const ev = QuantEngine.expectedValue(market.model_prob, market.market_prob);
+  // Safely get probabilities with defaults
+  const marketProb = isValidProbability(market.market_prob) ? market.market_prob : 0;
+  const modelProb = isValidProbability(market.model_prob) ? market.model_prob : 0;
+  const hasValidProbs = isValidProbability(market.market_prob) && isValidProbability(market.model_prob);
+
+  const edge = modelProb - marketProb;
+
+  // Safely calculate kelly and EV with error handling
+  let kelly = { quarter: 0 };
+  let ev = { ev: 0 };
+
+  if (hasValidProbs) {
+    try {
+      kelly = QuantEngine.kelly(modelProb, marketProb) || { quarter: 0 };
+      ev = QuantEngine.expectedValue(modelProb, marketProb) || { ev: 0 };
+    } catch {
+      console.warn('Failed to calculate kelly/ev');
+    }
+  }
 
   return (
     <div className="terminal-panel h-full">
@@ -37,31 +64,31 @@ export const MarketOverviewPanel = ({ market }) => {
         <div className="grid grid-cols-2 gap-x-3">
           <DataRow
             label="Market"
-            value={`${(market.market_prob * 100).toFixed(2)}¢`}
+            value={formatValue(marketProb * 100, 2, '', '¢')}
           />
           <DataRow
             label="Model"
-            value={`${(market.model_prob * 100).toFixed(2)}¢`}
+            value={formatValue(modelProb * 100, 2, '', '¢')}
             type="info"
           />
           <DataRow
             label="Edge"
-            value={`${edge > 0 ? "+" : ""}${(edge * 100).toFixed(2)}%`}
+            value={`${edge > 0 ? "+" : ""}${formatValue(edge * 100, 2, '', '%')}`}
             type={edge > 0 ? "positive" : "negative"}
           />
           <DataRow
             label="Kelly¼"
-            value={`${(kelly.quarter * 100).toFixed(2)}%`}
+            value={formatValue((kelly.quarter || 0) * 100, 2, '', '%')}
             type="highlight"
           />
           <DataRow
             label="EV/$1k"
-            value={`$${ev.ev.toFixed(0)}`}
-            type={ev.ev > 0 ? "positive" : "negative"}
+            value={formatValue(ev.ev, 0, '$', '')}
+            type={(ev.ev || 0) > 0 ? "positive" : "negative"}
           />
           <DataRow
             label="Spread"
-            value={`${(market.spread * 100).toFixed(2)}%`}
+            value={formatValue((market.spread || 0) * 100, 2, '', '%')}
           />
         </div>
 
@@ -69,25 +96,25 @@ export const MarketOverviewPanel = ({ market }) => {
           <div className="text-xs text-gray-600 mb-1">MARKET DATA</div>
           <DataRow
             label="Vol 24h"
-            value={`$${(market.volume_24h / 1000).toFixed(0)}k`}
+            value={formatValue((market.volume_24h || 0) / 1000, 0, '$', 'k')}
             small
           />
           <DataRow
             label="Liquidity"
-            value={`$${(market.liquidity / 1000).toFixed(0)}k`}
+            value={formatValue((market.liquidity || 0) / 1000, 0, '$', 'k')}
             small
           />
           <DataRow
             label="OI"
-            value={`$${(market.open_interest / 1000000).toFixed(2)}M`}
+            value={formatValue((market.open_interest || 0) / 1000000, 2, '$', 'M')}
             small
           />
           <DataRow
             label="Trades"
-            value={market.trades_24h.toLocaleString()}
+            value={typeof market.trades_24h === 'number' ? market.trades_24h.toLocaleString() : 'N/A'}
             small
           />
-          <DataRow label="Expiry" value={market.end_date} small />
+          <DataRow label="Expiry" value={market.end_date || 'N/A'} small />
         </div>
       </div>
     </div>

@@ -9,10 +9,26 @@ export const ConfluencePanel = ({ market }) => {
       </div>
     );
 
-  const confluence = QuantEngine.calculateConfluence(market.factors);
-  const sortedFactors = Object.entries(market.factors).sort(
-    (a, b) => Math.abs(b[1].contribution) - Math.abs(a[1].contribution)
-  );
+  // Validate factors data exists
+  const factors = market.factors || {};
+  const hasFactors = Object.keys(factors).length > 0;
+
+  // Safely calculate confluence with fallback
+  let confluence = { score: 0, bullishFactors: 0, bearishFactors: 0 };
+  try {
+    if (hasFactors) {
+      confluence = QuantEngine.calculateConfluence(factors);
+    }
+  } catch {
+    console.warn('Failed to calculate confluence');
+  }
+
+  // Safely sort factors with validation
+  const sortedFactors = hasFactors
+    ? Object.entries(factors)
+        .filter(([, factor]) => factor && typeof factor.contribution === 'number')
+        .sort((a, b) => Math.abs(b[1].contribution) - Math.abs(a[1].contribution))
+    : [];
 
   return (
     <div className="terminal-panel h-full">
@@ -63,49 +79,67 @@ export const ConfluencePanel = ({ market }) => {
         <div className="text-xs text-gray-600 mb-1">
           FACTOR CONTRIBUTIONS
         </div>
-        {sortedFactors.map(([key, factor]) => (
-          <div key={key} className="mb-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-400 capitalize">
-                {key.replace(/_/g, " ")}
-              </span>
-              <span
-                className={
-                  factor.contribution > 0
-                    ? "positive"
-                    : factor.contribution < 0
-                    ? "negative"
-                    : "text-gray-500"
-                }
-              >
-                {factor.contribution > 0 ? "+" : ""}
-                {(factor.contribution * 100).toFixed(1)}%
-              </span>
-            </div>
-            <div className="shap-bar relative">
-              <div className="absolute inset-y-0 left-1/2 w-px bg-gray-700" />
-              {factor.contribution < 0 && (
-                <div
-                  className="shap-negative h-full absolute right-1/2"
-                  style={{
-                    width: `${Math.abs(factor.contribution) * 500}%`,
-                  }}
-                />
-              )}
-              {factor.contribution > 0 && (
-                <div
-                  className="shap-positive h-full absolute left-1/2"
-                  style={{
-                    width: `${factor.contribution * 500}%`,
-                  }}
-                />
-              )}
-            </div>
-            <div className="text-xs text-gray-600 mt-0.5">
-              {factor.desc}
-            </div>
+        {!hasFactors ? (
+          <div className="text-xs text-gray-500 py-2">
+            Factor data unavailable
           </div>
-        ))}
+        ) : (
+          sortedFactors.map(([key, factor]) => {
+            const contribution = factor?.contribution || 0;
+            // Limit the bar width to max 50% to prevent overflow
+            const barWidth = Math.min(Math.abs(contribution) * 500, 50);
+            return (
+              <div key={key} className="mb-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-400 capitalize">
+                    {key.replace(/_/g, " ")}
+                  </span>
+                  <span
+                    className={
+                      contribution > 0
+                        ? "positive"
+                        : contribution < 0
+                        ? "negative"
+                        : "text-gray-500"
+                    }
+                  >
+                    {contribution > 0 ? "+" : ""}
+                    {(contribution * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="shap-bar relative overflow-hidden">
+                  {/* Center divider with explicit z-index */}
+                  <div
+                    className="absolute inset-y-0 left-1/2 w-px bg-gray-700"
+                    style={{ zIndex: 1 }}
+                  />
+                  {/* Contribution bars with z-index below divider */}
+                  {contribution < 0 && (
+                    <div
+                      className="shap-negative h-full absolute right-1/2"
+                      style={{
+                        width: `${barWidth}%`,
+                        zIndex: 0,
+                      }}
+                    />
+                  )}
+                  {contribution > 0 && (
+                    <div
+                      className="shap-positive h-full absolute left-1/2"
+                      style={{
+                        width: `${barWidth}%`,
+                        zIndex: 0,
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="text-xs text-gray-600 mt-0.5">
+                  {factor?.desc || ''}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
