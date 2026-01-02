@@ -37,6 +37,10 @@ export const BetsMarketPanel = () => {
         }
         
         const data = await response.json();
+        // Validate response data
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid response format');
+        }
         setEvents(data);
       } catch (err) {
         console.error('Failed to fetch markets:', err);
@@ -208,18 +212,38 @@ export const BetsMarketPanel = () => {
                     <div className="text-xs text-gray-600 mb-1">OUTCOMES</div>
                     {selectedEvent.markets[0].outcomes && (
                       <div className="space-y-1">
-                        {JSON.parse(selectedEvent.markets[0].outcomes).map((outcome, idx) => {
-                          const prices = selectedEvent.markets[0].outcomePrices 
-                            ? JSON.parse(selectedEvent.markets[0].outcomePrices)
-                            : [];
-                          const price = prices[idx] ? (parseFloat(prices[idx]) * 100).toFixed(2) : 'N/A';
-                          return (
-                            <div key={idx} className="flex justify-between text-xs">
-                              <span className="text-gray-400">{outcome}</span>
-                              <span className="mono text-gray-300">{price}¢</span>
-                            </div>
-                          );
-                        })}
+                        {(() => {
+                          try {
+                            const outcomes = JSON.parse(selectedEvent.markets[0].outcomes);
+                            if (!Array.isArray(outcomes)) return null;
+
+                            let prices = [];
+                            try {
+                              if (selectedEvent.markets[0].outcomePrices) {
+                                prices = JSON.parse(selectedEvent.markets[0].outcomePrices);
+                                if (!Array.isArray(prices)) prices = [];
+                              }
+                            } catch {
+                              prices = [];
+                            }
+
+                            return outcomes.map((outcome, idx) => {
+                              const price = prices[idx] ? (parseFloat(prices[idx]) * 100).toFixed(2) : 'N/A';
+                              return (
+                                <div key={idx} className="flex justify-between text-xs">
+                                  <span className="text-gray-400">{outcome}</span>
+                                  <span className="mono text-gray-300">{price}¢</span>
+                                </div>
+                              );
+                            });
+                          } catch {
+                            return (
+                              <div className="text-xs text-gray-500">
+                                Unable to parse outcome data
+                              </div>
+                            );
+                          }
+                        })()}
                       </div>
                     )}
                   </div>

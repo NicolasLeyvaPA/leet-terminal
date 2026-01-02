@@ -4,27 +4,84 @@ import { DataRow } from '../DataRow';
 import { MonteCarloChart } from '../MonteCarloChart';
 import { QuantEngine } from '../../utils/quantEngine';
 
+// Validate probability is a valid number between 0 and 1
+const isValidProbability = (prob) => {
+  return typeof prob === 'number' && !isNaN(prob) && prob >= 0 && prob <= 1;
+};
+
 export const MonteCarloPanel = ({ market }) => {
   const [simulation, setSimulation] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (market) {
+    if (!market) {
+      setSimulation(null);
+      setError(null);
+      return;
+    }
+
+    // Validate probabilities before running simulation
+    if (!isValidProbability(market.market_prob) || !isValidProbability(market.model_prob)) {
+      setError('Invalid probability data');
+      setSimulation(null);
+      return;
+    }
+
+    try {
       const result = QuantEngine.monteCarlo(
         market.market_prob,
         market.model_prob
       );
+
+      // Validate simulation result
+      if (!result || !result.stats || !result.paths) {
+        setError('Simulation failed');
+        setSimulation(null);
+        return;
+      }
+
       setSimulation(result);
+      setError(null);
+    } catch (err) {
+      console.warn('Monte Carlo simulation failed:', err);
+      setError('Simulation error');
+      setSimulation(null);
     }
   }, [market]);
 
-  if (!market || !simulation)
+  if (!market) {
     return (
       <div className="terminal-panel h-full flex items-center justify-center text-gray-600 text-xs">
         Select a market
       </div>
     );
+  }
+
+  if (error) {
+    return (
+      <div className="terminal-panel h-full flex items-center justify-center text-gray-500 text-xs">
+        {error}
+      </div>
+    );
+  }
+
+  if (!simulation) {
+    return (
+      <div className="terminal-panel h-full flex items-center justify-center text-gray-600 text-xs">
+        Loading simulation...
+      </div>
+    );
+  }
 
   const s = simulation.stats;
+
+  // Safe number formatting helper
+  const formatStat = (value, decimals = 1, prefix = '', suffix = '') => {
+    if (value === undefined || value === null || isNaN(value)) return 'N/A';
+    const formatted = Number(value).toFixed(decimals);
+    const sign = value >= 0 && prefix === '' ? '' : (value >= 0 ? '+' : '');
+    return `${prefix}${sign}${formatted}${suffix}`;
+  };
 
   return (
     <div className="terminal-panel h-full">
