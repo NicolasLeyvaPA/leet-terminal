@@ -1,58 +1,105 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
 
 export const PriceChart = ({ data, height = 120 }) => {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!canvasRef.current || !data?.length) return;
-    if (chartRef.current) chartRef.current.destroy();
+    // Validate data before proceeding
+    if (!canvasRef.current) return;
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      setError(null); // Not an error, just no data
+      return;
+    }
 
-    chartRef.current = new Chart(canvasRef.current, {
-      type: "line",
-      data: {
-        labels: data.map((d) => d.date),
-        datasets: [
-          {
-            data: data.map((d) => (d.price * 100).toFixed(1)),
-            borderColor: "#ff6b00",
-            backgroundColor: "rgba(255, 107, 0, 0.05)",
-            borderWidth: 1.5,
-            fill: true,
-            tension: 0.2,
-            pointRadius: 0,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { mode: "index", intersect: false },
+    // Clean up previous chart
+    if (chartRef.current) {
+      try {
+        chartRef.current.destroy();
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+
+    try {
+      // Validate data points have required properties
+      const validData = data.filter(
+        (d) => d && typeof d.price === 'number' && !isNaN(d.price)
+      );
+
+      if (validData.length === 0) {
+        setError('No valid price data');
+        return;
+      }
+
+      chartRef.current = new Chart(canvasRef.current, {
+        type: "line",
+        data: {
+          labels: validData.map((d) => d.date || ''),
+          datasets: [
+            {
+              data: validData.map((d) => (d.price * 100).toFixed(1)),
+              borderColor: "#ff6b00",
+              backgroundColor: "rgba(255, 107, 0, 0.05)",
+              borderWidth: 1.5,
+              fill: true,
+              tension: 0.2,
+              pointRadius: 0,
+            },
+          ],
         },
-        interaction: { mode: "nearest", axis: "x", intersect: false },
-        scales: {
-          x: { display: false },
-          y: {
-            display: true,
-            position: "right",
-            grid: { color: "#1a1a1a", drawBorder: false },
-            ticks: {
-              color: "#444",
-              font: { size: 9 },
-              callback: (v) => v + "¢",
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { mode: "index", intersect: false },
+          },
+          interaction: { mode: "nearest", axis: "x", intersect: false },
+          scales: {
+            x: { display: false },
+            y: {
+              display: true,
+              position: "right",
+              grid: { color: "#1a1a1a", drawBorder: false },
+              ticks: {
+                color: "#444",
+                font: { size: 9 },
+                callback: (v) => v + "¢",
+              },
             },
           },
         },
-      },
-    });
+      });
+      setError(null);
+    } catch (err) {
+      console.warn('Chart initialization failed:', err);
+      setError('Chart failed to load');
+    }
 
     return () => {
-      if (chartRef.current) chartRef.current.destroy();
+      if (chartRef.current) {
+        try {
+          chartRef.current.destroy();
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
     };
   }, [data]);
+
+  if (error) {
+    return (
+      <div
+        style={{ height }}
+        className="flex items-center justify-center text-gray-500 text-xs"
+      >
+        {error}
+      </div>
+    );
+  }
 
   return <canvas ref={canvasRef} style={{ height }} />;
 };
