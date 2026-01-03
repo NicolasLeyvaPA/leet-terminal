@@ -1,3 +1,6 @@
+// Utility helpers for data generation and formatting
+
+// Generate price history fallback (when API fails)
 export function generatePriceHistory(currentPrice, days) {
   const history = [];
   let price = currentPrice - (Math.random() * 0.12 - 0.04);
@@ -19,6 +22,7 @@ export function generatePriceHistory(currentPrice, days) {
   return history;
 }
 
+// Generate orderbook fallback (when API fails)
 export function generateOrderbook(midPrice) {
   const bids = [], asks = [];
   let bidCumulative = 0, askCumulative = 0;
@@ -47,6 +51,7 @@ export function generateOrderbook(midPrice) {
   };
 }
 
+// Generate simulated trade
 export function makeRandomTrade(ticker, lastMc = 7.6) {
   const sides = ["Buy", "Sell"];
   const side = sides[Math.random() < 0.45 ? 0 : 1];
@@ -64,14 +69,53 @@ export function makeRandomTrade(ticker, lastMc = 7.6) {
   };
 }
 
-export function makeInitialTrades(ticker, n = 20) {
-  const trades = [];
-  let mc = 7.6;
-  for (let i = 0; i < n; i++) {
-    const t = makeRandomTrade(ticker, mc);
-    mc = parseFloat(t.mc.replace("$", "").replace("M", "")) || mc;
-    trades.push(t);
-  }
-  return trades;
+// Format numbers with appropriate suffixes
+export function formatNumber(num) {
+  if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toFixed(2);
 }
 
+// Format probability as percentage
+export function formatProb(prob) {
+  return (prob * 100).toFixed(1) + '%';
+}
+
+// Format currency
+export function formatCurrency(amount) {
+  return '$' + formatNumber(amount);
+}
+
+// Calculate time remaining until date
+export function timeUntil(dateStr) {
+  if (!dateStr) return 'N/A';
+  const target = new Date(dateStr);
+  const now = new Date();
+  const diff = target - now;
+
+  if (diff < 0) return 'Expired';
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+  if (days > 30) return `${Math.floor(days / 30)}mo`;
+  if (days > 0) return `${days}d ${hours}h`;
+  return `${hours}h`;
+}
+
+// Parse Polymarket URL to extract event slug
+export function parsePolymarketUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    if (!urlObj.hostname.includes('polymarket')) return null;
+
+    const pathParts = urlObj.pathname.split('/');
+    const eventIndex = pathParts.indexOf('event');
+    if (eventIndex !== -1 && pathParts[eventIndex + 1]) {
+      return pathParts[eventIndex + 1].split('?')[0];
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
