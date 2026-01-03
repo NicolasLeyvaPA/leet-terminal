@@ -51,7 +51,7 @@ const Terminal = () => {
       if (["ANALYSIS", "ANA"].includes(cmd)) setWorkspace("analysis");
       else if (["PORTFOLIO", "PORT"].includes(cmd)) setWorkspace("portfolio");
       else if (["LAB", "QUANTUM"].includes(cmd)) setWorkspace("lab");
-      else if (["SCAN"].includes(cmd)) setWorkspace("scan");
+      else if (["NEWS", "FEED"].includes(cmd)) setWorkspace("news");
       else if (["BETS", "MARKETS"].includes(cmd)) setWorkspace("bets");
       setCommand("");
     }
@@ -225,11 +225,11 @@ const Terminal = () => {
           <div className="col-span-3 row-span-3">
             <GreeksPanel market={selectedMarket} />
           </div>
-          <div className="col-span-5 row-span-3">
+          <div className="col-span-4 row-span-3">
             <MonteCarloPanel market={selectedMarket} />
           </div>
-          <div className="col-span-5 row-span-3">
-            <NewsFeedPanel news={NEWS_FEED} onNewsClick={handleNewsSelect} />
+          <div className="col-span-3 row-span-3">
+            <OrderBookPanel market={selectedMarket} />
           </div>
         </div>
       );
@@ -250,9 +250,17 @@ const Terminal = () => {
           <div className="col-span-4 row-span-3">
             <ModelBreakdownPanel market={selectedMarket} />
           </div>
-          <div className="col-span-6 row-span-3">
-            <NewsFeedPanel news={NEWS_FEED} onNewsClick={handleNewsSelect} />
+          <div className="col-span-3 row-span-3">
+            <GreeksPanel market={selectedMarket} />
           </div>
+        </div>
+      );
+    }
+
+    if (workspace === "news") {
+      return (
+        <div className="h-full">
+          <NewsFeedPanel news={NEWS_FEED} onNewsClick={handleNewsSelect} fullPage />
         </div>
       );
     }
@@ -265,21 +273,23 @@ const Terminal = () => {
       );
     }
 
+    // Default fallback - analysis view
     return (
-      <div className="h-full grid grid-cols-10 grid-rows-6 gap-1.5">
-        <div className="col-span-4 row-span-3">
+      <div className="h-full flex flex-col gap-1.5">
+        <div className="flex gap-1.5" style={{ flex: "0 0 48%" }}>
+          <div className="flex-1">
+            <MarketOverviewPanel market={selectedMarket} />
+          </div>
+          <div className="flex-1">
+            <PriceChartPanel market={selectedMarket} />
+          </div>
+          <div className="w-64">
+            <OrderBookPanel market={selectedMarket} />
+          </div>
+        </div>
+        <div className="flex-1 min-h-0 grid grid-cols-3 gap-1.5">
           <ConfluencePanel market={selectedMarket} />
-        </div>
-        <div className="col-span-3 row-span-3">
           <MonteCarloPanel market={selectedMarket} />
-        </div>
-        <div className="col-span-3 row-span-3">
-          <ModelBreakdownPanel market={selectedMarket} />
-        </div>
-        <div className="col-span-5 row-span-3">
-          <NewsFeedPanel news={NEWS_FEED} />
-        </div>
-        <div className="col-span-5 row-span-3">
           <GreeksPanel market={selectedMarket} />
         </div>
       </div>
@@ -290,19 +300,19 @@ const Terminal = () => {
     <div className="h-screen flex flex-col">
       <div className="h-7 bg-[#080808] border-b border-gray-800 flex items-center justify-between px-3 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <span className="text-orange-500 font-bold text-sm">
-            LEET<span className="text-white ml-1">QUANTUM</span>
-            <span className="text-gray-400 ml-1">TERMINAL</span>
-            <span className="text-gray-600 text-xs ml-1">PRO</span>
+          <span className="text-orange-500 font-bold text-base tracking-wide">
+            LEET<span className="text-white ml-0.5">QUANTUM</span>
+            <span className="text-orange-400 ml-0.5">TERMINAL</span>
+            <span className="bg-orange-500 text-black text-[9px] px-1 py-0.5 rounded ml-2 font-bold">PRO</span>
           </span>
           <div className="flex">
-            {["analysis", "portfolio", "lab", "scan", "bets"].map((ws) => (
+            {["analysis", "portfolio", "lab", "news", "bets"].map((ws) => (
               <button
                 key={ws}
                 onClick={() => setWorkspace(ws)}
                 className={`workspace-tab ${workspace === ws ? "active" : ""}`}
               >
-                {ws}
+                {ws.toUpperCase()}
               </button>
             ))}
           </div>
@@ -344,7 +354,7 @@ const Terminal = () => {
           value={command}
           onChange={(e) => setCommand(e.target.value)}
           onKeyDown={handleCommand}
-          placeholder="Enter command or ticker (BTC150K, FEDQ1, GPT5, SCAN, PORT, LAB, BETS)..."
+          placeholder="Enter command or ticker (BTC150K, FEDQ1, GPT5, NEWS, PORT, LAB, BETS)..."
           className="cmd-input flex-1 px-2 py-1 text-xs"
         />
         <div className="flex gap-1">
@@ -375,19 +385,20 @@ const Terminal = () => {
         </div>
       </div>
 
-      <div className="h-5 bg-[#080808] border-t border-gray-800 flex items-center justify-between px-3 text-xs flex-shrink-0">
+      <div className="h-6 bg-[#080808] border-t border-gray-800 flex items-center justify-between px-3 text-xs flex-shrink-0">
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-            <span className="text-gray-600">Connected</span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-gray-500">LIVE</span>
           </span>
-          <span className="text-gray-600">Markets: {markets.length}</span>
+          <span className="text-gray-600">Markets: <span className="text-orange-400">{markets.length}</span></span>
           <span className="text-gray-600">
-            Signals: {markets.filter((m) => Math.abs(m.model_prob - m.market_prob) > 0.03).length}
+            Signals: <span className="text-green-400">{markets.filter((m) => Math.abs(m.model_prob - m.market_prob) > 0.03).length}</span>
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-yellow-500">⚠ Analysis Only - No Execution</span>
+          <span className="text-orange-500/70 text-[10px]">LEET QUANTUM TERMINAL</span>
+          <span className="text-yellow-500/80 text-[10px]">⚠ Analysis Only</span>
           <span className="text-gray-600">v2.0.0</span>
         </div>
       </div>
