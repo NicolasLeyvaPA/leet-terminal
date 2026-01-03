@@ -17,62 +17,75 @@ import { BetsMarketPanel } from './components/panels/BetsMarketPanel';
 import { MarketDetailDock } from './components/MarketDetailDock';
 import { useWatchlist } from './utils/useWatchlist';
 
+// Market limit options
+const MARKET_LIMITS = [10, 25, 50, 100];
+const REFRESH_INTERVAL = 15000; // 15 seconds
+
 const Terminal = () => {
   const { watchlist } = useWatchlist();
   const [markets, setMarkets] = useState([]);
   const [loadingMarkets, setLoadingMarkets] = useState(true);
+  const [marketLimit, setMarketLimit] = useState(25); // Default 25 markets
   const [platformFilter, setPlatformFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [selectedMarket, setSelectedMarket] = useState(null);
   const [command, setCommand] = useState("");
   const [workspace, setWorkspace] = useState("analysis");
   const [time, setTime] = useState(new Date());
-  const [leftWidth, setLeftWidth] = useState(280);
+  const [leftWidth, setLeftWidth] = useState(300);
   const [detailHeight, setDetailHeight] = useState(220);
   const [analyticsWidth, setAnalyticsWidth] = useState(420);
-  const [urlInput, setUrlInput] = useState("");
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [lastRefresh, setLastRefresh] = useState(null);
   const dragStateRef = useRef({ type: null, startX: 0, startY: 0, startVal: 0 });
 
-  // Load markets from Polymarket API on mount
-  useEffect(() => {
-    const loadMarkets = async () => {
-      try {
-        setLoadingMarkets(true);
-        setStatusMessage("Connecting to Polymarket...");
-        const data = await PolymarketAPI.fetchOpenEvents(30);
+  // Load markets from Polymarket API
+  const loadMarkets = useCallback(async (limit = marketLimit, isManual = false) => {
+    try {
+      if (isManual) setLoadingMarkets(true);
+      setStatusMessage("Syncing...");
+      const data = await PolymarketAPI.fetchOpenEvents(limit);
 
-        // Add price history and orderbook to each market
-        const enrichedMarkets = data.map(market => ({
-          ...market,
-          price_history: generatePriceHistory(market.market_prob, 90),
-          orderbook: generateOrderbook(market.market_prob),
-        }));
+      // Add price history and orderbook to each market
+      const enrichedMarkets = data.map(market => ({
+        ...market,
+        price_history: generatePriceHistory(market.market_prob, 90),
+        orderbook: generateOrderbook(market.market_prob),
+      }));
 
-        setMarkets(enrichedMarkets);
-        if (enrichedMarkets.length > 0 && !selectedMarket) {
-          setSelectedMarket(enrichedMarkets[0]);
-        }
-        setStatusMessage(`Loaded ${enrichedMarkets.length} live markets`);
-        setTimeout(() => setStatusMessage(""), 3000);
-      } catch (error) {
-        console.error('Failed to load markets:', error);
-        setStatusMessage("Failed to load markets - check connection");
-      } finally {
-        setLoadingMarkets(false);
+      setMarkets(enrichedMarkets);
+      if (enrichedMarkets.length > 0 && !selectedMarket) {
+        setSelectedMarket(enrichedMarkets[0]);
       }
-    };
+      setLastRefresh(new Date());
+      setStatusMessage(`${enrichedMarkets.length} markets`);
+      setTimeout(() => setStatusMessage(""), 2000);
+    } catch (error) {
+      console.error('Failed to load markets:', error);
+      setStatusMessage("Sync failed");
+    } finally {
+      setLoadingMarkets(false);
+    }
+  }, [marketLimit, selectedMarket]);
 
-    loadMarkets();
-    // Refresh markets every 60 seconds
-    const interval = setInterval(loadMarkets, 60000);
+  // Initial load and refresh interval
+  useEffect(() => {
+    loadMarkets(marketLimit, true);
+    const interval = setInterval(() => loadMarkets(marketLimit, false), REFRESH_INTERVAL);
     return () => clearInterval(interval);
-  }, []);
+  }, [marketLimit]);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Handle market limit change
+  const handleLimitChange = (newLimit) => {
+    setMarketLimit(newLimit);
+    loadMarkets(newLimit, true);
+  };
 
   // Handle loading market from URL
   const loadMarketFromUrl = async (url) => {
@@ -80,18 +93,16 @@ const Terminal = () => {
 
     try {
       setLoadingUrl(true);
-      setStatusMessage("Loading market...");
+      setStatusMessage("Loading...");
 
       const market = await PolymarketAPI.fetchEventBySlug(url);
 
-      // Enrich with price history and orderbook
       const enrichedMarket = {
         ...market,
         price_history: generatePriceHistory(market.market_prob, 90),
         orderbook: generateOrderbook(market.market_prob),
       };
 
-      // Add to markets if not already present
       setMarkets(prev => {
         const exists = prev.some(m => m.id === enrichedMarket.id);
         if (exists) {
@@ -101,13 +112,12 @@ const Terminal = () => {
       });
 
       setSelectedMarket(enrichedMarket);
-      setUrlInput("");
       setStatusMessage(`Loaded: ${market.ticker}`);
-      setTimeout(() => setStatusMessage(""), 3000);
+      setTimeout(() => setStatusMessage(""), 2000);
     } catch (error) {
       console.error('Failed to load market from URL:', error);
-      setStatusMessage("Failed to load market - check URL");
-      setTimeout(() => setStatusMessage(""), 5000);
+      setStatusMessage("Failed - check URL");
+      setTimeout(() => setStatusMessage(""), 3000);
     } finally {
       setLoadingUrl(false);
     }
@@ -117,7 +127,6 @@ const Terminal = () => {
     if (e.key === "Enter" && command) {
       const cmd = command.trim();
 
-      // Check if it's a Polymarket URL
       if (cmd.includes('polymarket.com')) {
         loadMarketFromUrl(cmd);
         setCommand("");
@@ -137,25 +146,52 @@ const Terminal = () => {
       else if (["NEWS", "FEED"].includes(cmdUpper)) setWorkspace("news");
       else if (["BETS", "MARKETS"].includes(cmdUpper)) setWorkspace("bets");
       else if (["REFRESH", "RELOAD"].includes(cmdUpper)) {
-        window.location.reload();
+        loadMarkets(marketLimit, true);
       }
       setCommand("");
     }
   };
 
-  const filteredMarkets = useMemo(() => {
+  // Get unique categories from markets
+  const categories = useMemo(() => {
+    const cats = new Set(markets.map(m => m.category || 'Other'));
+    return ['all', ...Array.from(cats).sort()];
+  }, [markets]);
+
+  // Filter and group markets
+  const { filteredMarkets, groupedMarkets } = useMemo(() => {
     const allMarkets = [...markets, ...watchlist];
     const uniqueMarkets = Array.from(
       new Map(allMarkets.map((m) => [m.id, m])).values()
     );
+
     let filtered = uniqueMarkets;
     if (platformFilter !== "all") {
-      filtered = uniqueMarkets.filter(
-        (m) => m.platform?.toLowerCase() === platformFilter
-      );
+      filtered = filtered.filter(m => m.platform?.toLowerCase() === platformFilter);
     }
-    return filtered;
-  }, [markets, watchlist, platformFilter]);
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter(m => m.category === categoryFilter);
+    }
+
+    // Group by category
+    const grouped = filtered.reduce((acc, market) => {
+      const cat = market.category || 'Other';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(market);
+      return acc;
+    }, {});
+
+    // Sort markets within each category by edge
+    Object.keys(grouped).forEach(cat => {
+      grouped[cat].sort((a, b) => {
+        const edgeA = Math.abs((a.model_prob || 0) - (a.market_prob || 0));
+        const edgeB = Math.abs((b.model_prob || 0) - (b.market_prob || 0));
+        return edgeB - edgeA;
+      });
+    });
+
+    return { filteredMarkets: filtered, groupedMarkets: grouped };
+  }, [markets, watchlist, platformFilter, categoryFilter]);
 
   const handleNewsSelect = (newsItem) => {
     const tickers = newsItem.markets || [];
@@ -233,7 +269,7 @@ const Terminal = () => {
 
   // Bloomberg-style ticker tape
   const tickerItems = useMemo(() => {
-    return markets.slice(0, 15).map((m) => {
+    return markets.slice(0, 20).map((m) => {
       const edge = m.model_prob - m.market_prob;
       const change = m.market_prob - (m.prev_prob || m.market_prob);
       return (
@@ -413,7 +449,6 @@ const Terminal = () => {
           )}
           <span className="text-gray-600">POLYMARKET</span>
           <span className="mono text-orange-500 font-medium">{time.toLocaleTimeString()}</span>
-          <span className="text-gray-600">{time.toLocaleDateString()}</span>
         </div>
       </div>
 
@@ -428,7 +463,7 @@ const Terminal = () => {
         )}
       </div>
 
-      {/* Command Bar with URL Input */}
+      {/* Command Bar with Controls */}
       <div className="h-8 bg-[#080808] border-b border-gray-800 flex items-center px-2 gap-2 flex-shrink-0">
         <span className="text-orange-500 text-xs font-bold">GO</span>
         <input
@@ -436,9 +471,44 @@ const Terminal = () => {
           value={command}
           onChange={(e) => setCommand(e.target.value)}
           onKeyDown={handleCommand}
-          placeholder="Paste Polymarket URL or enter ticker (e.g. https://polymarket.com/event/...)..."
-          className="cmd-input flex-1 px-2 py-1 text-xs bg-transparent border-none outline-none text-gray-300 placeholder-gray-600"
+          placeholder="Paste Polymarket URL or enter ticker..."
+          className="flex-1 px-2 py-1 text-xs bg-transparent border-none outline-none text-gray-300 placeholder-gray-600"
         />
+
+        {/* Market Limit Selector */}
+        <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
+          <span className="text-[10px] text-gray-500">LIMIT:</span>
+          {MARKET_LIMITS.map(limit => (
+            <button
+              key={limit}
+              onClick={() => handleLimitChange(limit)}
+              className={`text-[10px] px-1.5 py-0.5 rounded transition-all ${
+                marketLimit === limit
+                  ? 'bg-orange-500 text-black font-bold'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {limit}
+            </button>
+          ))}
+        </div>
+
+        {/* Category Filter */}
+        <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
+          <span className="text-[10px] text-gray-500">CAT:</span>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="text-[10px] bg-transparent text-gray-400 border border-gray-700 rounded px-1 py-0.5 outline-none"
+          >
+            {categories.map(cat => (
+              <option key={cat} value={cat} className="bg-gray-900">
+                {cat === 'all' ? 'ALL' : cat.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="h-4 w-px bg-gray-700" />
         <div className="flex gap-1">
           <button
@@ -446,14 +516,15 @@ const Terminal = () => {
             disabled={loadingUrl || !command}
             className={`btn text-[10px] px-3 py-1 ${loadingUrl ? 'opacity-50' : ''}`}
           >
-            {loadingUrl ? 'LOADING...' : 'ANALYZE'}
+            {loadingUrl ? '...' : 'ANALYZE'}
           </button>
           <button
-            onClick={() => window.location.reload()}
-            className="btn text-[10px] px-2 py-1"
-            title="Refresh markets"
+            onClick={() => loadMarkets(marketLimit, true)}
+            disabled={loadingMarkets}
+            className={`btn text-[10px] px-2 py-1 ${loadingMarkets ? 'opacity-50' : ''}`}
+            title="Refresh markets (auto every 15s)"
           >
-            REFRESH
+            SYNC
           </button>
         </div>
       </div>
@@ -465,8 +536,10 @@ const Terminal = () => {
             <div className="h-full min-w-[140px]" style={{ flex: `0 0 ${leftWidth}px` }}>
               <WatchlistPanel
                 markets={filteredMarkets}
+                groupedMarkets={groupedMarkets}
                 selectedId={selectedMarket?.id}
                 onSelect={setSelectedMarket}
+                categoryFilter={categoryFilter}
               />
             </div>
             <div className="split-handle-x" onMouseDown={(e) => startDrag("left", e)} />
@@ -489,23 +562,27 @@ const Terminal = () => {
             <span className="text-gray-500">{loadingMarkets ? 'SYNCING' : 'LIVE'}</span>
           </span>
           <span className="text-gray-600">
-            Markets: <span className="text-orange-400 font-medium">{markets.length}</span>
+            Markets: <span className="text-orange-400 font-medium">{filteredMarkets.length}</span>
+            {categoryFilter !== 'all' && <span className="text-gray-500">/{markets.length}</span>}
           </span>
           <span className="text-gray-600">
             Signals: <span className="text-green-400 font-medium">
-              {markets.filter((m) => Math.abs(m.model_prob - m.market_prob) > 0.03).length}
+              {filteredMarkets.filter((m) => Math.abs(m.model_prob - m.market_prob) > 0.03).length}
             </span>
+          </span>
+          <span className="text-gray-600">
+            Refresh: <span className="text-gray-500">15s</span>
           </span>
           {selectedMarket && (
             <span className="text-gray-600">
-              Selected: <span className="text-orange-400">{selectedMarket.ticker}</span>
+              <span className="text-orange-400">{selectedMarket.ticker}</span>
             </span>
           )}
         </div>
         <div className="flex items-center gap-4">
           <span className="text-orange-500/70 font-medium">LEET QUANTUM TERMINAL</span>
-          <span className="text-yellow-500/80">ANALYSIS ONLY - NOT FINANCIAL ADVICE</span>
-          <span className="text-gray-600">v3.0.0</span>
+          <span className="text-yellow-500/80">ANALYSIS ONLY</span>
+          <span className="text-gray-600">v3.1.0</span>
         </div>
       </div>
     </div>
