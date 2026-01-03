@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { PanelHeader } from '../PanelHeader';
-import { DataRow } from '../DataRow';
 import { QuantEngine } from '../../utils/quantEngine';
 
 export const BuySellPanel = ({ market }) => {
   const [side, setSide] = useState("YES");
-  const [size, setSize] = useState(1000);
+  const [size, setSize] = useState(100);
 
   if (!market) {
     return (
@@ -15,89 +14,118 @@ export const BuySellPanel = ({ market }) => {
     );
   }
 
-  const ev = QuantEngine.expectedValue(market.model_prob, market.market_prob, size);
-  const kelly = QuantEngine.kelly(market.model_prob, market.market_prob);
+  // Safe validation
+  const marketProb = typeof market.market_prob === 'number' ? market.market_prob : 0.5;
+  const modelProb = typeof market.model_prob === 'number' ? market.model_prob : 0.5;
+  const validSize = Math.max(0, size || 0);
+
+  // Calculate potential profit (to win)
+  const price = side === "YES" ? marketProb : (1 - marketProb);
+  const contracts = validSize / price;
+  const potentialWin = contracts * (1 - price); // Profit if correct
+
+  // Expected value based on model
+  let ev = { ev: 0 };
+  let kelly = { full: 0, quarter: 0 };
+  try {
+    ev = QuantEngine.expectedValue(modelProb, marketProb, validSize) || { ev: 0 };
+    kelly = QuantEngine.kelly(modelProb, marketProb) || { full: 0, quarter: 0 };
+  } catch {
+    // Use defaults
+  }
+
+  const edge = modelProb - marketProb;
+
+  const handleSizeChange = (e) => {
+    const value = e.target.value.replace(/[^0-9]/g, '');
+    setSize(value === '' ? 0 : parseInt(value, 10));
+  };
 
   return (
-    <div className="terminal-panel h-full">
-      <PanelHeader title="BUY / SELL" subtitle="Analysis Only" />
-      <div className="panel-content p-2 text-xs">
-        <div className="flex gap-2 mb-3">
+    <div className="terminal-panel h-full flex flex-col">
+      <PanelHeader title="SIMULATOR" subtitle="LEET QUANTUM" />
+      <div className="panel-content p-2 text-xs flex-1 flex flex-col">
+        {/* Side Selection */}
+        <div className="flex gap-1 mb-2">
           <button
-            className={`flex-1 btn ${side === "YES" ? "primary" : ""}`}
+            className={`flex-1 py-1.5 rounded text-xs font-bold transition-all ${
+              side === "YES"
+                ? "bg-green-500 text-black"
+                : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+            }`}
             onClick={() => setSide("YES")}
           >
-            Buy YES
+            YES
           </button>
           <button
-            className={`flex-1 btn ${side === "NO" ? "danger" : ""}`}
+            className={`flex-1 py-1.5 rounded text-xs font-bold transition-all ${
+              side === "NO"
+                ? "bg-red-500 text-black"
+                : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+            }`}
             onClick={() => setSide("NO")}
           >
-            Buy NO
+            NO
           </button>
         </div>
 
-        <div className="mb-3">
-          <div className="flex justify-between mb-1">
-            <span className="text-gray-500">Size (USD)</span>
-            <span className="mono">${size}</span>
-          </div>
-          <input
-            type="range"
-            min="100"
-            max="5000"
-            step="100"
-            value={size}
-            onChange={(e) => setSize(parseInt(e.target.value, 10))}
-            className="w-full"
-          />
-          <div className="flex justify-between mt-1 text-[10px] text-gray-500">
-            <span>$100</span>
-            <span>$2500</span>
-            <span>$5k</span>
+        {/* Investment Input */}
+        <div className="mb-2">
+          <label className="text-[10px] text-gray-500 block mb-1">INVESTMENT</label>
+          <div className="relative">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+            <input
+              type="text"
+              value={size}
+              onChange={handleSizeChange}
+              className="w-full bg-black border border-gray-700 rounded px-2 py-1.5 pl-5 text-sm mono text-white focus:border-orange-500 focus:outline-none"
+              placeholder="Enter amount"
+            />
           </div>
         </div>
 
-        <div className="border-t border-gray-800 pt-2 space-y-1">
-          <DataRow
-            label="Market Prob"
-            value={`${(market.market_prob * 100).toFixed(1)}%`}
-          />
-          <DataRow
-            label="Model Prob"
-            value={`${(market.model_prob * 100).toFixed(1)}%`}
-            type="info"
-          />
-          <DataRow
-            label="Edge"
-            value={`${(
-              (market.model_prob - market.market_prob) * 100
-            ).toFixed(1)}%`}
-            type={
-              market.model_prob > market.market_prob
-                ? "positive"
-                : "negative"
-            }
-          />
-          <DataRow
-            label="EV on Size"
-            value={`${ev.ev >= 0 ? "+" : ""}$${ev.ev.toFixed(2)}`}
-            type={ev.ev > 0 ? "positive" : "negative"}
-          />
-          <DataRow
-            label="Kelly (full)"
-            value={`${(kelly.full * 100).toFixed(1)}%`}
-          />
-          <DataRow
-            label="Kelly (¼)"
-            value={`${(kelly.quarter * 100).toFixed(1)}%`}
-            type="highlight"
-          />
+        {/* TO WIN - Main highlight */}
+        <div className="bg-gradient-to-r from-green-500/20 to-green-500/5 border border-green-500/30 rounded p-2 mb-2">
+          <div className="text-[10px] text-green-400 mb-0.5">IF CORRECT, YOU WIN</div>
+          <div className="text-xl font-bold text-green-400 mono">
+            +${potentialWin.toFixed(2)}
+          </div>
+          <div className="text-[10px] text-gray-500 mt-0.5">
+            {(contracts).toFixed(1)} contracts @ {(price * 100).toFixed(1)}¢
+          </div>
         </div>
 
-        <div className="mt-3 pt-2 border-t border-gray-800 text-[10px] text-gray-500 leading-snug">
-          ⚠ This panel is for sizing and edge analysis only. Leet Quantum
-          Terminal does not execute orders on Polymarket or Kalshi.
+        {/* Key Metrics */}
+        <div className="space-y-1 flex-1">
+          <div className="flex justify-between items-center py-0.5">
+            <span className="text-gray-500 text-[10px]">Current Price</span>
+            <span className="mono text-white">{(price * 100).toFixed(1)}¢</span>
+          </div>
+          <div className="flex justify-between items-center py-0.5">
+            <span className="text-gray-500 text-[10px]">Model Fair Value</span>
+            <span className="mono text-blue-400">{(modelProb * 100).toFixed(1)}¢</span>
+          </div>
+          <div className="flex justify-between items-center py-0.5">
+            <span className="text-gray-500 text-[10px]">Edge</span>
+            <span className={`mono font-medium ${edge > 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {edge > 0 ? '+' : ''}{(edge * 100).toFixed(1)}%
+            </span>
+          </div>
+          <div className="flex justify-between items-center py-0.5">
+            <span className="text-gray-500 text-[10px]">Expected Value</span>
+            <span className={`mono font-medium ${(ev.ev || 0) > 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {(ev.ev || 0) >= 0 ? '+' : ''}${(ev.ev || 0).toFixed(2)}
+            </span>
+          </div>
+          <div className="flex justify-between items-center py-0.5">
+            <span className="text-gray-500 text-[10px]">Kelly Suggested</span>
+            <span className="mono text-orange-400">{((kelly.quarter || 0) * 100).toFixed(1)}%</span>
+          </div>
+        </div>
+
+        {/* Disclaimer */}
+        <div className="mt-2 pt-2 border-t border-gray-800 text-[9px] text-gray-600 leading-tight">
+          Analysis only • No execution
         </div>
       </div>
     </div>
