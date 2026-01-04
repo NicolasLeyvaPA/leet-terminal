@@ -14,8 +14,12 @@ import { NewsFeedPanel } from './components/panels/NewsFeedPanel';
 import { BetsMarketPanel } from './components/panels/BetsMarketPanel';
 import { MarketDetailDock } from './components/MarketDetailDock';
 import { useWatchlist } from './utils/useWatchlist';
+import Login from './components/Login';
+import Signup from './components/Signup';
+import { getSession, signOut, getPhantomAuth, getMetaMaskAuth, verifyAuthentication } from './utils/auth';
+import { isSupabaseConfigured } from './utils/supabase';
 
-const Terminal = () => {
+const Terminal = ({ onLogout }) => {
   const { watchlist } = useWatchlist();
   const [markets] = useState(MARKETS_DATABASE);
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -340,6 +344,13 @@ const Terminal = () => {
         <div className="flex items-center gap-3 text-xs">
           <span className="text-gray-600">Polymarket • Kalshi</span>
           <span className="mono text-orange-500">{time.toLocaleTimeString()}</span>
+          <button
+            onClick={onLogout}
+            className="btn text-xs hover:bg-red-500/20 hover:text-red-400"
+            title="Logout"
+          >
+            LOGOUT
+          </button>
         </div>
       </div>
 
@@ -406,5 +417,122 @@ const Terminal = () => {
   );
 };
 
-export default Terminal;
+const App = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [authInfo, setAuthInfo] = useState(null);
+
+  // Check authentication status on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      // Verify authentication is valid
+      const verification = await verifyAuthentication();
+      
+      if (verification.isValid) {
+        setIsAuthenticated(true);
+        setAuthInfo(verification);
+        localStorage.setItem('isAuthenticated', 'true');
+        
+        // Log auth info for debugging
+        console.log('✅ Authentication verified:', {
+          type: verification.authType,
+          hasJWT: !!verification.user?.jwtToken || !!verification.session?.access_token,
+          user: verification.user?.publicKey || verification.user?.address || verification.user?.email,
+        });
+      } else {
+        setIsAuthenticated(false);
+        setAuthInfo(null);
+        localStorage.removeItem('isAuthenticated');
+        
+        // Log why auth failed
+        console.warn('❌ Authentication failed:', verification.reason || 'Unknown reason');
+      }
+      
+      setLoading(false);
+    };
+
+    checkAuth();
+  }, []);
+
+  // Handle OAuth callback
+  useEffect(() => {
+    if (isSupabaseConfigured() && window.location.hash) {
+      // Check if this is an OAuth callback
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      if (hashParams.get('access_token')) {
+        // OAuth callback detected, session will be set by Supabase
+        getSession().then(async ({ session, isValid }) => {
+          if (session && isValid) {
+            // Verify authentication is valid
+            const verification = await verifyAuthentication();
+            if (verification.isValid) {
+              setIsAuthenticated(true);
+              setAuthInfo(verification);
+              localStorage.setItem('isAuthenticated', 'true');
+              console.log('✅ OAuth callback verified:', verification.authType);
+              // Clean up URL
+              window.history.replaceState({}, document.title, window.location.pathname);
+            } else {
+              console.error('❌ OAuth callback verification failed:', verification.reason);
+              setIsAuthenticated(false);
+            }
+          }
+        });
+      }
+    }
+  }, []);
+
+  const handleLogin = async () => {
+    // Verify authentication after login
+    const verification = await verifyAuthentication();
+    if (verification.isValid) {
+      setIsAuthenticated(true);
+      setAuthInfo(verification);
+      localStorage.setItem('isAuthenticated', 'true');
+      console.log('✅ Login verified:', verification.authType);
+    } else {
+      console.error('❌ Login verification failed:', verification.reason);
+      // Don't set authenticated if verification fails
+    }
+  };
+
+  const handleSignup = async () => {
+    // Verify authentication after signup
+    const verification = await verifyAuthentication();
+    if (verification.isValid) {
+      setIsAuthenticated(true);
+      setAuthInfo(verification);
+      localStorage.setItem('isAuthenticated', 'true');
+      console.log('✅ Signup verified:', verification.authType);
+    } else {
+      console.error('❌ Signup verification failed:', verification.reason);
+      // Don't set authenticated if verification fails
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    setIsAuthenticated(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[#0a0a0a]">
+        <div className="text-orange-500 text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    if (showSignup) {
+      return <Signup onSignup={handleSignup} onSwitchToLogin={() => setShowSignup(false)} />;
+    }
+    return <Login onLogin={handleLogin} onSwitchToSignup={() => setShowSignup(true)} />;
+  }
+
+  return <Terminal onLogout={handleLogout} />;
+};
+
+export default App;
 
