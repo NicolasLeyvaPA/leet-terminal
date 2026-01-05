@@ -138,6 +138,17 @@ export const connectMetaMask = async () => {
         error: 'User rejected the connection request',
       };
     }
+    
+    // Handle "already pending" error specifically
+    if (err.message?.includes('already pending') || 
+        err.message?.includes('wallet_requestPermissions') ||
+        err.code === -32002) {
+      return {
+        success: false,
+        error: 'A MetaMask connection request is already pending. Please check your MetaMask extension and wait for it to complete, or refresh the page.',
+      };
+    }
+    
     return {
       success: false,
       error: err.message || 'Failed to connect to MetaMask',

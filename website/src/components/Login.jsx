@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { authenticateUser, signInWithOAuth, authenticateWithPhantom, authenticateWithMetaMask } from '../utils/auth';
 import { isSupabaseConfigured } from '../utils/supabase';
 import { isPhantomInstalled } from '../utils/phantom';
@@ -13,6 +13,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
   const [oauthLoading, setOauthLoading] = useState(null);
   const [phantomInstalled, setPhantomInstalled] = useState(false);
   const [metamaskInstalled, setMetamaskInstalled] = useState(false);
+  const metamaskConnectingRef = useRef(false);
 
   useEffect(() => {
     setPhantomInstalled(isPhantomInstalled());
@@ -94,8 +95,15 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
       e.stopPropagation();
     }
     
+    // Prevent duplicate requests
+    if (metamaskConnectingRef.current) {
+      setError('MetaMask connection already in progress. Please wait...');
+      return;
+    }
+    
     setError('');
     setOauthLoading('metamask');
+    metamaskConnectingRef.current = true;
 
     try {
       // CRITICAL: Explicitly check we're NOT using Phantom
@@ -160,10 +168,13 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
         // Check if error is related to Phantom interception
         if (result.error?.includes('Phantom') || result.error?.includes('Solana')) {
           setError('Phantom is intercepting Ethereum requests. Please disable Phantom\'s Ethereum mode or use a different browser.');
+        } else if (result.error?.includes('already pending') || result.error?.includes('wallet_requestPermissions')) {
+          setError('A MetaMask connection request is already pending. Please check your MetaMask extension and wait for it to complete.');
         } else {
           setError(result.error || 'Failed to connect to MetaMask');
         }
         setOauthLoading(null);
+        metamaskConnectingRef.current = false;
       }
     } catch (err) {
       console.error('MetaMask login error:', err);
@@ -171,10 +182,13 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
       // Check if Phantom intercepted
       if (err.message?.includes('Phantom') || err.message?.includes('Solana')) {
         setError('Phantom intercepted the request. Disable Phantom\'s Ethereum compatibility or use MetaMask in incognito mode.');
+      } else if (err.message?.includes('already pending') || err.message?.includes('wallet_requestPermissions')) {
+        setError('A MetaMask connection request is already pending. Please check your MetaMask extension and wait for it to complete.');
       } else {
         setError('Failed to connect to MetaMask: ' + (err.message || 'Unknown error'));
       }
       setOauthLoading(null);
+      metamaskConnectingRef.current = false;
     }
   };
 
