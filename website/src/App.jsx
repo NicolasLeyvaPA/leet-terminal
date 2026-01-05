@@ -297,37 +297,28 @@ const Terminal = () => {
 
   const renderRightGrid = () => {
     if (workspace === "analysis") {
+      // Clean 3x2 grid layout - no overlapping
       return (
-        <div className="h-full flex flex-col gap-1.5">
-          <div className="flex gap-1.5" style={{ flex: "0 0 48%" }}>
-            <div className="flex-1">
-              <MarketOverviewPanel market={selectedMarket} />
-            </div>
-            <div className="flex-1">
-              <PriceChartPanel market={selectedMarket} />
-            </div>
-            <div className="w-64">
-              <OrderBookPanel market={selectedMarket} />
-            </div>
+        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+          {/* Row 1 */}
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <MarketOverviewPanel market={selectedMarket} />
           </div>
-          <div id="analytics-container" className="flex-1 min-h-0 flex gap-1.5">
-            <div id="analytics-left" className="h-full" style={{ flex: `0 0 ${analyticsWidth}px` }}>
-              <ConfluencePanel market={selectedMarket} />
-            </div>
-            <div className="split-handle-x" onMouseDown={(e) => startDrag("analytics", e)} />
-            <div className="flex-1 min-w-0 grid grid-rows-2 gap-1.5">
-              <div className="row-span-1">
-                <ModelBreakdownPanel market={selectedMarket} />
-              </div>
-              <div className="row-span-1 grid grid-cols-2 gap-1.5">
-                <div className="col-span-1">
-                  <GreeksPanel market={selectedMarket} />
-                </div>
-                <div className="col-span-1">
-                  <MonteCarloPanel market={selectedMarket} />
-                </div>
-              </div>
-            </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <PriceChartPanel market={selectedMarket} />
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <ConfluencePanel market={selectedMarket} />
+          </div>
+          {/* Row 2 */}
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <ModelBreakdownPanel market={selectedMarket} />
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <MonteCarloPanel market={selectedMarket} />
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <GreeksPanel market={selectedMarket} />
           </div>
         </div>
       );
@@ -335,21 +326,21 @@ const Terminal = () => {
 
     if (workspace === "portfolio") {
       return (
-        <div className="h-full grid grid-cols-10 grid-rows-6 gap-1.5">
-          <div className="col-span-3 row-span-6">
+        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+          <div className="col-span-1 row-span-2 min-h-0 overflow-hidden">
             <PortfolioPanel positions={PORTFOLIO_POSITIONS} markets={markets} />
           </div>
-          <div className="col-span-4 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <PriceChartPanel market={selectedMarket} />
           </div>
-          <div className="col-span-3 row-span-3">
-            <GreeksPanel market={selectedMarket} />
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <OrderBookPanel market={selectedMarket} />
           </div>
-          <div className="col-span-4 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <MonteCarloPanel market={selectedMarket} />
           </div>
-          <div className="col-span-3 row-span-3">
-            <OrderBookPanel market={selectedMarket} />
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <GreeksPanel market={selectedMarket} />
           </div>
         </div>
       );
@@ -357,20 +348,20 @@ const Terminal = () => {
 
     if (workspace === "lab") {
       return (
-        <div className="h-full grid grid-cols-10 grid-rows-6 gap-1.5">
-          <div className="col-span-3 row-span-6">
+        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+          <div className="col-span-1 row-span-2 min-h-0 overflow-hidden">
             <QuantumLabPanel markets={markets} />
           </div>
-          <div className="col-span-4 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <MonteCarloPanel market={selectedMarket} />
           </div>
-          <div className="col-span-3 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <ConfluencePanel market={selectedMarket} />
           </div>
-          <div className="col-span-4 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <ModelBreakdownPanel market={selectedMarket} />
           </div>
-          <div className="col-span-3 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <GreeksPanel market={selectedMarket} />
           </div>
         </div>
@@ -379,7 +370,7 @@ const Terminal = () => {
 
     if (workspace === "news") {
       return (
-        <div className="h-full">
+        <div className="h-full overflow-hidden">
           <NewsFeedPanel news={[]} onNewsClick={handleNewsSelect} fullPage />
         </div>
       );
@@ -387,28 +378,31 @@ const Terminal = () => {
 
     if (workspace === "bets") {
       return (
-        <div className="h-full">
+        <div className="h-full overflow-hidden">
           <BetsMarketPanel />
         </div>
       );
     }
 
+    // Default fallback - same as analysis
     return (
-      <div className="h-full flex flex-col gap-1.5">
-        <div className="flex gap-1.5" style={{ flex: "0 0 48%" }}>
-          <div className="flex-1">
-            <MarketOverviewPanel market={selectedMarket} />
-          </div>
-          <div className="flex-1">
-            <PriceChartPanel market={selectedMarket} />
-          </div>
-          <div className="w-64">
-            <OrderBookPanel market={selectedMarket} />
-          </div>
+      <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <MarketOverviewPanel market={selectedMarket} />
         </div>
-        <div className="flex-1 min-h-0 grid grid-cols-3 gap-1.5">
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <PriceChartPanel market={selectedMarket} />
+        </div>
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
           <ConfluencePanel market={selectedMarket} />
+        </div>
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <ModelBreakdownPanel market={selectedMarket} />
+        </div>
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
           <MonteCarloPanel market={selectedMarket} />
+        </div>
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
           <GreeksPanel market={selectedMarket} />
         </div>
       </div>
