@@ -13,3 +13,4 @@ export const isSupabaseConfigured = () => {
   return !!supabase;
 };
 
+

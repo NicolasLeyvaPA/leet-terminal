@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createUser, usernameExists, signUpWithEmail, signInWithOAuth, authenticateWithPhantom, authenticateWithMetaMask } from '../utils/auth';
 import { isSupabaseConfigured } from '../utils/supabase';
 import { isPhantomInstalled } from '../utils/phantom';
@@ -14,6 +14,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
   const [oauthLoading, setOauthLoading] = useState(null);
   const [phantomInstalled, setPhantomInstalled] = useState(false);
   const [metamaskInstalled, setMetamaskInstalled] = useState(false);
+  const metamaskConnectingRef = useRef(false);
 
   useEffect(() => {
     setPhantomInstalled(isPhantomInstalled());
@@ -127,20 +128,37 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
   };
 
   const handleMetaMaskSignup = async () => {
+    // Prevent duplicate requests
+    if (metamaskConnectingRef.current) {
+      setError('MetaMask connection already in progress. Please wait...');
+      return;
+    }
+    
     setError('');
     setOauthLoading('metamask');
+    metamaskConnectingRef.current = true;
 
     try {
       const result = await authenticateWithMetaMask();
       if (result.success) {
         onSignup();
       } else {
-        setError(result.error || 'Failed to connect to MetaMask');
+        if (result.error?.includes('already pending') || result.error?.includes('wallet_requestPermissions')) {
+          setError('A MetaMask connection request is already pending. Please check your MetaMask extension and wait for it to complete.');
+        } else {
+          setError(result.error || 'Failed to connect to MetaMask');
+        }
         setOauthLoading(null);
+        metamaskConnectingRef.current = false;
       }
     } catch (err) {
-      setError('Failed to connect to MetaMask');
+      if (err.message?.includes('already pending') || err.message?.includes('wallet_requestPermissions')) {
+        setError('A MetaMask connection request is already pending. Please check your MetaMask extension and wait for it to complete.');
+      } else {
+        setError('Failed to connect to MetaMask: ' + (err.message || 'Unknown error'));
+      }
       setOauthLoading(null);
+      metamaskConnectingRef.current = false;
     }
   };
 
