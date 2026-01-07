@@ -2,24 +2,82 @@
 const GAMMA_API = 'https://gamma-api.polymarket.com';
 const CLOB_API = 'https://clob.polymarket.com';
 
+// CORS proxy options (fallbacks if direct/vite proxy fails)
+const CORS_PROXIES = [
+  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url) => `https://cors-anywhere.herokuapp.com/${url}`,
+];
+
 // Helper to handle API calls with CORS fallback
 async function fetchWithFallback(url, options = {}) {
-  const proxyUrl = import.meta.env.DEV
-    ? url.replace(GAMMA_API, '/api/polymarket').replace(CLOB_API, '/api/clob')
-    : url;
+  // First try: Vite proxy in development
+  if (import.meta.env.DEV) {
+    const proxyUrl = url
+      .replace(GAMMA_API, '/api/polymarket')
+      .replace(CLOB_API, '/api/clob');
 
-  try {
-    const response = await fetch(proxyUrl, options);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
-  } catch (error) {
-    // Fallback to CORS proxy
-    console.warn('Direct fetch failed, trying CORS proxy:', error);
-    const corsProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    const response = await fetch(corsProxy);
-    if (!response.ok) throw new Error(`Proxy HTTP ${response.status}`);
-    return await response.json();
+    try {
+      const response = await fetch(proxyUrl, {
+        ...options,
+        headers: {
+          'Accept': 'application/json',
+          ...options.headers,
+        },
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      console.warn(`Vite proxy returned ${response.status}, trying fallbacks...`);
+    } catch (error) {
+      console.warn('Vite proxy failed:', error.message);
+    }
   }
+
+  // Second try: Direct fetch (may work in some environments)
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Accept': 'application/json',
+        ...options.headers,
+      },
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (error) {
+    console.warn('Direct fetch failed:', error.message);
+  }
+
+  // Third try: CORS proxies as fallback
+  for (const makeProxyUrl of CORS_PROXIES) {
+    try {
+      const proxyUrl = makeProxyUrl(url);
+      const response = await fetch(proxyUrl, {
+        ...options,
+        headers: {
+          'Accept': 'application/json',
+          ...options.headers,
+        },
+      });
+      if (response.ok) {
+        const text = await response.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          console.warn('Proxy returned non-JSON response');
+          continue;
+        }
+      }
+    } catch (error) {
+      console.warn('CORS proxy failed:', error.message);
+      continue;
+    }
+  }
+
+  // All methods failed
+  throw new Error(`Failed to fetch from ${url}. All proxy methods exhausted.`);
 }
 
 // Extract event slug from Polymarket URL
@@ -41,21 +99,37 @@ export function extractEventSlug(url) {
 export async function fetchEventBySlug(slug) {
   const cleanSlug = extractEventSlug(slug);
   const url = `${GAMMA_API}/events?slug=${cleanSlug}`;
-  const data = await fetchWithFallback(url);
 
-  if (Array.isArray(data) && data.length > 0) {
-    return transformEventToMarket(data[0]);
+  try {
+    const data = await fetchWithFallback(url);
+
+    if (Array.isArray(data) && data.length > 0) {
+      return transformEventToMarket(data[0]);
+    }
+    throw new Error('Event not found');
+  } catch (error) {
+    console.error('Error loading market:', error.message);
+    throw error;
   }
-  throw new Error('Event not found');
 }
 
 // Fetch all open events
 export async function fetchOpenEvents(limit = 50) {
   const url = `${GAMMA_API}/events?closed=false&order=volume&ascending=false&limit=${limit}`;
-  const data = await fetchWithFallback(url);
 
-  if (!Array.isArray(data)) return [];
-  return data.map(transformEventToMarket).filter(Boolean);
+  try {
+    const data = await fetchWithFallback(url);
+
+    if (!Array.isArray(data)) {
+      console.warn('Unexpected response format, returning empty array');
+      return [];
+    }
+    return data.map(transformEventToMarket).filter(Boolean);
+  } catch (error) {
+    console.error('Error loading markets:', error.message);
+    // Return empty array instead of throwing to prevent app crash
+    return [];
+  }
 }
 
 // Fetch market price history
