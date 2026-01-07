@@ -51,6 +51,17 @@ export function generateOrderbook(midPrice) {
   };
 }
 
+// Generate initial trades for a market
+export function makeInitialTrades(ticker, count = 30) {
+  const trades = [];
+  let mc = 7.6;
+  for (let i = 0; i < count; i++) {
+    mc += (Math.random() - 0.5) * 0.1;
+    trades.push(makeRandomTrade(ticker, mc));
+  }
+  return trades;
+}
+
 // Generate simulated trade
 export function makeRandomTrade(ticker, lastMc = 7.6) {
   const sides = ["Buy", "Sell"];
