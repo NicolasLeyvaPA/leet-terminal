@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { MARKETS_DATABASE, PORTFOLIO_POSITIONS, NEWS_FEED } from './data/constants';
+import { PORTFOLIO_POSITIONS } from './data/constants';
+import { PolymarketAPI } from './services/polymarketAPI';
+import { generatePriceHistory, generateOrderbook } from './utils/helpers';
 import { WatchlistPanel } from './components/panels/WatchlistPanel';
 import { MarketOverviewPanel } from './components/panels/MarketOverviewPanel';
 import { PriceChartPanel } from './components/panels/PriceChartPanel';
@@ -19,81 +21,195 @@ import Signup from './components/Signup';
 import { getSession, signOut, getPhantomAuth, getMetaMaskAuth, verifyAuthentication } from './utils/auth';
 import { isSupabaseConfigured } from './utils/supabase';
 
+// Market limit options
+const MARKET_LIMITS = [10, 25, 50, 100];
+const REFRESH_INTERVAL = 15000; // 15 seconds
+
 const Terminal = ({ onLogout }) => {
   const { watchlist } = useWatchlist();
-  const [markets] = useState(MARKETS_DATABASE);
+  const [markets, setMarkets] = useState([]);
+  const [loadingMarkets, setLoadingMarkets] = useState(true);
+  const [marketLimit, setMarketLimit] = useState(25); // Default 25 markets
   const [platformFilter, setPlatformFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [selectedMarket, setSelectedMarket] = useState(null);
   const [command, setCommand] = useState("");
   const [workspace, setWorkspace] = useState("analysis");
   const [time, setTime] = useState(new Date());
-  const [leftWidth, setLeftWidth] = useState(260);
+  const [leftWidth, setLeftWidth] = useState(300);
   const [detailHeight, setDetailHeight] = useState(220);
   const [analyticsWidth, setAnalyticsWidth] = useState(420);
+  const [loadingUrl, setLoadingUrl] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [lastRefresh, setLastRefresh] = useState(null);
   const dragStateRef = useRef({ type: null, startX: 0, startY: 0, startVal: 0 });
 
-  useEffect(() => {
-    if (!selectedMarket && markets.length > 0) {
-      setSelectedMarket(markets[0]);
+  // Load markets from Polymarket API
+  const loadMarkets = useCallback(async (limit = marketLimit, isManual = false) => {
+    try {
+      if (isManual) setLoadingMarkets(true);
+      setStatusMessage("Syncing...");
+      const data = await PolymarketAPI.fetchOpenEvents(limit);
+
+      // Add price history and orderbook to each market
+      const enrichedMarkets = data.map(market => ({
+        ...market,
+        price_history: generatePriceHistory(market.market_prob, 90),
+        orderbook: generateOrderbook(market.market_prob),
+      }));
+
+      setMarkets(enrichedMarkets);
+      if (enrichedMarkets.length > 0 && !selectedMarket) {
+        setSelectedMarket(enrichedMarkets[0]);
+      }
+      setLastRefresh(new Date());
+      setStatusMessage(`${enrichedMarkets.length} markets`);
+      setTimeout(() => setStatusMessage(""), 2000);
+    } catch (error) {
+      console.error('Failed to load markets:', error);
+      setStatusMessage("Sync failed");
+    } finally {
+      setLoadingMarkets(false);
     }
-  }, [markets]);
+  }, [marketLimit, selectedMarket]);
+
+  // Initial load and refresh interval
+  useEffect(() => {
+    loadMarkets(marketLimit, true);
+    const interval = setInterval(() => loadMarkets(marketLimit, false), REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, [marketLimit]);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Handle market limit change
+  const handleLimitChange = (newLimit) => {
+    setMarketLimit(newLimit);
+    loadMarkets(newLimit, true);
+  };
+
+  // Handle loading market from URL
+  const loadMarketFromUrl = async (url) => {
+    if (!url.trim()) return;
+
+    try {
+      setLoadingUrl(true);
+      setStatusMessage("Loading...");
+
+      const market = await PolymarketAPI.fetchEventBySlug(url);
+
+      const enrichedMarket = {
+        ...market,
+        price_history: generatePriceHistory(market.market_prob, 90),
+        orderbook: generateOrderbook(market.market_prob),
+      };
+
+      setMarkets(prev => {
+        const exists = prev.some(m => m.id === enrichedMarket.id);
+        if (exists) {
+          return prev.map(m => m.id === enrichedMarket.id ? enrichedMarket : m);
+        }
+        return [enrichedMarket, ...prev];
+      });
+
+      setSelectedMarket(enrichedMarket);
+      setStatusMessage(`Loaded: ${market.ticker}`);
+      setTimeout(() => setStatusMessage(""), 2000);
+    } catch (error) {
+      console.error('Failed to load market from URL:', error);
+      setStatusMessage("Failed - check URL");
+      setTimeout(() => setStatusMessage(""), 3000);
+    } finally {
+      setLoadingUrl(false);
+    }
+  };
+
   const handleCommand = (e) => {
     if (e.key === "Enter" && command) {
-      const cmd = command.toUpperCase().trim();
-      const market = markets.find((m) => m.ticker === cmd);
+      const cmd = command.trim();
+
+      if (cmd.includes('polymarket.com')) {
+        loadMarketFromUrl(cmd);
+        setCommand("");
+        return;
+      }
+
+      const cmdUpper = cmd.toUpperCase();
+      const market = markets.find((m) => m.ticker === cmdUpper);
       if (market) {
         setSelectedMarket(market);
         setCommand("");
         return;
       }
-      if (["ANALYSIS", "ANA"].includes(cmd)) setWorkspace("analysis");
-      else if (["PORTFOLIO", "PORT"].includes(cmd)) setWorkspace("portfolio");
-      else if (["LAB", "QUANTUM"].includes(cmd)) setWorkspace("lab");
-      else if (["NEWS", "FEED"].includes(cmd)) setWorkspace("news");
-      else if (["BETS", "MARKETS"].includes(cmd)) setWorkspace("bets");
+      if (["ANALYSIS", "ANA"].includes(cmdUpper)) setWorkspace("analysis");
+      else if (["PORTFOLIO", "PORT"].includes(cmdUpper)) setWorkspace("portfolio");
+      else if (["LAB", "QUANTUM"].includes(cmdUpper)) setWorkspace("lab");
+      else if (["NEWS", "FEED"].includes(cmdUpper)) setWorkspace("news");
+      else if (["BETS", "MARKETS"].includes(cmdUpper)) setWorkspace("bets");
+      else if (["REFRESH", "RELOAD"].includes(cmdUpper)) {
+        loadMarkets(marketLimit, true);
+      }
       setCommand("");
     }
   };
 
-  const filteredMarkets = useMemo(() => {
-    // Combine markets database with watchlist items
+  // Get unique categories from markets
+  const categories = useMemo(() => {
+    const cats = new Set(markets.map(m => m.category || 'Other'));
+    return ['all', ...Array.from(cats).sort()];
+  }, [markets]);
+
+  // Filter and group markets
+  const { filteredMarkets, groupedMarkets } = useMemo(() => {
     const allMarkets = [...markets, ...watchlist];
-    // Remove duplicates by id
     const uniqueMarkets = Array.from(
       new Map(allMarkets.map((m) => [m.id, m])).values()
     );
+
     let filtered = uniqueMarkets;
     if (platformFilter !== "all") {
-      filtered = uniqueMarkets.filter(
-        (m) => m.platform?.toLowerCase() === platformFilter
-      );
+      filtered = filtered.filter(m => m.platform?.toLowerCase() === platformFilter);
     }
-    return filtered;
-  }, [markets, watchlist, platformFilter]);
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter(m => m.category === categoryFilter);
+    }
+
+    // Group by category
+    const grouped = filtered.reduce((acc, market) => {
+      const cat = market.category || 'Other';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(market);
+      return acc;
+    }, {});
+
+    // Sort markets within each category by edge
+    Object.keys(grouped).forEach(cat => {
+      grouped[cat].sort((a, b) => {
+        const edgeA = Math.abs((a.model_prob || 0) - (a.market_prob || 0));
+        const edgeB = Math.abs((b.model_prob || 0) - (b.market_prob || 0));
+        return edgeB - edgeA;
+      });
+    });
+
+    return { filteredMarkets: filtered, groupedMarkets: grouped };
+  }, [markets, watchlist, platformFilter, categoryFilter]);
 
   const handleNewsSelect = (newsItem) => {
     const tickers = newsItem.markets || [];
     const targetMarket = markets.find((m) => tickers.includes(m.ticker));
-
     if (targetMarket) {
-      const platform = targetMarket.platform.toLowerCase();
-      setPlatformFilter(platform);
+      setPlatformFilter("all");
       setSelectedMarket(targetMarket);
       setWorkspace("analysis");
     }
   };
 
-  // Use refs to store handler functions to avoid stale closures in event listeners
   const onDragRef = useRef(null);
   const stopDragRef = useRef(null);
 
-  // Memoized drag handler to prevent memory leaks
   const onDrag = useCallback((event) => {
     const state = dragStateRef.current;
     if (!state.type) return;
@@ -121,7 +237,6 @@ const Terminal = ({ onLogout }) => {
     }
   }, []);
 
-  // Memoized stop drag handler
   const stopDrag = useCallback(() => {
     dragStateRef.current = { type: null, startX: 0, startY: 0, startVal: 0 };
     if (onDragRef.current) {
@@ -132,7 +247,6 @@ const Terminal = ({ onLogout }) => {
     }
   }, []);
 
-  // Store refs to handlers
   onDragRef.current = onDrag;
   stopDragRef.current = stopDrag;
 
@@ -148,70 +262,67 @@ const Terminal = ({ onLogout }) => {
     window.addEventListener("mouseup", stopDrag);
   }, [leftWidth, detailHeight, analyticsWidth, onDrag, stopDrag]);
 
-  // Cleanup on unmount
   useEffect(() => {
     const currentOnDrag = onDragRef.current;
     const currentStopDrag = stopDragRef.current;
     return () => {
-      if (currentOnDrag) {
-        window.removeEventListener("mousemove", currentOnDrag);
-      }
-      if (currentStopDrag) {
-        window.removeEventListener("mouseup", currentStopDrag);
-      }
+      if (currentOnDrag) window.removeEventListener("mousemove", currentOnDrag);
+      if (currentStopDrag) window.removeEventListener("mouseup", currentStopDrag);
     };
   }, []);
 
-  const tickerItems = markets.slice(0, 12).map((m) => {
-    const edge = m.model_prob - m.market_prob;
-    const change = m.market_prob - m.prev_prob;
-    return (
-      <span key={m.id} className="inline-flex items-center gap-1 mx-3 text-xs">
-        <span className="text-orange-500 font-bold">{m.ticker}</span>
-        <span className="text-gray-400">{(m.market_prob * 100).toFixed(1)}¢</span>
-        <span className={change > 0 ? "positive" : change < 0 ? "negative" : "text-gray-500"}>
-          {change > 0 ? "▲" : change < 0 ? "▼" : "•"} {Math.abs(change * 100).toFixed(1)}
+  // Bloomberg-style ticker tape
+  const tickerItems = useMemo(() => {
+    return markets.slice(0, 20).map((m) => {
+      const edge = m.model_prob - m.market_prob;
+      const change = m.market_prob - (m.prev_prob || m.market_prob);
+      return (
+        <span
+          key={m.id}
+          className="inline-flex items-center gap-1.5 mx-4 text-xs cursor-pointer hover:bg-gray-800/50 px-2 py-0.5 rounded"
+          onClick={() => setSelectedMarket(m)}
+        >
+          <span className="text-orange-500 font-bold">{m.ticker}</span>
+          <span className="text-white font-medium">{(m.market_prob * 100).toFixed(1)}¢</span>
+          <span className={change > 0 ? "text-green-400" : change < 0 ? "text-red-400" : "text-gray-500"}>
+            {change > 0 ? "+" : ""}{(change * 100).toFixed(2)}
+          </span>
+          {Math.abs(edge) > 0.02 && (
+            <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${
+              edge > 0 ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
+            }`}>
+              {edge > 0 ? "BUY" : "SELL"}
+            </span>
+          )}
         </span>
-        <span className={edge > 0 ? "positive" : "negative"}>
-          [{edge > 0 ? "+" : ""}{(edge * 100).toFixed(1)}%]
-        </span>
-      </span>
-    );
-  });
+      );
+    });
+  }, [markets]);
 
   const renderRightGrid = () => {
     if (workspace === "analysis") {
+      // Clean 3x2 grid layout - no overlapping
       return (
-        <div className="h-full flex flex-col gap-1.5">
-          <div className="flex gap-1.5" style={{ flex: "0 0 48%" }}>
-            <div className="flex-1">
-              <MarketOverviewPanel market={selectedMarket} />
-            </div>
-            <div className="flex-1">
-              <PriceChartPanel market={selectedMarket} />
-            </div>
-            <div className="w-64">
-              <OrderBookPanel market={selectedMarket} />
-            </div>
+        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+          {/* Row 1 */}
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <MarketOverviewPanel market={selectedMarket} />
           </div>
-          <div id="analytics-container" className="flex-1 min-h-0 flex gap-1.5">
-            <div id="analytics-left" className="h-full" style={{ flex: `0 0 ${analyticsWidth}px` }}>
-              <ConfluencePanel market={selectedMarket} />
-            </div>
-            <div className="split-handle-x" onMouseDown={(e) => startDrag("analytics", e)} />
-            <div className="flex-1 min-w-0 grid grid-rows-2 gap-1.5">
-              <div className="row-span-1">
-                <ModelBreakdownPanel market={selectedMarket} />
-              </div>
-              <div className="row-span-1 grid grid-cols-2 gap-1.5">
-                <div className="col-span-1">
-                  <GreeksPanel market={selectedMarket} />
-                </div>
-                <div className="col-span-1">
-                  <MonteCarloPanel market={selectedMarket} />
-                </div>
-              </div>
-            </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <PriceChartPanel market={selectedMarket} />
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <ConfluencePanel market={selectedMarket} />
+          </div>
+          {/* Row 2 */}
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <ModelBreakdownPanel market={selectedMarket} />
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <MonteCarloPanel market={selectedMarket} />
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <GreeksPanel market={selectedMarket} />
           </div>
         </div>
       );
@@ -219,21 +330,21 @@ const Terminal = ({ onLogout }) => {
 
     if (workspace === "portfolio") {
       return (
-        <div className="h-full grid grid-cols-10 grid-rows-6 gap-1.5">
-          <div className="col-span-3 row-span-6">
-            <PortfolioPanel positions={PORTFOLIO_POSITIONS} markets={MARKETS_DATABASE} />
+        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+          <div className="col-span-1 row-span-2 min-h-0 overflow-hidden">
+            <PortfolioPanel positions={PORTFOLIO_POSITIONS} markets={markets} />
           </div>
-          <div className="col-span-4 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <PriceChartPanel market={selectedMarket} />
           </div>
-          <div className="col-span-3 row-span-3">
-            <GreeksPanel market={selectedMarket} />
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <OrderBookPanel market={selectedMarket} />
           </div>
-          <div className="col-span-4 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <MonteCarloPanel market={selectedMarket} />
           </div>
-          <div className="col-span-3 row-span-3">
-            <OrderBookPanel market={selectedMarket} />
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <GreeksPanel market={selectedMarket} />
           </div>
         </div>
       );
@@ -241,20 +352,20 @@ const Terminal = ({ onLogout }) => {
 
     if (workspace === "lab") {
       return (
-        <div className="h-full grid grid-cols-10 grid-rows-6 gap-1.5">
-          <div className="col-span-3 row-span-6">
-            <QuantumLabPanel markets={MARKETS_DATABASE} />
+        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+          <div className="col-span-1 row-span-2 min-h-0 overflow-hidden">
+            <QuantumLabPanel markets={markets} />
           </div>
-          <div className="col-span-4 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <MonteCarloPanel market={selectedMarket} />
           </div>
-          <div className="col-span-3 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <ConfluencePanel market={selectedMarket} />
           </div>
-          <div className="col-span-4 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <ModelBreakdownPanel market={selectedMarket} />
           </div>
-          <div className="col-span-3 row-span-3">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <GreeksPanel market={selectedMarket} />
           </div>
         </div>
@@ -263,37 +374,39 @@ const Terminal = ({ onLogout }) => {
 
     if (workspace === "news") {
       return (
-        <div className="h-full">
-          <NewsFeedPanel news={NEWS_FEED} onNewsClick={handleNewsSelect} fullPage />
+        <div className="h-full overflow-hidden">
+          <NewsFeedPanel news={[]} onNewsClick={handleNewsSelect} fullPage />
         </div>
       );
     }
 
     if (workspace === "bets") {
       return (
-        <div className="h-full">
+        <div className="h-full overflow-hidden">
           <BetsMarketPanel />
         </div>
       );
     }
 
-    // Default fallback - analysis view
+    // Default fallback - same as analysis
     return (
-      <div className="h-full flex flex-col gap-1.5">
-        <div className="flex gap-1.5" style={{ flex: "0 0 48%" }}>
-          <div className="flex-1">
-            <MarketOverviewPanel market={selectedMarket} />
-          </div>
-          <div className="flex-1">
-            <PriceChartPanel market={selectedMarket} />
-          </div>
-          <div className="w-64">
-            <OrderBookPanel market={selectedMarket} />
-          </div>
+      <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <MarketOverviewPanel market={selectedMarket} />
         </div>
-        <div className="flex-1 min-h-0 grid grid-cols-3 gap-1.5">
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <PriceChartPanel market={selectedMarket} />
+        </div>
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
           <ConfluencePanel market={selectedMarket} />
+        </div>
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <ModelBreakdownPanel market={selectedMarket} />
+        </div>
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
           <MonteCarloPanel market={selectedMarket} />
+        </div>
+        <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
           <GreeksPanel market={selectedMarket} />
         </div>
       </div>
@@ -301,49 +414,39 @@ const Terminal = ({ onLogout }) => {
   };
 
   return (
-    <div className="h-screen flex flex-col">
-      <div className="h-7 bg-[#080808] border-b border-gray-800 flex items-center justify-between px-3 flex-shrink-0">
+    <div className="h-screen flex flex-col bg-[#0a0a0a]">
+      {/* Header - Bloomberg style */}
+      <div className="h-8 bg-gradient-to-r from-[#0a0a0a] to-[#111] border-b border-orange-500/30 flex items-center justify-between px-3 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <span className="text-orange-500 font-bold text-base tracking-wide">
-            LEET<span className="text-white ml-0.5">QUANTUM</span>
-            <span className="text-orange-400 ml-0.5">TERMINAL</span>
-            <span className="bg-orange-500 text-black text-[9px] px-1 py-0.5 rounded ml-2 font-bold">PRO</span>
-          </span>
+          <div className="flex items-center">
+            <span className="text-orange-500 font-black text-lg tracking-tight">LEET</span>
+            <span className="text-white font-bold text-lg">QUANTUM</span>
+            <span className="text-orange-400 font-bold text-lg ml-1">TERMINAL</span>
+            <span className="bg-orange-500 text-black text-[8px] px-1.5 py-0.5 rounded ml-2 font-black">PRO</span>
+          </div>
+          <div className="h-4 w-px bg-gray-700" />
           <div className="flex">
             {["analysis", "portfolio", "lab", "news", "bets"].map((ws) => (
               <button
                 key={ws}
                 onClick={() => setWorkspace(ws)}
-                className={`workspace-tab ${workspace === ws ? "active" : ""}`}
+                className={`px-3 py-1 text-xs font-medium transition-all ${
+                  workspace === ws
+                    ? "text-orange-400 border-b-2 border-orange-500"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
               >
                 {ws.toUpperCase()}
               </button>
             ))}
           </div>
-          <div className="flex border-l border-gray-800 pl-3 ml-2">
-            <button
-              onClick={() => setPlatformFilter("all")}
-              className={`workspace-tab ${platformFilter === "all" ? "active" : ""}`}
-            >
-              ALL
-            </button>
-            <button
-              onClick={() => setPlatformFilter("polymarket")}
-              className={`workspace-tab ${platformFilter === "polymarket" ? "active" : ""}`}
-            >
-              POLY
-            </button>
-            <button
-              onClick={() => setPlatformFilter("kalshi")}
-              className={`workspace-tab ${platformFilter === "kalshi" ? "active" : ""}`}
-            >
-              KALSHI
-            </button>
-          </div>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          <span className="text-gray-600">Polymarket • Kalshi</span>
-          <span className="mono text-orange-500">{time.toLocaleTimeString()}</span>
+          {statusMessage && (
+            <span className="text-orange-400 animate-pulse">{statusMessage}</span>
+          )}
+          <span className="text-gray-600">POLYMARKET</span>
+          <span className="mono text-orange-500 font-medium">{time.toLocaleTimeString()}</span>
           <button
             onClick={onLogout}
             className="btn text-xs hover:bg-red-500/20 hover:text-red-400"
@@ -354,34 +457,94 @@ const Terminal = ({ onLogout }) => {
         </div>
       </div>
 
-      <div className="ticker-tape h-5 flex items-center text-xs mono flex-shrink-0">
-        <div className="ticker-content">{tickerItems}{tickerItems}</div>
+      {/* Bloomberg-style Ticker Tape */}
+      <div className="ticker-tape h-6 flex items-center text-xs mono flex-shrink-0 bg-[#050505] border-b border-gray-800">
+        {loadingMarkets ? (
+          <span className="text-gray-500 px-4">Loading live markets...</span>
+        ) : markets.length === 0 ? (
+          <span className="text-gray-500 px-4">No markets loaded - paste a Polymarket URL below</span>
+        ) : (
+          <div className="ticker-content">{tickerItems}{tickerItems}</div>
+        )}
       </div>
 
-      <div className="h-7 bg-[#080808] border-b border-gray-800 flex items-center px-2 gap-2 flex-shrink-0">
-        <span className="text-orange-500 text-xs">❯</span>
+      {/* Command Bar with Controls */}
+      <div className="h-8 bg-[#080808] border-b border-gray-800 flex items-center px-2 gap-2 flex-shrink-0">
+        <span className="text-orange-500 text-xs font-bold">GO</span>
         <input
           type="text"
           value={command}
           onChange={(e) => setCommand(e.target.value)}
           onKeyDown={handleCommand}
-          placeholder="Enter command or ticker (BTC150K, FEDQ1, GPT5, NEWS, PORT, LAB, BETS)..."
-          className="cmd-input flex-1 px-2 py-1 text-xs"
+          placeholder="Paste Polymarket URL or enter ticker..."
+          className="flex-1 px-2 py-1 text-xs bg-transparent border-none outline-none text-gray-300 placeholder-gray-600"
         />
+
+        {/* Market Limit Selector */}
+        <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
+          <span className="text-[10px] text-gray-500">LIMIT:</span>
+          {MARKET_LIMITS.map(limit => (
+            <button
+              key={limit}
+              onClick={() => handleLimitChange(limit)}
+              className={`text-[10px] px-1.5 py-0.5 rounded transition-all ${
+                marketLimit === limit
+                  ? 'bg-orange-500 text-black font-bold'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {limit}
+            </button>
+          ))}
+        </div>
+
+        {/* Category Filter */}
+        <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
+          <span className="text-[10px] text-gray-500">CAT:</span>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="text-[10px] bg-transparent text-gray-400 border border-gray-700 rounded px-1 py-0.5 outline-none"
+          >
+            {categories.map(cat => (
+              <option key={cat} value={cat} className="bg-gray-900">
+                {cat === 'all' ? 'ALL' : cat.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="h-4 w-px bg-gray-700" />
         <div className="flex gap-1">
-          <button className="btn text-xs">HELP</button>
-          <button className="btn text-xs">⚙</button>
+          <button
+            onClick={() => command && loadMarketFromUrl(command)}
+            disabled={loadingUrl || !command}
+            className={`btn text-[10px] px-3 py-1 ${loadingUrl ? 'opacity-50' : ''}`}
+          >
+            {loadingUrl ? '...' : 'ANALYZE'}
+          </button>
+          <button
+            onClick={() => loadMarkets(marketLimit, true)}
+            disabled={loadingMarkets}
+            className={`btn text-[10px] px-2 py-1 ${loadingMarkets ? 'opacity-50' : ''}`}
+            title="Refresh markets (auto every 15s)"
+          >
+            SYNC
+          </button>
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="flex-1 min-h-0 p-1.5">
         <div className="h-full flex flex-col gap-1.5">
           <div className="flex-1 min-h-0 flex gap-1.5">
             <div className="h-full min-w-[140px]" style={{ flex: `0 0 ${leftWidth}px` }}>
               <WatchlistPanel
                 markets={filteredMarkets}
+                groupedMarkets={groupedMarkets}
                 selectedId={selectedMarket?.id}
                 onSelect={setSelectedMarket}
+                categoryFilter={categoryFilter}
               />
             </div>
             <div className="split-handle-x" onMouseDown={(e) => startDrag("left", e)} />
@@ -396,21 +559,35 @@ const Terminal = ({ onLogout }) => {
         </div>
       </div>
 
-      <div className="h-6 bg-[#080808] border-t border-gray-800 flex items-center justify-between px-3 text-xs flex-shrink-0">
+      {/* Footer - Bloomberg style */}
+      <div className="h-6 bg-gradient-to-r from-[#080808] to-[#0a0a0a] border-t border-orange-500/20 flex items-center justify-between px-3 text-xs flex-shrink-0">
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-gray-500">LIVE</span>
+            <span className={`w-2 h-2 rounded-full ${loadingMarkets ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`} />
+            <span className="text-gray-500">{loadingMarkets ? 'SYNCING' : 'LIVE'}</span>
           </span>
-          <span className="text-gray-600">Markets: <span className="text-orange-400">{markets.length}</span></span>
           <span className="text-gray-600">
-            Signals: <span className="text-green-400">{markets.filter((m) => Math.abs(m.model_prob - m.market_prob) > 0.03).length}</span>
+            Markets: <span className="text-orange-400 font-medium">{filteredMarkets.length}</span>
+            {categoryFilter !== 'all' && <span className="text-gray-500">/{markets.length}</span>}
           </span>
+          <span className="text-gray-600">
+            Signals: <span className="text-green-400 font-medium">
+              {filteredMarkets.filter((m) => Math.abs(m.model_prob - m.market_prob) > 0.03).length}
+            </span>
+          </span>
+          <span className="text-gray-600">
+            Refresh: <span className="text-gray-500">15s</span>
+          </span>
+          {selectedMarket && (
+            <span className="text-gray-600">
+              <span className="text-orange-400">{selectedMarket.ticker}</span>
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-orange-500/70 text-[10px]">LEET QUANTUM TERMINAL</span>
-          <span className="text-yellow-500/80 text-[10px]">⚠ Analysis Only</span>
-          <span className="text-gray-600">v2.0.0</span>
+          <span className="text-orange-500/70 font-medium">LEET QUANTUM TERMINAL</span>
+          <span className="text-yellow-500/80">ANALYSIS ONLY</span>
+          <span className="text-gray-600">v3.1.0</span>
         </div>
       </div>
     </div>
@@ -428,14 +605,14 @@ const App = () => {
     const checkAuth = async () => {
       // Verify authentication is valid
       const verification = await verifyAuthentication();
-      
+
       if (verification.isValid) {
         setIsAuthenticated(true);
         setAuthInfo(verification);
         localStorage.setItem('isAuthenticated', 'true');
-        
+
         // Log auth info for debugging
-        console.log('✅ Authentication verified:', {
+        console.log('Authentication verified:', {
           type: verification.authType,
           hasJWT: !!verification.user?.jwtToken || !!verification.session?.access_token,
           user: verification.user?.publicKey || verification.user?.address || verification.user?.email,
@@ -444,11 +621,11 @@ const App = () => {
         setIsAuthenticated(false);
         setAuthInfo(null);
         localStorage.removeItem('isAuthenticated');
-        
+
         // Log why auth failed
-        console.warn('❌ Authentication failed:', verification.reason || 'Unknown reason');
+        console.warn('Authentication failed:', verification.reason || 'Unknown reason');
       }
-      
+
       setLoading(false);
     };
 
@@ -470,11 +647,11 @@ const App = () => {
               setIsAuthenticated(true);
               setAuthInfo(verification);
               localStorage.setItem('isAuthenticated', 'true');
-              console.log('✅ OAuth callback verified:', verification.authType);
+              console.log('OAuth callback verified:', verification.authType);
               // Clean up URL
               window.history.replaceState({}, document.title, window.location.pathname);
             } else {
-              console.error('❌ OAuth callback verification failed:', verification.reason);
+              console.error('OAuth callback verification failed:', verification.reason);
               setIsAuthenticated(false);
             }
           }
@@ -490,9 +667,9 @@ const App = () => {
       setIsAuthenticated(true);
       setAuthInfo(verification);
       localStorage.setItem('isAuthenticated', 'true');
-      console.log('✅ Login verified:', verification.authType);
+      console.log('Login verified:', verification.authType);
     } else {
-      console.error('❌ Login verification failed:', verification.reason);
+      console.error('Login verification failed:', verification.reason);
       // Don't set authenticated if verification fails
     }
   };
@@ -504,9 +681,9 @@ const App = () => {
       setIsAuthenticated(true);
       setAuthInfo(verification);
       localStorage.setItem('isAuthenticated', 'true');
-      console.log('✅ Signup verified:', verification.authType);
+      console.log('Signup verified:', verification.authType);
     } else {
-      console.error('❌ Signup verification failed:', verification.reason);
+      console.error('Signup verification failed:', verification.reason);
       // Don't set authenticated if verification fails
     }
   };
@@ -535,4 +712,3 @@ const App = () => {
 };
 
 export default App;
-

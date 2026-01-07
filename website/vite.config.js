@@ -18,7 +18,12 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/polymarket/, ''),
         secure: true,
       },
+      '/api/clob': {
+        target: 'https://clob.polymarket.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/clob/, ''),
+        secure: true,
+      },
     },
   },
 })
-
