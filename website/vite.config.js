@@ -10,7 +10,6 @@ export default defineConfig({
       '602bbd8f7052.ngrok-free.app',
       '.ngrok-free.app', // Allow all ngrok subdomains
       '.ngrok.io', // Allow legacy ngrok domains
-      'localhost',
     ],
     proxy: {
       '/api/polymarket': {
@@ -18,29 +17,8 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/polymarket/, ''),
         secure: true,
-        configure: (proxy, options) => {
-          proxy.on('error', (err, req, res) => {
-            console.warn('Polymarket proxy error:', err.message);
-          });
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            proxyReq.setHeader('Accept', 'application/json');
-          });
-        },
-      },
-      '/api/clob': {
-        target: 'https://clob.polymarket.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/clob/, ''),
-        secure: true,
-        configure: (proxy, options) => {
-          proxy.on('error', (err, req, res) => {
-            console.warn('CLOB proxy error:', err.message);
-          });
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            proxyReq.setHeader('Accept', 'application/json');
-          });
-        },
       },
     },
   },
 })
+

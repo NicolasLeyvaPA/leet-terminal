@@ -12,10 +12,8 @@ export const PriceChartPanel = ({ market }) => {
   return (
     <div className="terminal-panel h-full">
       <PanelHeader title="PRICE" subtitle={`${market.ticker} 90D`} />
-      <div className="panel-content p-1 flex flex-col">
-        <div className="flex-1 min-h-0">
-          <PriceChart data={market.price_history} />
-        </div>
+      <div className="panel-content p-1">
+        <PriceChart data={market.price_history} height={140} />
       </div>
     </div>
   );

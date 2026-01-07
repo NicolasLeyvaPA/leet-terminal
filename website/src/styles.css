@@ -31,8 +31,6 @@ body {
   border-radius: 3px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  min-height: 0;
 }
 
 .panel-header {
@@ -51,7 +49,6 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  min-height: 0;
 }
 
 .data-row {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
 
-export const PriceChart = ({ data }) => {
+export const PriceChart = ({ data, height = 120 }) => {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
   const [error, setError] = useState(null);
@@ -92,16 +92,15 @@ export const PriceChart = ({ data }) => {
 
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-500 text-xs">
+      <div
+        style={{ height }}
+        className="flex items-center justify-center text-gray-500 text-xs"
+      >
         {error}
       </div>
     );
   }
 
-  return (
-    <div className="h-full w-full">
-      <canvas ref={canvasRef} className="h-full w-full" />
-    </div>
-  );
+  return <canvas ref={canvasRef} style={{ height }} />;
 };
 
