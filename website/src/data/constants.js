@@ -1,4 +1,5 @@
-// Constants - No fake data, all markets loaded from Polymarket API
+// Constants - Markets loaded from Polymarket API
+// Static market definitions below serve as fallback/reference
 
 // Empty markets database - will be populated from API
 export const MARKETS_DATABASE = [];
