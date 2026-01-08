@@ -18,6 +18,12 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/polymarket/, ''),
         secure: true,
       },
+      '/api/polymarket-data': {
+        target: 'https://data-api.polymarket.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/polymarket-data/, ''),
+        secure: true,
+      },
     },
   },
 })

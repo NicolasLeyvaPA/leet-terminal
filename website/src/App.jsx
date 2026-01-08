@@ -16,10 +16,12 @@ import { MarketDetailDock } from './components/MarketDetailDock';
 import { useWatchlist } from './utils/useWatchlist';
 import Login from './components/Login';
 import Signup from './components/Signup';
+import PolymarketLinkModal from './components/PolymarketLinkModal';
+import SettingsModal from './components/SettingsModal';
 import { getSession, signOut, getPhantomAuth, getMetaMaskAuth, verifyAuthentication } from './utils/auth';
-import { isSupabaseConfigured } from './utils/supabase';
+import { isSupabaseConfigured, supabase } from './utils/supabase';
 
-const Terminal = ({ onLogout }) => {
+const Terminal = ({ onLogout, onOpenSettings }) => {
   const { watchlist } = useWatchlist();
   const [markets] = useState(MARKETS_DATABASE);
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -370,7 +372,13 @@ const Terminal = ({ onLogout }) => {
         />
         <div className="flex gap-1">
           <button className="btn text-xs">HELP</button>
-          <button className="btn text-xs">⚙</button>
+          <button 
+            onClick={onOpenSettings}
+            className="btn text-xs hover:bg-orange-500/20 hover:text-orange-400"
+            title="Settings"
+          >
+            ⚙
+          </button>
         </div>
       </div>
 
@@ -422,6 +430,50 @@ const App = () => {
   const [showSignup, setShowSignup] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authInfo, setAuthInfo] = useState(null);
+  const [showPolymarketModal, setShowPolymarketModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsKey, setSettingsKey] = useState(0); // Force re-render of settings modal
+
+  // Helper function to get user identifier for localStorage key
+  const getUserIdentifier = (verification) => {
+    if (!verification || !verification.user) return null;
+    return verification.user?.publicKey || 
+           verification.user?.address || 
+           verification.user?.email ||
+           verification.user?.id ||
+           null;
+  };
+
+  // Check if user has seen the Polymarket prompt
+  const hasSeenPolymarketPrompt = (userIdentifier) => {
+    if (!userIdentifier) return true; // Don't show if we can't identify user
+    const key = `polymarket_prompt_shown_${userIdentifier}`;
+    return localStorage.getItem(key) === 'true';
+  };
+
+  // Mark Polymarket prompt as shown
+  const markPolymarketPromptShown = async (userIdentifier, action) => {
+    if (!userIdentifier) return;
+    
+    const key = `polymarket_prompt_shown_${userIdentifier}`;
+    localStorage.setItem(key, 'true');
+    localStorage.setItem(`polymarket_link_preference_${userIdentifier}`, action); // 'linked' or 'skipped'
+    
+    // Also store in Supabase if configured and user has auth
+    if (isSupabaseConfigured() && authInfo?.user?.jwtToken) {
+      try {
+        // Try to get wallet_user_id from auth
+        const userId = authInfo.user?.id;
+        if (userId) {
+          // Store preference in Supabase user_preferences if we have wallet_user_id
+          // This would require additional logic to get wallet_user_id from auth_user_id
+          // For now, we'll just use localStorage
+        }
+      } catch (error) {
+        console.warn('Failed to store preference in Supabase:', error);
+      }
+    }
+  };
 
   // Check authentication status on mount
   useEffect(() => {
@@ -440,6 +492,12 @@ const App = () => {
           hasJWT: !!verification.user?.jwtToken || !!verification.session?.access_token,
           user: verification.user?.publicKey || verification.user?.address || verification.user?.email,
         });
+
+        // Check if user is new and should see Polymarket prompt
+        const userIdentifier = getUserIdentifier(verification);
+        if (userIdentifier && !hasSeenPolymarketPrompt(userIdentifier)) {
+          setShowPolymarketModal(true);
+        }
       } else {
         setIsAuthenticated(false);
         setAuthInfo(null);
@@ -471,6 +529,13 @@ const App = () => {
               setAuthInfo(verification);
               localStorage.setItem('isAuthenticated', 'true');
               console.log('✅ OAuth callback verified:', verification.authType);
+              
+              // Check if user is new and should see Polymarket prompt
+              const userIdentifier = getUserIdentifier(verification);
+              if (userIdentifier && !hasSeenPolymarketPrompt(userIdentifier)) {
+                setShowPolymarketModal(true);
+              }
+              
               // Clean up URL
               window.history.replaceState({}, document.title, window.location.pathname);
             } else {
@@ -491,6 +556,12 @@ const App = () => {
       setAuthInfo(verification);
       localStorage.setItem('isAuthenticated', 'true');
       console.log('✅ Login verified:', verification.authType);
+
+      // Check if user is new and should see Polymarket prompt
+      const userIdentifier = getUserIdentifier(verification);
+      if (userIdentifier && !hasSeenPolymarketPrompt(userIdentifier)) {
+        setShowPolymarketModal(true);
+      }
     } else {
       console.error('❌ Login verification failed:', verification.reason);
       // Don't set authenticated if verification fails
@@ -505,6 +576,12 @@ const App = () => {
       setAuthInfo(verification);
       localStorage.setItem('isAuthenticated', 'true');
       console.log('✅ Signup verified:', verification.authType);
+
+      // New user - show Polymarket prompt
+      const userIdentifier = getUserIdentifier(verification);
+      if (userIdentifier) {
+        setShowPolymarketModal(true);
+      }
     } else {
       console.error('❌ Signup verification failed:', verification.reason);
       // Don't set authenticated if verification fails
@@ -514,6 +591,172 @@ const App = () => {
   const handleLogout = async () => {
     await signOut();
     setIsAuthenticated(false);
+    setShowPolymarketModal(false);
+  };
+
+  const handlePolymarketLink = async (walletAddress) => {
+    if (!authInfo) {
+      console.warn('⚠️ No auth info available for Polymarket linking');
+      setShowPolymarketModal(false);
+      return;
+    }
+    
+    const userIdentifier = getUserIdentifier(authInfo);
+    if (userIdentifier) {
+      await markPolymarketPromptShown(userIdentifier, 'linked');
+      
+      // Store the linked wallet address
+      if (walletAddress) {
+        localStorage.setItem(`polymarket_linked_address_${userIdentifier}`, walletAddress);
+        console.log('💾 Stored linked wallet address:', walletAddress);
+        
+        // Fetch Polymarket profile data
+        try {
+          const { fetchPolymarketProfile } = await import('./utils/polymarket');
+          const profileResult = await fetchPolymarketProfile(walletAddress);
+          
+          if (profileResult.success && profileResult.data) {
+            localStorage.setItem(`polymarket_proxy_wallet_${userIdentifier}`, profileResult.data.proxyWallet);
+            localStorage.setItem(`polymarket_username_${userIdentifier}`, profileResult.data.username);
+            console.log('✅ Polymarket profile fetched:', {
+              proxyWallet: profileResult.data.proxyWallet,
+              username: profileResult.data.username,
+            });
+          } else {
+            console.warn('⚠️ Failed to fetch Polymarket profile:', profileResult.error);
+          }
+        } catch (error) {
+          console.error('❌ Error fetching Polymarket profile:', error);
+        }
+      }
+    }
+    setShowPolymarketModal(false);
+    
+    console.log('🔗 Polymarket linking completed');
+  };
+
+  const handlePolymarketSkip = async () => {
+    if (!authInfo) {
+      console.warn('⚠️ No auth info available for Polymarket skip');
+      setShowPolymarketModal(false);
+      return;
+    }
+    
+    const userIdentifier = getUserIdentifier(authInfo);
+    if (userIdentifier) {
+      await markPolymarketPromptShown(userIdentifier, 'skipped');
+    }
+    setShowPolymarketModal(false);
+    console.log('⏭️ Polymarket linking skipped');
+  };
+
+  const handleOpenSettings = () => {
+    setShowSettingsModal(true);
+  };
+
+  const handleCloseSettings = () => {
+    setShowSettingsModal(false);
+  };
+
+  const handleSettingsPolymarketLink = async (walletAddress) => {
+    if (!authInfo) {
+      console.warn('⚠️ No auth info available for Polymarket linking');
+      return;
+    }
+    
+    const userIdentifier = getUserIdentifier(authInfo);
+    if (userIdentifier) {
+      await markPolymarketPromptShown(userIdentifier, 'linked');
+      
+      // Store the linked wallet address
+      if (walletAddress) {
+        localStorage.setItem(`polymarket_linked_address_${userIdentifier}`, walletAddress);
+        console.log('💾 Stored linked wallet address:', walletAddress);
+        
+        // Fetch Polymarket profile data
+        try {
+          const { fetchPolymarketProfile } = await import('./utils/polymarket');
+          const profileResult = await fetchPolymarketProfile(walletAddress);
+          
+          if (profileResult.success && profileResult.data) {
+            localStorage.setItem(`polymarket_proxy_wallet_${userIdentifier}`, profileResult.data.proxyWallet);
+            localStorage.setItem(`polymarket_username_${userIdentifier}`, profileResult.data.username);
+            console.log('✅ Polymarket profile fetched:', {
+              proxyWallet: profileResult.data.proxyWallet,
+              username: profileResult.data.username,
+            });
+          } else {
+            console.warn('⚠️ Failed to fetch Polymarket profile:', profileResult.error);
+          }
+        } catch (error) {
+          console.error('❌ Error fetching Polymarket profile:', error);
+        }
+      }
+      
+      // Force settings modal to re-render with updated state
+      setSettingsKey(prev => prev + 1);
+    }
+    
+    console.log('🔗 Polymarket linking completed');
+  };
+
+  const handleSettingsPolymarketUnlink = async () => {
+    if (!authInfo) {
+      console.warn('⚠️ No auth info available for Polymarket unlinking');
+      return;
+    }
+    
+    const userIdentifier = getUserIdentifier(authInfo);
+    if (userIdentifier) {
+      // Clear the link preference, linked address, and profile data
+      localStorage.removeItem(`polymarket_link_preference_${userIdentifier}`);
+      localStorage.removeItem(`polymarket_linked_address_${userIdentifier}`);
+      localStorage.removeItem(`polymarket_proxy_wallet_${userIdentifier}`);
+      localStorage.removeItem(`polymarket_username_${userIdentifier}`);
+      
+      // Optionally clear the prompt shown flag to allow showing the welcome modal again
+      // localStorage.removeItem(`polymarket_prompt_shown_${userIdentifier}`);
+      
+      // Force settings modal to re-render with updated state
+      setSettingsKey(prev => prev + 1);
+      
+      console.log('🔓 Polymarket account unlinked');
+    }
+  };
+
+  // Get the linked Polymarket wallet address
+  const getPolymarketLinkedAddress = () => {
+    if (!authInfo) return null;
+    const userIdentifier = getUserIdentifier(authInfo);
+    if (!userIdentifier) return null;
+    return localStorage.getItem(`polymarket_linked_address_${userIdentifier}`);
+  };
+
+  // Get Polymarket profile data
+  const getPolymarketProfile = () => {
+    if (!authInfo) return null;
+    const userIdentifier = getUserIdentifier(authInfo);
+    if (!userIdentifier) return null;
+    
+    const proxyWallet = localStorage.getItem(`polymarket_proxy_wallet_${userIdentifier}`);
+    const username = localStorage.getItem(`polymarket_username_${userIdentifier}`);
+    
+    if (proxyWallet || username) {
+      return {
+        proxyWallet,
+        username,
+      };
+    }
+    return null;
+  };
+
+  // Check if Polymarket is linked
+  const isPolymarketLinked = () => {
+    if (!authInfo) return false;
+    const userIdentifier = getUserIdentifier(authInfo);
+    if (!userIdentifier) return false;
+    const preference = localStorage.getItem(`polymarket_link_preference_${userIdentifier}`);
+    return preference === 'linked';
   };
 
   if (loading) {
@@ -531,7 +774,28 @@ const App = () => {
     return <Login onLogin={handleLogin} onSwitchToSignup={() => setShowSignup(true)} />;
   }
 
-  return <Terminal onLogout={handleLogout} />;
+  return (
+    <>
+      <Terminal onLogout={handleLogout} onOpenSettings={handleOpenSettings} />
+      {showPolymarketModal && (
+        <PolymarketLinkModal
+          onLink={handlePolymarketLink}
+          onSkip={handlePolymarketSkip}
+        />
+      )}
+      {showSettingsModal && (
+        <SettingsModal
+          key={settingsKey}
+          onClose={handleCloseSettings}
+          onLinkPolymarket={handleSettingsPolymarketLink}
+          onUnlinkPolymarket={handleSettingsPolymarketUnlink}
+          isPolymarketLinked={isPolymarketLinked()}
+          linkedAddress={getPolymarketLinkedAddress()}
+          polymarketProfile={getPolymarketProfile()}
+        />
+      )}
+    </>
+  );
 };
 
 export default App;
