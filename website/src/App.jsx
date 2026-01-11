@@ -14,8 +14,11 @@ import { PortfolioPanel } from './components/panels/PortfolioPanel';
 import { QuantumLabPanel } from './components/panels/QuantumLabPanel';
 import { NewsFeedPanel } from './components/panels/NewsFeedPanel';
 import { BetsMarketPanel } from './components/panels/BetsMarketPanel';
+import { ArbitrageOpportunitiesPanel } from './components/panels/ArbitrageOpportunitiesPanel';
+import { ArbitrageBotPanel } from './components/panels/ArbitrageBotPanel';
 import { MarketDetailDock } from './components/MarketDetailDock';
 import { useWatchlist } from './utils/useWatchlist';
+import { getArbitrageBot } from './utils/arbitrageEngine';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import { getSession, signOut, getPhantomAuth, getMetaMaskAuth, verifyAuthentication } from './utils/auth';
@@ -36,6 +39,9 @@ const Terminal = ({ onLogout }) => {
   const [command, setCommand] = useState("");
   const [workspace, setWorkspace] = useState("analysis");
   const [time, setTime] = useState(new Date());
+
+  // Initialize arbitrage bot
+  const arbitrageBot = useMemo(() => getArbitrageBot(), []);
   const [leftWidth, setLeftWidth] = useState(300);
   const [detailHeight, setDetailHeight] = useState(220);
   const [analyticsWidth, setAnalyticsWidth] = useState(420);
@@ -149,6 +155,7 @@ const Terminal = ({ onLogout }) => {
       else if (["LAB", "QUANTUM"].includes(cmdUpper)) setWorkspace("lab");
       else if (["NEWS", "FEED"].includes(cmdUpper)) setWorkspace("news");
       else if (["BETS", "MARKETS"].includes(cmdUpper)) setWorkspace("bets");
+      else if (["ARB", "ARBITRAGE", "BOT"].includes(cmdUpper)) setWorkspace("arbitrage");
       else if (["REFRESH", "RELOAD"].includes(cmdUpper)) {
         loadMarkets(marketLimit, true);
       }
@@ -388,6 +395,19 @@ const Terminal = ({ onLogout }) => {
       );
     }
 
+    if (workspace === "arbitrage") {
+      return (
+        <div className="h-full grid grid-cols-3 grid-rows-1 gap-1.5 overflow-hidden">
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <ArbitrageBotPanel bot={arbitrageBot} />
+          </div>
+          <div className="col-span-2 row-span-1 min-h-0 overflow-hidden">
+            <ArbitrageOpportunitiesPanel bot={arbitrageBot} />
+          </div>
+        </div>
+      );
+    }
+
     // Default fallback - same as analysis
     return (
       <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
@@ -426,7 +446,7 @@ const Terminal = ({ onLogout }) => {
           </div>
           <div className="h-4 w-px bg-gray-700" />
           <div className="flex">
-            {["analysis", "portfolio", "lab", "news", "bets"].map((ws) => (
+            {["analysis", "portfolio", "lab", "arbitrage", "news", "bets"].map((ws) => (
               <button
                 key={ws}
                 onClick={() => setWorkspace(ws)}

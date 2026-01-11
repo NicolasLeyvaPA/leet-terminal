@@ -41,6 +41,37 @@ export default defineConfig({
           });
         },
       },
+      // Crypto exchange proxies for arbitrage bot
+      '/api/binance': {
+        target: 'https://api.binance.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/binance/, ''),
+        secure: true,
+      },
+      '/api/kraken': {
+        target: 'https://api.kraken.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/kraken/, ''),
+        secure: true,
+      },
+      '/api/kucoin': {
+        target: 'https://api.kucoin.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/kucoin/, ''),
+        secure: true,
+      },
+      '/api/bybit': {
+        target: 'https://api.bybit.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/bybit/, ''),
+        secure: true,
+      },
+      '/api/coinbase': {
+        target: 'https://api.coinbase.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/coinbase/, ''),
+        secure: true,
+      },
     },
   },
 })
