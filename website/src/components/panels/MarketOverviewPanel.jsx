@@ -179,6 +179,50 @@ export const MarketOverviewPanel = ({ market }) => {
             />
           </div>
         </div>
+
+        {/* Multi-Option Markets Display */}
+        {market.isMultiOption && market.allOutcomes && market.allOutcomes.length > 0 && (
+          <div className="border-t border-gray-800 pt-2 mt-2">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-[10px] text-purple-400 font-bold">
+                ALL OPTIONS ({market.marketCount || market.allOutcomes.length})
+              </div>
+              <div className="text-[9px] text-purple-400/60 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20">
+                MULTI-OUTCOME
+              </div>
+            </div>
+            <div className="space-y-1 max-h-28 overflow-y-auto scrollbar-thin">
+              {market.allOutcomes.slice(0, 12).map((outcome, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between text-[10px] bg-gray-900/40 rounded px-2 py-1 border border-gray-800/50 hover:border-purple-500/30 transition-colors"
+                >
+                  <span className="text-gray-300 truncate flex-1 mr-2">
+                    {idx + 1}. {outcome.name}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white font-mono font-bold">
+                      {(outcome.probability * 100).toFixed(1)}%
+                    </span>
+                    <div
+                      className="w-12 h-1.5 bg-gray-800 rounded-full overflow-hidden"
+                    >
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
+                        style={{ width: `${Math.min(outcome.probability * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {market.allOutcomes.length > 12 && (
+                <div className="text-[9px] text-gray-500 text-center py-1">
+                  +{market.allOutcomes.length - 12} more options
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -119,57 +119,71 @@ const PolymarketOpportunityCard = ({ opportunity }) => {
 
   if (!opportunity) return null;
 
-  const { market, type, totalProbability, spreadPercent, action, venue } = opportunity;
+  const { market, type, totalProbability, deviationPercent, theoreticalEdge, action, venue, riskNote } = opportunity;
   const isOverround = type === 'OVERROUND';
 
+  // Format total probability as percentage (1.05 → "105.0%")
+  const totalProbDisplay = (totalProbability * 100).toFixed(1);
+
   return (
-    <div className="bg-gray-900/50 rounded border border-gray-800 p-2 mb-2">
+    <div className="bg-gray-900/50 rounded border border-gray-800 p-3 mb-2">
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] text-gray-400 truncate">{market?.question?.slice(0, 60)}...</div>
-          <div className="flex items-center gap-2 mt-1">
-            <span className={`text-[9px] px-1.5 py-0.5 rounded border ${
+          <div className="text-[11px] text-gray-300 font-medium truncate">{market?.question}</div>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold ${
               isOverround
                 ? 'bg-red-500/20 text-red-400 border-red-500/30'
                 : 'bg-green-500/20 text-green-400 border-green-500/30'
             }`}>
               {type}
             </span>
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
-              {venue?.toUpperCase()}
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
+              {market?.outcomes?.length || 0} OPTIONS
             </span>
           </div>
         </div>
-        <div className={`text-lg font-bold ${isOverround ? 'text-red-400' : 'text-green-400'}`}>
-          {spreadPercent}%
+        <div className="text-right">
+          <div className={`text-xl font-bold ${isOverround ? 'text-red-400' : 'text-green-400'}`}>
+            {deviationPercent}%
+          </div>
+          <div className="text-[9px] text-gray-500">edge</div>
         </div>
       </div>
 
-      {/* Probability analysis */}
-      <div className="bg-gray-800/50 rounded p-2 mb-2">
-        <div className="flex justify-between text-[10px] mb-1">
-          <span className="text-gray-500">Total Probability</span>
-          <span className={totalProbability > 1 ? 'text-red-400' : 'text-green-400'}>
-            {formatPercent(totalProbability * 100)}
+      {/* Probability analysis - clean display */}
+      <div className="bg-gray-800/50 rounded p-2 mb-2 space-y-1.5">
+        <div className="flex justify-between text-[10px]">
+          <span className="text-gray-500">Probability Sum</span>
+          <span className={totalProbability > 1 ? 'text-red-400 font-bold' : 'text-green-400 font-bold'}>
+            {totalProbDisplay}%
           </span>
         </div>
         <div className="flex justify-between text-[10px]">
-          <span className="text-gray-500">Mispricing</span>
-          <span className="text-orange-400 font-bold">{spreadPercent}%</span>
+          <span className="text-gray-500">Fair Value</span>
+          <span className="text-gray-400">100.0%</span>
         </div>
-        <div className="flex justify-between text-[10px] mt-1">
-          <span className="text-gray-500">Strategy</span>
-          <span className="text-yellow-400">{action}</span>
+        <div className="flex justify-between text-[10px]">
+          <span className="text-gray-500">Deviation</span>
+          <span className={`font-bold ${isOverround ? 'text-red-400' : 'text-green-400'}`}>
+            {isOverround ? '+' : '-'}{deviationPercent}%
+          </span>
         </div>
+      </div>
+
+      {/* Strategy */}
+      <div className="text-[10px] text-yellow-400 bg-yellow-500/10 rounded px-2 py-1.5 mb-2 border border-yellow-500/20">
+        {action}
       </div>
 
       {/* Expandable outcomes */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="text-[9px] text-gray-500 hover:text-gray-300 w-full text-left"
+        className="text-[9px] text-gray-500 hover:text-gray-300 w-full text-left flex items-center gap-1"
       >
-        {expanded ? '▼ Hide Outcomes' : `▶ Show ${market?.outcomes?.length || 0} Outcomes`}
+        <span>{expanded ? '▼' : '▶'}</span>
+        <span>Show {market?.outcomes?.length || 0} Outcomes</span>
       </button>
 
       {expanded && market?.outcomes && (
@@ -177,18 +191,26 @@ const PolymarketOpportunityCard = ({ opportunity }) => {
           {market.outcomes.map((outcome, idx) => (
             <div key={idx} className="flex justify-between text-[10px] bg-gray-800/30 rounded px-2 py-1">
               <span className="text-gray-400 truncate flex-1">{outcome.name}</span>
-              <span className="text-white font-mono ml-2">{formatPercent(outcome.probability * 100)}</span>
+              <span className="text-white font-mono ml-2">{(outcome.probability * 100).toFixed(1)}%</span>
             </div>
           ))}
+          <div className="border-t border-gray-700 pt-1 mt-1">
+            <div className="flex justify-between text-[10px] font-bold">
+              <span className="text-gray-400">TOTAL</span>
+              <span className={totalProbability > 1 ? 'text-red-400' : 'text-green-400'}>
+                {totalProbDisplay}%
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Info note */}
-      <div className="mt-2 text-[9px] text-gray-500 italic">
-        {isOverround
-          ? 'Probabilities sum > 100% — market may be overpriced'
-          : 'Probabilities sum < 100% — potential buying opportunity'}
-      </div>
+      {/* Risk note */}
+      {riskNote && (
+        <div className="mt-2 text-[9px] text-gray-500 italic">
+          {riskNote}
+        </div>
+      )}
     </div>
   );
 };

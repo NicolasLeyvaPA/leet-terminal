@@ -17,6 +17,7 @@ import { BetsMarketPanel } from './components/panels/BetsMarketPanel';
 import { ArbitrageOpportunitiesPanel } from './components/panels/ArbitrageOpportunitiesPanel';
 import { ArbitrageBotPanel } from './components/panels/ArbitrageBotPanel';
 import { PredictionArbPanel } from './components/panels/PredictionArbPanel';
+import { LiveTradesPanel } from './components/panels/LiveTradesPanel';
 import { MarketDetailDock } from './components/MarketDetailDock';
 import { useWatchlist } from './utils/useWatchlist';
 import { getArbitrageBot } from './utils/arbitrageEngine';
@@ -315,28 +316,32 @@ const Terminal = ({ onLogout }) => {
 
   const renderRightGrid = () => {
     if (workspace === "analysis") {
-      // Clean 3x2 grid layout - no overlapping
+      // Clean 3x3 grid layout with OrderBook integrated
       return (
-        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+        <div className="h-full grid grid-cols-3 gap-1.5 overflow-hidden" style={{ gridTemplateRows: '1fr 1fr 0.6fr' }}>
           {/* Row 1 */}
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <div className="col-span-1 min-h-0 overflow-hidden">
             <MarketOverviewPanel market={selectedMarket} />
           </div>
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <div className="col-span-1 min-h-0 overflow-hidden">
             <PriceChartPanel market={selectedMarket} />
           </div>
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <div className="col-span-1 min-h-0 overflow-hidden">
             <ConfluencePanel market={selectedMarket} />
           </div>
           {/* Row 2 */}
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <div className="col-span-1 min-h-0 overflow-hidden">
             <ModelBreakdownPanel market={selectedMarket} />
           </div>
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <div className="col-span-1 min-h-0 overflow-hidden">
             <MonteCarloPanel market={selectedMarket} />
           </div>
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+          <div className="col-span-1 min-h-0 overflow-hidden">
             <GreeksPanel market={selectedMarket} />
+          </div>
+          {/* Row 3: OrderBook spanning full width */}
+          <div className="col-span-3 min-h-0 overflow-hidden">
+            <OrderBookPanel market={selectedMarket} horizontal />
           </div>
         </div>
       );
@@ -403,54 +408,74 @@ const Terminal = ({ onLogout }) => {
     }
 
     if (workspace === "arbitrage") {
+      // CUTTING-EDGE ARBITRAGE TERMINAL
+      // Premium trading terminal feel with live execution feed
       return (
-        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
-          {/* Row 1: Prediction Market Arbitrage (Polymarket ↔ Kalshi) */}
-          <div className="col-span-1 row-span-2 min-h-0 overflow-hidden">
-            <PredictionArbPanel bot={predictionArbBot} />
-          </div>
-          {/* Row 1: Crypto Spot Arbitrage Controls */}
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <ArbitrageBotPanel bot={arbitrageBot} />
-          </div>
-          {/* Row 1: Crypto Opportunities */}
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <ArbitrageOpportunitiesPanel bot={arbitrageBot} />
-          </div>
-          {/* Row 2: Additional panels for monitoring */}
-          <div className="col-span-2 row-span-1 min-h-0 overflow-hidden">
-            <div className="terminal-panel h-full flex flex-col">
-              <div className="panel-header flex items-center justify-between">
-                <span>ARBITRAGE MONITOR</span>
-                <span className="text-[10px] text-gray-500">Cross-Venue Analytics</span>
+        <div className="h-full flex flex-col gap-1.5 overflow-hidden">
+          {/* Top bar - Terminal header with key metrics */}
+          <div className="flex-shrink-0 bg-gradient-to-r from-gray-900 via-gray-900 to-orange-900/20 rounded border border-orange-500/20 p-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-orange-500 animate-pulse" />
+                  <span className="text-orange-400 font-black text-sm tracking-wider">ARB TERMINAL</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">v2.0</span>
+                </div>
+                <div className="h-4 w-px bg-gray-700" />
+                <div className="flex items-center gap-4 text-[10px]">
+                  <div>
+                    <span className="text-gray-500">POLY:</span>
+                    <span className="text-orange-400 font-bold ml-1">{markets.length}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">MULTI:</span>
+                    <span className="text-purple-400 font-bold ml-1">{markets.filter(m => m.isMultiOption).length}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">KALSHI:</span>
+                    <span className="text-blue-400 font-bold ml-1">--</span>
+                  </div>
+                </div>
               </div>
-              <div className="panel-content flex-1 p-2 grid grid-cols-4 gap-2">
-                <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
-                  <div className="text-[9px] text-gray-500">POLYMARKET</div>
-                  <div className="text-lg font-bold text-orange-400">{markets.length}</div>
-                  <div className="text-[9px] text-gray-600">markets loaded</div>
+              <div className="flex items-center gap-3">
+                <div className={`flex items-center gap-1.5 px-2 py-1 rounded ${
+                  predictionArbBot.isRunning
+                    ? 'bg-green-500/20 border border-green-500/30'
+                    : 'bg-gray-800 border border-gray-700'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${predictionArbBot.isRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
+                  <span className={`text-[10px] font-bold ${predictionArbBot.isRunning ? 'text-green-400' : 'text-gray-500'}`}>
+                    {predictionArbBot.isRunning ? 'RUNNING' : 'STOPPED'}
+                  </span>
                 </div>
-                <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
-                  <div className="text-[9px] text-gray-500">MULTI-OPTION</div>
-                  <div className="text-lg font-bold text-purple-400">
-                    {markets.filter(m => m.isMultiOption).length}
-                  </div>
-                  <div className="text-[9px] text-gray-600">sports/events</div>
+                <div className="text-[10px] text-gray-500 mono">
+                  {new Date().toLocaleTimeString()}
                 </div>
-                <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
-                  <div className="text-[9px] text-gray-500">KALSHI</div>
-                  <div className="text-lg font-bold text-blue-400">--</div>
-                  <div className="text-[9px] text-gray-600">requires API key</div>
-                </div>
-                <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
-                  <div className="text-[9px] text-gray-500">BOT STATUS</div>
-                  <div className={`text-lg font-bold ${predictionArbBot.isRunning ? 'text-green-400' : 'text-gray-500'}`}>
-                    {predictionArbBot.isRunning ? 'ON' : 'OFF'}
-                  </div>
-                  <div className="text-[9px] text-gray-600">
-                    {predictionArbBot.opportunities?.length || 0} opps
-                  </div>
-                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main content area */}
+          <div className="flex-1 min-h-0 grid grid-cols-12 gap-1.5">
+            {/* Left column - Opportunities & Controls */}
+            <div className="col-span-4 flex flex-col gap-1.5 min-h-0">
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <PredictionArbPanel bot={predictionArbBot} />
+              </div>
+            </div>
+
+            {/* Center column - LIVE TRADES (BIG) */}
+            <div className="col-span-5 min-h-0 overflow-hidden">
+              <LiveTradesPanel bot={predictionArbBot} />
+            </div>
+
+            {/* Right column - Crypto Arb */}
+            <div className="col-span-3 flex flex-col gap-1.5 min-h-0">
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ArbitrageBotPanel bot={arbitrageBot} />
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ArbitrageOpportunitiesPanel bot={arbitrageBot} />
               </div>
             </div>
           </div>
@@ -606,25 +631,19 @@ const Terminal = ({ onLogout }) => {
 
       {/* Main Content */}
       <div className="flex-1 min-h-0 p-1.5">
-        <div className="h-full flex flex-col gap-1.5">
-          <div className="flex-1 min-h-0 flex gap-1.5">
-            <div className="h-full min-w-[140px]" style={{ flex: `0 0 ${leftWidth}px` }}>
-              <WatchlistPanel
-                markets={filteredMarkets}
-                groupedMarkets={groupedMarkets}
-                selectedId={selectedMarket?.id}
-                onSelect={setSelectedMarket}
-                categoryFilter={categoryFilter}
-              />
-            </div>
-            <div className="split-handle-x" onMouseDown={(e) => startDrag("left", e)} />
-            <div className="flex-1 min-w-0 h-full">
-              {renderRightGrid()}
-            </div>
+        <div className="h-full flex gap-1.5">
+          <div className="h-full min-w-[140px]" style={{ flex: `0 0 ${leftWidth}px` }}>
+            <WatchlistPanel
+              markets={filteredMarkets}
+              groupedMarkets={groupedMarkets}
+              selectedId={selectedMarket?.id}
+              onSelect={setSelectedMarket}
+              categoryFilter={categoryFilter}
+            />
           </div>
-          <div className="split-handle-y" onMouseDown={(e) => startDrag("detail", e)} />
-          <div className="min-h-[80px]" style={{ flex: `0 0 ${detailHeight}px` }}>
-            <MarketDetailDock market={selectedMarket} show={true} onToggle={() => {}} />
+          <div className="split-handle-x" onMouseDown={(e) => startDrag("left", e)} />
+          <div className="flex-1 min-w-0 h-full">
+            {renderRightGrid()}
           </div>
         </div>
       </div>

@@ -798,43 +798,86 @@ export class PredictionMarketArbitrageBot {
 
   /**
    * Find opportunities within Polymarket (same-venue arb on multi-option markets)
-   * This works even without Kalshi data
+   *
+   * ARBITRAGE MATH:
+   * - In a fair market, all mutually exclusive outcomes should sum to 100% (1.0)
+   * - OVERROUND: Sum > 100% = bookmaker margin, favorable to sell all
+   * - UNDERROUND: Sum < 100% = rare, favorable to buy all
+   *
+   * Example: 3-outcome market (A, B, C are mutually exclusive)
+   *   Fair: P(A) + P(B) + P(C) = 1.0 (100%)
+   *   Overround: 0.35 + 0.40 + 0.30 = 1.05 (105%) → 5% edge by selling all
+   *   Underround: 0.30 + 0.35 + 0.25 = 0.90 (90%) → 10% edge by buying all
    */
   findPolymarketOpportunities() {
     const opportunities = [];
 
     for (const market of this.polymarkets) {
-      // Skip markets without multi-option data
-      if (!market.allOutcomes || market.allOutcomes.length < 2) continue;
+      // ONLY process true multi-option markets (3+ mutually exclusive outcomes)
+      // Binary markets (Yes/No) always sum to 1.0 and aren't arbitrage opportunities
+      if (!market.isMultiOption || !market.allOutcomes || market.allOutcomes.length < 3) {
+        continue;
+      }
 
-      // Check if probabilities sum to more than 1 (overround = arb opportunity)
-      const totalProb = market.allOutcomes.reduce((sum, o) => sum + (o.probability || 0), 0);
+      // Validate all probabilities are in valid range [0, 1]
+      const validOutcomes = market.allOutcomes.filter(o => {
+        const p = o.probability;
+        return typeof p === 'number' && !isNaN(p) && p >= 0 && p <= 1;
+      });
 
-      // Also check for underround (probs sum to less than 1)
-      if (totalProb > 1.02 || totalProb < 0.98) {
-        const spread = Math.abs(1 - totalProb);
+      if (validOutcomes.length < 3) continue;
+
+      // Sum probabilities - for mutually exclusive events, should equal 1.0
+      const totalProb = validOutcomes.reduce((sum, o) => sum + o.probability, 0);
+
+      // Sanity check: probabilities should be close to 1.0 (between 0.5 and 2.0)
+      // Values outside this range indicate data issues, not real arbitrage
+      if (totalProb < 0.5 || totalProb > 2.0) {
+        console.warn(`[Arb] Skipping ${market.ticker}: totalProb=${totalProb} (data issue)`);
+        continue;
+      }
+
+      // Calculate deviation from fair market (1.0 = 100%)
+      const deviation = totalProb - 1.0;
+      const deviationPercent = Math.abs(deviation) * 100;
+
+      // Only flag significant deviations (>2% from fair value)
+      // This filters out normal market noise and spread effects
+      if (deviationPercent > 2.0) {
+        const isOverround = deviation > 0;
 
         opportunities.push({
-          id: `poly_internal_${market.id}_${Date.now()}`,
-          type: totalProb > 1 ? 'OVERROUND' : 'UNDERROUND',
+          id: `poly_arb_${market.id}_${Date.now()}`,
+          type: isOverround ? 'OVERROUND' : 'UNDERROUND',
           market: {
             id: market.id,
             question: market.question,
             category: market.category,
-            outcomes: market.allOutcomes,
+            outcomes: validOutcomes,
           },
+          // Store as decimal (1.05 means 105%)
           totalProbability: totalProb,
-          spread: spread,
-          spreadPercent: (spread * 100).toFixed(2),
+          // Deviation from fair value
+          deviation: deviation,
+          deviationPercent: deviationPercent.toFixed(2),
+          // Theoretical edge (before costs)
+          theoreticalEdge: deviationPercent,
           timestamp: Date.now(),
           venue: 'polymarket',
-          action: totalProb > 1 ? 'Sell all outcomes' : 'Buy all outcomes',
+          // Action explanation
+          action: isOverround
+            ? `Sell all ${validOutcomes.length} outcomes (market overpriced by ${deviationPercent.toFixed(1)}%)`
+            : `Buy all ${validOutcomes.length} outcomes (market underpriced by ${deviationPercent.toFixed(1)}%)`,
+          // Risk note
+          riskNote: isOverround
+            ? 'Requires shorting capability and sufficient liquidity'
+            : 'Guaranteed profit if you can buy all outcomes at these prices',
         });
       }
     }
 
-    // Sort by spread (best opportunities first)
-    opportunities.sort((a, b) => b.spread - a.spread);
+    // Sort by theoretical edge (best opportunities first)
+    opportunities.sort((a, b) => b.theoreticalEdge - a.theoreticalEdge);
 
     return opportunities;
   }
