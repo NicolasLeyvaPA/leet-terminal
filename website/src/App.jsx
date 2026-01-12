@@ -19,6 +19,7 @@ import { ArbitrageOpportunitiesPanel } from './components/panels/ArbitrageOpport
 import { ArbitrageBotPanel } from './components/panels/ArbitrageBotPanel';
 import { PredictionArbPanel } from './components/panels/PredictionArbPanel';
 import { LiveTradesPanel } from './components/panels/LiveTradesPanel';
+import { FeedPanel } from './components/panels/FeedPanel';
 // MarketDetailDock removed - content now embedded in analysis grid
 import { useWatchlist } from './utils/useWatchlist';
 import { getArbitrageBot } from './utils/arbitrageEngine';
@@ -200,9 +201,10 @@ const Terminal = ({ onLogout }) => {
         return;
       }
       if (["ANALYSIS", "ANA"].includes(cmdUpper)) setWorkspace("analysis");
+      else if (["FEED", "TRENDING", "DISCOVER"].includes(cmdUpper)) setWorkspace("feed");
       else if (["PORTFOLIO", "PORT"].includes(cmdUpper)) setWorkspace("portfolio");
       else if (["LAB", "QUANTUM"].includes(cmdUpper)) setWorkspace("lab");
-      else if (["NEWS", "FEED"].includes(cmdUpper)) setWorkspace("news");
+      else if (["NEWS"].includes(cmdUpper)) setWorkspace("news");
       else if (["BETS", "MARKETS"].includes(cmdUpper)) setWorkspace("bets");
       else if (["ARB", "ARBITRAGE", "BOT"].includes(cmdUpper)) setWorkspace("arbitrage");
       else if (["REFRESH", "RELOAD"].includes(cmdUpper)) {
@@ -530,6 +532,25 @@ const Terminal = ({ onLogout }) => {
       );
     }
 
+    if (workspace === "feed") {
+      return (
+        <div className="h-full overflow-hidden">
+          <FeedPanel
+            polymarkets={markets}
+            kalshiMarkets={kalshiMarkets}
+            onSelectMarket={(market) => {
+              setSelectedMarket(market);
+              setWorkspace("analysis");
+            }}
+            onAddToWatchlist={(market) => {
+              // TODO: Add to watchlist functionality
+              console.log('Add to watchlist:', market.ticker);
+            }}
+          />
+        </div>
+      );
+    }
+
     // Default fallback - same as analysis
     return (
       <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
@@ -568,7 +589,7 @@ const Terminal = ({ onLogout }) => {
           </div>
           <div className="h-4 w-px bg-gray-700" />
           <div className="flex">
-            {["analysis", "portfolio", "lab", "arbitrage", "news", "bets"].map((ws) => (
+            {["analysis", "feed", "portfolio", "lab", "arbitrage", "news", "bets"].map((ws) => (
               <button
                 key={ws}
                 onClick={() => setWorkspace(ws)}
