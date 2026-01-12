@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { PanelHeader } from '../PanelHeader';
 import { PriceChart } from '../PriceChart';
+import { ExpandedChartModal } from '../ExpandedChartModal';
 
 // ============================================
 // PRICE CHART PANEL WITH NEWS EVENTS
 // Shows price history with news event markers
+// Supports fullscreen expansion
 // ============================================
 
 // Extract keywords from market question for news matching
@@ -46,18 +48,30 @@ const filterNewsForMarket = (news, market) => {
     return { ...item, relevanceScore: score };
   });
 
-  // Return top 5 relevant news items (score > 0)
+  // Return all relevant news sorted by score (for expanded view)
   return scored
     .filter(item => item.relevanceScore > 0)
-    .sort((a, b) => b.relevanceScore - a.relevanceScore)
-    .slice(0, 5);
+    .sort((a, b) => b.relevanceScore - a.relevanceScore);
 };
 
 export const PriceChartPanel = ({ market, news = [] }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   // Filter news relevant to this market
   const relevantNews = useMemo(() => {
     return filterNewsForMarket(news, market);
   }, [news, market]);
+
+  // Handle ESC key to close expanded view
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isExpanded) {
+        setIsExpanded(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isExpanded]);
 
   if (!market)
     return (
@@ -67,24 +81,48 @@ export const PriceChartPanel = ({ market, news = [] }) => {
     );
 
   return (
-    <div className="terminal-panel h-full">
-      <PanelHeader
-        title="PRICE"
-        subtitle={`${market.ticker} 90D`}
-        actions={
-          relevantNews.length > 0 && (
-            <span className="text-[9px] text-blue-400 px-1.5 py-0.5 bg-blue-500/10 rounded">
-              {relevantNews.length} news
-            </span>
-          )
-        }
-      />
-      <div className="panel-content p-1 flex flex-col">
+    <>
+      <div className="terminal-panel h-full flex flex-col">
+        <PanelHeader
+          title="PRICE"
+          subtitle={market.ticker}
+          actions={
+            <div className="flex items-center gap-1">
+              {relevantNews.length > 0 && (
+                <span className="text-[9px] text-blue-400 px-1.5 py-0.5 bg-blue-500/10 rounded">
+                  {relevantNews.length} news
+                </span>
+              )}
+              <button
+                onClick={() => setIsExpanded(true)}
+                className="text-[9px] text-gray-500 hover:text-orange-400 px-1.5 py-0.5 rounded hover:bg-gray-800 transition-colors"
+                title="Expand to fullscreen"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                </svg>
+              </button>
+            </div>
+          }
+        />
         <div className="flex-1 min-h-0">
-          <PriceChart data={market.price_history} newsEvents={relevantNews} />
+          <PriceChart
+            data={market.price_history}
+            newsEvents={relevantNews.slice(0, 10)}
+            onExpand={() => setIsExpanded(true)}
+            showControls={true}
+          />
         </div>
       </div>
-    </div>
+
+      {/* Expanded Chart Modal */}
+      <ExpandedChartModal
+        market={market}
+        news={relevantNews}
+        isOpen={isExpanded}
+        onClose={() => setIsExpanded(false)}
+      />
+    </>
   );
 };
 
