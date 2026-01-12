@@ -3,6 +3,7 @@ import { PanelHeader } from '../PanelHeader';
 import { DataRow } from '../DataRow';
 import { Tag } from '../Tag';
 import { QuantEngine } from '../../utils/quantEngine';
+import { MarketDetailModal } from '../MarketDetailModal';
 
 // ============================================
 // BEGINNER-FRIENDLY TOOLTIP COMPONENT
@@ -62,6 +63,8 @@ const formatTimeRemaining = (dateStr) => {
 };
 
 export const MarketOverviewPanel = ({ market }) => {
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
   if (!market)
     return (
       <div className="terminal-panel h-full flex items-center justify-center text-gray-600 text-xs">
@@ -237,15 +240,19 @@ export const MarketOverviewPanel = ({ market }) => {
               <div className="text-[10px] text-purple-400 font-bold">
                 ALL OPTIONS ({market.marketCount || market.allOutcomes.length})
               </div>
-              <div className="text-[9px] text-purple-400/60 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20">
-                MULTI-OUTCOME
-              </div>
+              <button
+                onClick={() => setShowDetailModal(true)}
+                className="text-[9px] text-orange-400 px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 transition-colors font-medium"
+              >
+                View All & Calculate Payouts →
+              </button>
             </div>
             <div className="space-y-1 max-h-28 overflow-y-auto scrollbar-thin">
-              {market.allOutcomes.slice(0, 12).map((outcome, idx) => (
+              {market.allOutcomes.slice(0, 6).map((outcome, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between text-[10px] bg-gray-900/40 rounded px-2 py-1 border border-gray-800/50 hover:border-purple-500/30 transition-colors"
+                  className="flex items-center justify-between text-[10px] bg-gray-900/40 rounded px-2 py-1 border border-gray-800/50 hover:border-purple-500/30 transition-colors cursor-pointer"
+                  onClick={() => setShowDetailModal(true)}
                 >
                   <span className="text-gray-300 truncate flex-1 mr-2">
                     {idx + 1}. {outcome.name}
@@ -254,9 +261,7 @@ export const MarketOverviewPanel = ({ market }) => {
                     <span className="text-white font-mono font-bold">
                       {(outcome.probability * 100).toFixed(1)}%
                     </span>
-                    <div
-                      className="w-12 h-1.5 bg-gray-800 rounded-full overflow-hidden"
-                    >
+                    <div className="w-12 h-1.5 bg-gray-800 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
                         style={{ width: `${Math.min(outcome.probability * 100, 100)}%` }}
@@ -265,14 +270,24 @@ export const MarketOverviewPanel = ({ market }) => {
                   </div>
                 </div>
               ))}
-              {market.allOutcomes.length > 12 && (
-                <div className="text-[9px] text-gray-500 text-center py-1">
-                  +{market.allOutcomes.length - 12} more options
-                </div>
+              {market.allOutcomes.length > 6 && (
+                <button
+                  onClick={() => setShowDetailModal(true)}
+                  className="text-[9px] text-orange-400 text-center py-1 w-full hover:text-orange-300 transition-colors"
+                >
+                  +{market.allOutcomes.length - 6} more options • Click to view all with payout calculator
+                </button>
               )}
             </div>
           </div>
         )}
+
+        {/* Market Detail Modal */}
+        <MarketDetailModal
+          market={market}
+          isOpen={showDetailModal}
+          onClose={() => setShowDetailModal(false)}
+        />
       </div>
     </div>
   );

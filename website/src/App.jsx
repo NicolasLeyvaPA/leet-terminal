@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { PORTFOLIO_POSITIONS } from './data/constants';
 import { PolymarketAPI } from './services/polymarketAPI';
 import { KalshiAPI } from './services/kalshiAPI';
+import { fetchAllNews, getMockNews } from './services/newsAPI';
 import { generatePriceHistory, generateOrderbook } from './utils/helpers';
 import { WatchlistPanel } from './components/panels/WatchlistPanel';
 import { MarketOverviewPanel } from './components/panels/MarketOverviewPanel';
@@ -20,8 +21,10 @@ import { ArbitrageBotPanel } from './components/panels/ArbitrageBotPanel';
 import { PredictionArbPanel } from './components/panels/PredictionArbPanel';
 import { LiveTradesPanel } from './components/panels/LiveTradesPanel';
 import { FeedPanel } from './components/panels/FeedPanel';
+import { LayoutSettings } from './components/LayoutSettings';
 // MarketDetailDock removed - content now embedded in analysis grid
 import { useWatchlist } from './utils/useWatchlist';
+import { useLayout } from './utils/useLayout';
 import { getArbitrageBot } from './utils/arbitrageEngine';
 import { getPredictionMarketArbitrageBot } from './utils/predictionMarketArbitrage';
 import Login from './components/Login';
@@ -37,8 +40,10 @@ const Terminal = ({ onLogout }) => {
   const { watchlist } = useWatchlist();
   const [markets, setMarkets] = useState([]);
   const [kalshiMarkets, setKalshiMarkets] = useState([]);
+  const [newsData, setNewsData] = useState([]);
   const [loadingMarkets, setLoadingMarkets] = useState(true);
   const [loadingKalshi, setLoadingKalshi] = useState(false);
+  const [loadingNews, setLoadingNews] = useState(false);
   const [marketLimit, setMarketLimit] = useState(25); // Default 25 markets
   const [platformFilter, setPlatformFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -46,6 +51,9 @@ const Terminal = ({ onLogout }) => {
   const [command, setCommand] = useState("");
   const [workspace, setWorkspace] = useState("analysis");
   const [time, setTime] = useState(new Date());
+
+  // Layout management for drag-and-drop panels
+  const layout = useLayout(workspace);
 
   // Initialize arbitrage bots
   const arbitrageBot = useMemo(() => getArbitrageBot(), []);
@@ -135,6 +143,42 @@ const Terminal = ({ onLogout }) => {
       clearInterval(kalshiInterval);
     };
   }, []);
+
+  // Load news from RSS feeds
+  const loadNews = useCallback(async () => {
+    try {
+      setLoadingNews(true);
+      console.log('[News] Fetching RSS feeds...');
+      const news = await fetchAllNews();
+
+      if (news.length > 0) {
+        setNewsData(news);
+        console.log(`[News] Loaded ${news.length} articles`);
+      } else {
+        // Fallback to mock news if RSS fails
+        console.log('[News] RSS failed, using mock data');
+        setNewsData(getMockNews());
+      }
+    } catch (error) {
+      console.warn('[News] Failed to load:', error.message);
+      // Fallback to mock news on error
+      setNewsData(getMockNews());
+    } finally {
+      setLoadingNews(false);
+    }
+  }, []);
+
+  // Load news on startup and refresh every 5 minutes
+  useEffect(() => {
+    // Initial load after short delay
+    const initialNewsLoad = setTimeout(() => loadNews(), 3000);
+    // Refresh news every 5 minutes (300000ms)
+    const newsInterval = setInterval(() => loadNews(), 300000);
+    return () => {
+      clearTimeout(initialNewsLoad);
+      clearInterval(newsInterval);
+    };
+  }, [loadNews]);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -437,7 +481,7 @@ const Terminal = ({ onLogout }) => {
     if (workspace === "news") {
       return (
         <div className="h-full overflow-hidden">
-          <NewsFeedPanel news={[]} onNewsClick={handleNewsSelect} fullPage />
+          <NewsFeedPanel news={newsData} onNewsClick={handleNewsSelect} fullPage />
         </div>
       );
     }
@@ -610,6 +654,16 @@ const Terminal = ({ onLogout }) => {
           )}
           <span className="text-gray-600">POLYMARKET</span>
           <span className="mono text-orange-500 font-medium">{time.toLocaleTimeString()}</span>
+          <LayoutSettings
+            panels={layout.panels}
+            panelInfo={layout.panelInfo}
+            visibility={layout.visibility}
+            toggleVisibility={layout.toggleVisibility}
+            collapsed={layout.collapsed}
+            toggleCollapsed={layout.toggleCollapsed}
+            movePanel={layout.movePanel}
+            resetLayout={layout.resetLayout}
+          />
           <button
             onClick={onLogout}
             className="btn text-xs hover:bg-red-500/20 hover:text-red-400"
