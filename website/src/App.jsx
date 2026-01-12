@@ -18,7 +18,7 @@ import { ArbitrageOpportunitiesPanel } from './components/panels/ArbitrageOpport
 import { ArbitrageBotPanel } from './components/panels/ArbitrageBotPanel';
 import { PredictionArbPanel } from './components/panels/PredictionArbPanel';
 import { LiveTradesPanel } from './components/panels/LiveTradesPanel';
-import { MarketDetailDock } from './components/MarketDetailDock';
+// MarketDetailDock removed - content now embedded in analysis grid
 import { useWatchlist } from './utils/useWatchlist';
 import { getArbitrageBot } from './utils/arbitrageEngine';
 import { getPredictionMarketArbitrageBot } from './utils/predictionMarketArbitrage';
@@ -51,6 +51,7 @@ const Terminal = ({ onLogout }) => {
   const [analyticsWidth, setAnalyticsWidth] = useState(420);
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  // lastRefresh tracking available but not displayed in current UI
   const [lastRefresh, setLastRefresh] = useState(null);
   const dragStateRef = useRef({ type: null, startX: 0, startY: 0, startVal: 0 });
 
