@@ -72,6 +72,19 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/coinbase/, ''),
         secure: true,
       },
+      // Kalshi API proxy for prediction market arbitrage
+      '/api/kalshi': {
+        target: 'https://trading-api.kalshi.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/kalshi/, ''),
+        secure: true,
+      },
+      '/api/kalshi-demo': {
+        target: 'https://demo-api.kalshi.co',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/kalshi-demo/, ''),
+        secure: true,
+      },
     },
   },
 })

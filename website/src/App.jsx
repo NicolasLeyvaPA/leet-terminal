@@ -16,9 +16,11 @@ import { NewsFeedPanel } from './components/panels/NewsFeedPanel';
 import { BetsMarketPanel } from './components/panels/BetsMarketPanel';
 import { ArbitrageOpportunitiesPanel } from './components/panels/ArbitrageOpportunitiesPanel';
 import { ArbitrageBotPanel } from './components/panels/ArbitrageBotPanel';
+import { PredictionArbPanel } from './components/panels/PredictionArbPanel';
 import { MarketDetailDock } from './components/MarketDetailDock';
 import { useWatchlist } from './utils/useWatchlist';
 import { getArbitrageBot } from './utils/arbitrageEngine';
+import { getPredictionMarketArbitrageBot } from './utils/predictionMarketArbitrage';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import { getSession, signOut, getPhantomAuth, getMetaMaskAuth, verifyAuthentication } from './utils/auth';
@@ -40,8 +42,9 @@ const Terminal = ({ onLogout }) => {
   const [workspace, setWorkspace] = useState("analysis");
   const [time, setTime] = useState(new Date());
 
-  // Initialize arbitrage bot
+  // Initialize arbitrage bots
   const arbitrageBot = useMemo(() => getArbitrageBot(), []);
+  const predictionArbBot = useMemo(() => getPredictionMarketArbitrageBot(), []);
   const [leftWidth, setLeftWidth] = useState(300);
   const [detailHeight, setDetailHeight] = useState(220);
   const [analyticsWidth, setAnalyticsWidth] = useState(420);
@@ -397,12 +400,49 @@ const Terminal = ({ onLogout }) => {
 
     if (workspace === "arbitrage") {
       return (
-        <div className="h-full grid grid-cols-3 grid-rows-1 gap-1.5 overflow-hidden">
+        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+          {/* Row 1: Prediction Market Arbitrage (Polymarket ↔ Kalshi) */}
+          <div className="col-span-1 row-span-2 min-h-0 overflow-hidden">
+            <PredictionArbPanel bot={predictionArbBot} />
+          </div>
+          {/* Row 1: Crypto Spot Arbitrage Controls */}
           <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <ArbitrageBotPanel bot={arbitrageBot} />
           </div>
-          <div className="col-span-2 row-span-1 min-h-0 overflow-hidden">
+          {/* Row 1: Crypto Opportunities */}
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <ArbitrageOpportunitiesPanel bot={arbitrageBot} />
+          </div>
+          {/* Row 2: Additional panels for monitoring */}
+          <div className="col-span-2 row-span-1 min-h-0 overflow-hidden">
+            <div className="terminal-panel h-full flex flex-col">
+              <div className="panel-header flex items-center justify-between">
+                <span>ARBITRAGE MONITOR</span>
+                <span className="text-[10px] text-gray-500">Cross-Venue Analytics</span>
+              </div>
+              <div className="panel-content flex-1 p-2 grid grid-cols-4 gap-2">
+                <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
+                  <div className="text-[9px] text-gray-500">POLYMARKET</div>
+                  <div className="text-lg font-bold text-orange-400">{markets.length}</div>
+                  <div className="text-[9px] text-gray-600">markets</div>
+                </div>
+                <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
+                  <div className="text-[9px] text-gray-500">KALSHI</div>
+                  <div className="text-lg font-bold text-blue-400">--</div>
+                  <div className="text-[9px] text-gray-600">requires API key</div>
+                </div>
+                <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
+                  <div className="text-[9px] text-gray-500">MATCHED PAIRS</div>
+                  <div className="text-lg font-bold text-green-400">0</div>
+                  <div className="text-[9px] text-gray-600">verified</div>
+                </div>
+                <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
+                  <div className="text-[9px] text-gray-500">ACTIVE OPPS</div>
+                  <div className="text-lg font-bold text-yellow-400">0</div>
+                  <div className="text-[9px] text-gray-600">profitable</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       );
