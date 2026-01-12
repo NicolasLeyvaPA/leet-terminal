@@ -71,6 +71,10 @@ const Terminal = ({ onLogout }) => {
       if (enrichedMarkets.length > 0 && !selectedMarket) {
         setSelectedMarket(enrichedMarkets[0]);
       }
+
+      // Pass market data to the prediction arbitrage bot
+      predictionArbBot.setMarketData(enrichedMarkets);
+
       setLastRefresh(new Date());
       setStatusMessage(`${enrichedMarkets.length} markets`);
       setTimeout(() => setStatusMessage(""), 2000);
@@ -80,7 +84,7 @@ const Terminal = ({ onLogout }) => {
     } finally {
       setLoadingMarkets(false);
     }
-  }, [marketLimit, selectedMarket]);
+  }, [marketLimit, selectedMarket, predictionArbBot]);
 
   // Initial load and refresh interval
   useEffect(() => {
@@ -424,7 +428,14 @@ const Terminal = ({ onLogout }) => {
                 <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
                   <div className="text-[9px] text-gray-500">POLYMARKET</div>
                   <div className="text-lg font-bold text-orange-400">{markets.length}</div>
-                  <div className="text-[9px] text-gray-600">markets</div>
+                  <div className="text-[9px] text-gray-600">markets loaded</div>
+                </div>
+                <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
+                  <div className="text-[9px] text-gray-500">MULTI-OPTION</div>
+                  <div className="text-lg font-bold text-purple-400">
+                    {markets.filter(m => m.isMultiOption).length}
+                  </div>
+                  <div className="text-[9px] text-gray-600">sports/events</div>
                 </div>
                 <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
                   <div className="text-[9px] text-gray-500">KALSHI</div>
@@ -432,14 +443,13 @@ const Terminal = ({ onLogout }) => {
                   <div className="text-[9px] text-gray-600">requires API key</div>
                 </div>
                 <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
-                  <div className="text-[9px] text-gray-500">MATCHED PAIRS</div>
-                  <div className="text-lg font-bold text-green-400">0</div>
-                  <div className="text-[9px] text-gray-600">verified</div>
-                </div>
-                <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
-                  <div className="text-[9px] text-gray-500">ACTIVE OPPS</div>
-                  <div className="text-lg font-bold text-yellow-400">0</div>
-                  <div className="text-[9px] text-gray-600">profitable</div>
+                  <div className="text-[9px] text-gray-500">BOT STATUS</div>
+                  <div className={`text-lg font-bold ${predictionArbBot.isRunning ? 'text-green-400' : 'text-gray-500'}`}>
+                    {predictionArbBot.isRunning ? 'ON' : 'OFF'}
+                  </div>
+                  <div className="text-[9px] text-gray-600">
+                    {predictionArbBot.opportunities?.length || 0} opps
+                  </div>
                 </div>
               </div>
             </div>

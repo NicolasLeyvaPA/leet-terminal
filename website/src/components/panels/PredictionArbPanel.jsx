@@ -113,11 +113,96 @@ const RiskMeter = ({ level, label }) => {
   );
 };
 
-// Opportunity card component
+// Polymarket internal opportunity card (overround/underround)
+const PolymarketOpportunityCard = ({ opportunity }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!opportunity) return null;
+
+  const { market, type, totalProbability, spreadPercent, action, venue } = opportunity;
+  const isOverround = type === 'OVERROUND';
+
+  return (
+    <div className="bg-gray-900/50 rounded border border-gray-800 p-2 mb-2">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] text-gray-400 truncate">{market?.question?.slice(0, 60)}...</div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`text-[9px] px-1.5 py-0.5 rounded border ${
+              isOverround
+                ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                : 'bg-green-500/20 text-green-400 border-green-500/30'
+            }`}>
+              {type}
+            </span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
+              {venue?.toUpperCase()}
+            </span>
+          </div>
+        </div>
+        <div className={`text-lg font-bold ${isOverround ? 'text-red-400' : 'text-green-400'}`}>
+          {spreadPercent}%
+        </div>
+      </div>
+
+      {/* Probability analysis */}
+      <div className="bg-gray-800/50 rounded p-2 mb-2">
+        <div className="flex justify-between text-[10px] mb-1">
+          <span className="text-gray-500">Total Probability</span>
+          <span className={totalProbability > 1 ? 'text-red-400' : 'text-green-400'}>
+            {formatPercent(totalProbability * 100)}
+          </span>
+        </div>
+        <div className="flex justify-between text-[10px]">
+          <span className="text-gray-500">Mispricing</span>
+          <span className="text-orange-400 font-bold">{spreadPercent}%</span>
+        </div>
+        <div className="flex justify-between text-[10px] mt-1">
+          <span className="text-gray-500">Strategy</span>
+          <span className="text-yellow-400">{action}</span>
+        </div>
+      </div>
+
+      {/* Expandable outcomes */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="text-[9px] text-gray-500 hover:text-gray-300 w-full text-left"
+      >
+        {expanded ? '▼ Hide Outcomes' : `▶ Show ${market?.outcomes?.length || 0} Outcomes`}
+      </button>
+
+      {expanded && market?.outcomes && (
+        <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+          {market.outcomes.map((outcome, idx) => (
+            <div key={idx} className="flex justify-between text-[10px] bg-gray-800/30 rounded px-2 py-1">
+              <span className="text-gray-400 truncate flex-1">{outcome.name}</span>
+              <span className="text-white font-mono ml-2">{formatPercent(outcome.probability * 100)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Info note */}
+      <div className="mt-2 text-[9px] text-gray-500 italic">
+        {isOverround
+          ? 'Probabilities sum > 100% — market may be overpriced'
+          : 'Probabilities sum < 100% — potential buying opportunity'}
+      </div>
+    </div>
+  );
+};
+
+// Cross-venue opportunity card component (Polymarket ↔ Kalshi)
 const OpportunityCard = ({ opportunity, onExecute, disabled }) => {
   const [expanded, setExpanded] = useState(false);
 
   if (!opportunity) return null;
+
+  // Check if this is a Polymarket internal opportunity
+  if (opportunity.venue === 'polymarket' && opportunity.type) {
+    return <PolymarketOpportunityCard opportunity={opportunity} />;
+  }
 
   const { polymarket, kalshi, costs, equivalence, spreadPercent } = opportunity;
 
@@ -296,19 +381,48 @@ export const PredictionArbPanel = ({ bot }) => {
       <div className="flex-1 overflow-y-auto p-2">
         {activeTab === 'opportunities' && (
           <div>
+            {/* Data status */}
+            <div className="bg-gray-900/50 rounded p-2 mb-2 border border-gray-800">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-gray-500">Polymarket Markets</span>
+                <span className="text-orange-400 font-bold">{state.polymarketCount || 0}</span>
+              </div>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-gray-500">Kalshi Markets</span>
+                <span className="text-blue-400 font-bold">{state.kalshiCount || '--'}</span>
+              </div>
+              {state.dataReceivedAt && (
+                <div className="flex justify-between text-[10px] mt-1">
+                  <span className="text-gray-500">Data Age</span>
+                  <span className={`${state.dataAge > 30000 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    {Math.round((state.dataAge || 0) / 1000)}s ago
+                  </span>
+                </div>
+              )}
+            </div>
+
             {state.opportunities?.length === 0 ? (
               <div className="text-center py-8 text-gray-500 text-xs">
-                {state.isRunning ? 'Scanning for opportunities...' : 'Start the bot to scan'}
+                {state.polymarketCount === 0
+                  ? 'Waiting for market data...'
+                  : state.isRunning
+                    ? 'Scanning for opportunities...'
+                    : 'Click START to begin scanning'}
               </div>
             ) : (
-              state.opportunities.map((opp, idx) => (
-                <OpportunityCard
-                  key={opp.id || idx}
-                  opportunity={opp}
-                  onExecute={handleExecute}
-                  disabled={!state.isRunning || state.isKilled || state.isHalted}
-                />
-              ))
+              <>
+                <div className="text-[9px] text-gray-500 mb-2">
+                  Found {state.opportunities.length} potential opportunities
+                </div>
+                {state.opportunities.map((opp, idx) => (
+                  <OpportunityCard
+                    key={opp.id || idx}
+                    opportunity={opp}
+                    onExecute={handleExecute}
+                    disabled={!state.isRunning || state.isKilled || state.isHalted}
+                  />
+                ))}
+              </>
             )}
           </div>
         )}

@@ -177,12 +177,17 @@ export async function fetchOrderbook(tokenId) {
 function transformEventToMarket(event) {
   if (!event || !event.markets || event.markets.length === 0) return null;
 
-  const market = event.markets[0];
+  // Handle ALL markets in the event (for multi-option events like "Who wins LaLiga?")
+  const allMarkets = event.markets;
+  const isMultiOption = allMarkets.length > 1;
+
+  // Primary market for pricing (use first market)
+  const market = allMarkets[0];
   const bestBid = parseFloat(market.bestBid) || 0;
   const bestAsk = parseFloat(market.bestAsk) || 0;
   const midPrice = (bestBid + bestAsk) / 2 || parseFloat(market.lastTradePrice) || 0.5;
 
-  // Parse outcomes and prices safely
+  // Parse outcomes and prices safely from first market
   let outcomes = [];
   let outcomePrices = [];
   try {
@@ -190,10 +195,57 @@ function transformEventToMarket(event) {
     outcomePrices = JSON.parse(market.outcomePrices || '[]');
   } catch {}
 
+  // For multi-option events: aggregate ALL outcomes from ALL markets
+  // Each market in a multi-option event has outcomes like ["Team A", "Not Team A"]
+  // We want to extract all the positive outcomes (e.g., "Team A", "Team B", "Team C")
+  let allOutcomes = [];
+  if (isMultiOption) {
+    allOutcomes = allMarkets.map(m => {
+      let mOutcomes = [];
+      let mPrices = [];
+      try {
+        mOutcomes = JSON.parse(m.outcomes || '[]');
+        mPrices = JSON.parse(m.outcomePrices || '[]');
+      } catch {}
+
+      // Get the "positive" outcome (first one, e.g., "Real Madrid" not "Not Real Madrid")
+      const outcomeName = mOutcomes[0] || 'Unknown';
+      const outcomePrice = parseFloat(mPrices[0]) || 0;
+
+      return {
+        name: outcomeName,
+        price: outcomePrice,
+        probability: outcomePrice,
+        marketId: m.id,
+        bestBid: parseFloat(m.bestBid) || 0,
+        bestAsk: parseFloat(m.bestAsk) || 0,
+        volume24h: parseFloat(m.volume24hr) || 0,
+        liquidity: parseFloat(m.liquidityNum) || 0,
+      };
+    }).sort((a, b) => b.probability - a.probability); // Sort by probability descending
+  } else {
+    // Binary market - just use the outcomes as-is
+    allOutcomes = outcomes.map((name, idx) => ({
+      name,
+      price: parseFloat(outcomePrices[idx]) || 0,
+      probability: parseFloat(outcomePrices[idx]) || 0,
+      marketId: market.id,
+      bestBid: idx === 0 ? bestBid : 1 - bestAsk,
+      bestAsk: idx === 0 ? bestAsk : 1 - bestBid,
+    }));
+  }
+
   // Calculate edge (we'll use a simple model based on volume and price movement)
-  const volume24h = parseFloat(market.volume24hr) || 0;
-  const volumeTotal = parseFloat(market.volumeNum) || parseFloat(event.volume) || 0;
-  const liquidity = parseFloat(market.liquidityNum) || 0;
+  // For multi-option events, aggregate volume and liquidity across all markets
+  const volume24h = isMultiOption
+    ? allMarkets.reduce((sum, m) => sum + (parseFloat(m.volume24hr) || 0), 0)
+    : parseFloat(market.volume24hr) || 0;
+  const volumeTotal = isMultiOption
+    ? allMarkets.reduce((sum, m) => sum + (parseFloat(m.volumeNum) || 0), 0)
+    : parseFloat(market.volumeNum) || parseFloat(event.volume) || 0;
+  const liquidity = isMultiOption
+    ? allMarkets.reduce((sum, m) => sum + (parseFloat(m.liquidityNum) || 0), 0)
+    : parseFloat(market.liquidityNum) || 0;
 
   // Simple model probability estimation based on market dynamics
   // In a real system, this would be a sophisticated ML model
@@ -233,9 +285,14 @@ function transformEventToMarket(event) {
     conditionId: market.conditionId,
     clobTokenIds: market.clobTokenIds,
 
-    // Outcomes
+    // Outcomes (original format for backward compatibility)
     outcomes,
     outcomePrices,
+
+    // Multi-option support: ALL outcomes from ALL markets
+    allOutcomes,
+    isMultiOption,
+    marketCount: allMarkets.length,
 
     // Generated analysis (will be calculated from real data)
     factors: generateFactors(midPrice, modelProb, volume24h, liquidity),

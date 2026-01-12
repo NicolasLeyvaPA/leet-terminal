@@ -768,6 +768,75 @@ export class PredictionMarketArbitrageBot {
 
     // Listeners
     this.listeners = new Set();
+
+    // Market data (received from App.jsx)
+    this.polymarkets = [];
+    this.kalshiMarkets = [];
+    this.dataReceivedAt = null;
+  }
+
+  /**
+   * Receive market data from App.jsx
+   * This is the main way the bot gets market data
+   */
+  setMarketData(polymarkets, kalshiMarkets = []) {
+    this.polymarkets = polymarkets || [];
+    this.kalshiMarkets = kalshiMarkets || [];
+    this.dataReceivedAt = Date.now();
+
+    // Update circuit breaker timestamp
+    this.circuitBreakers.updateDataTimestamp();
+
+    // Detect opportunities with new data
+    if (this.polymarkets.length > 0) {
+      this.opportunities = this.findPolymarketOpportunities();
+    }
+
+    this.notify();
+    console.log(`[PredictionMarketArbitrageBot] Received ${this.polymarkets.length} Polymarket markets`);
+  }
+
+  /**
+   * Find opportunities within Polymarket (same-venue arb on multi-option markets)
+   * This works even without Kalshi data
+   */
+  findPolymarketOpportunities() {
+    const opportunities = [];
+
+    for (const market of this.polymarkets) {
+      // Skip markets without multi-option data
+      if (!market.allOutcomes || market.allOutcomes.length < 2) continue;
+
+      // Check if probabilities sum to more than 1 (overround = arb opportunity)
+      const totalProb = market.allOutcomes.reduce((sum, o) => sum + (o.probability || 0), 0);
+
+      // Also check for underround (probs sum to less than 1)
+      if (totalProb > 1.02 || totalProb < 0.98) {
+        const spread = Math.abs(1 - totalProb);
+
+        opportunities.push({
+          id: `poly_internal_${market.id}_${Date.now()}`,
+          type: totalProb > 1 ? 'OVERROUND' : 'UNDERROUND',
+          market: {
+            id: market.id,
+            question: market.question,
+            category: market.category,
+            outcomes: market.allOutcomes,
+          },
+          totalProbability: totalProb,
+          spread: spread,
+          spreadPercent: (spread * 100).toFixed(2),
+          timestamp: Date.now(),
+          venue: 'polymarket',
+          action: totalProb > 1 ? 'Sell all outcomes' : 'Buy all outcomes',
+        });
+      }
+    }
+
+    // Sort by spread (best opportunities first)
+    opportunities.sort((a, b) => b.spread - a.spread);
+
+    return opportunities;
   }
 
   /**
@@ -808,6 +877,11 @@ export class PredictionMarketArbitrageBot {
       unpairedExposure: this.leggingManager.getUnpairedExposure(),
       hasMismatches: this.reconciler.hasMismatches(),
       config: this.config,
+      // Market data info
+      polymarketCount: this.polymarkets.length,
+      kalshiCount: this.kalshiMarkets.length,
+      dataReceivedAt: this.dataReceivedAt,
+      dataAge: this.dataReceivedAt ? Date.now() - this.dataReceivedAt : null,
     };
   }
 
