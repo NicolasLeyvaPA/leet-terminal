@@ -127,8 +127,8 @@ export const MonteCarloPanel = ({ market }) => {
   return (
     <div className="terminal-panel h-full flex flex-col">
       <PanelHeader
-        title="OUTCOME SIMULATOR"
-        subtitle="5,000 scenarios tested"
+        title="MONTE CARLO"
+        subtitle="5,000 simulated scenarios"
         actions={
           <button
             onClick={() => setShowHelp(!showHelp)}

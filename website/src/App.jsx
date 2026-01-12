@@ -411,7 +411,7 @@ const Terminal = ({ onLogout }) => {
             <MarketOverviewPanel market={selectedMarket} />
           </div>
           <div className="col-span-1 min-h-0 overflow-hidden">
-            <PriceChartPanel market={selectedMarket} />
+            <PriceChartPanel market={selectedMarket} news={newsData} />
           </div>
           <div className="col-span-1 min-h-0 overflow-hidden">
             <ConfluencePanel market={selectedMarket} />
@@ -441,7 +441,7 @@ const Terminal = ({ onLogout }) => {
             <PortfolioPanel positions={PORTFOLIO_POSITIONS} markets={markets} />
           </div>
           <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <PriceChartPanel market={selectedMarket} />
+            <PriceChartPanel market={selectedMarket} news={newsData} />
           </div>
           <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
             <OrderBookPanel market={selectedMarket} />
@@ -602,7 +602,7 @@ const Terminal = ({ onLogout }) => {
           <MarketOverviewPanel market={selectedMarket} />
         </div>
         <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-          <PriceChartPanel market={selectedMarket} />
+          <PriceChartPanel market={selectedMarket} news={newsData} />
         </div>
         <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
           <ConfluencePanel market={selectedMarket} />
