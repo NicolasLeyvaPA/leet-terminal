@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { PORTFOLIO_POSITIONS } from './data/constants';
 import { PolymarketAPI } from './services/polymarketAPI';
+import { KalshiAPI } from './services/kalshiAPI';
+import { ArbitrageEngine } from './services/arbitrageEngine';
+import { FeedAlgorithm } from './services/feedAlgorithm';
 import { generatePriceHistory, generateOrderbook } from './utils/helpers';
 import { WatchlistPanel } from './components/panels/WatchlistPanel';
 import { MarketOverviewPanel } from './components/panels/MarketOverviewPanel';
@@ -14,6 +17,8 @@ import { PortfolioPanel } from './components/panels/PortfolioPanel';
 import { QuantumLabPanel } from './components/panels/QuantumLabPanel';
 import { NewsFeedPanel } from './components/panels/NewsFeedPanel';
 import { BetsMarketPanel } from './components/panels/BetsMarketPanel';
+import { FeedPanel } from './components/panels/FeedPanel';
+import { ArbitragePanel } from './components/panels/ArbitragePanel';
 import { MarketDetailDock } from './components/MarketDetailDock';
 import { useWatchlist } from './utils/useWatchlist';
 import Login from './components/Login';
@@ -28,6 +33,7 @@ const REFRESH_INTERVAL = 15000; // 15 seconds
 const Terminal = ({ onLogout }) => {
   const { watchlist } = useWatchlist();
   const [markets, setMarkets] = useState([]);
+  const [kalshiMarkets, setKalshiMarkets] = useState([]);
   const [loadingMarkets, setLoadingMarkets] = useState(true);
   const [marketLimit, setMarketLimit] = useState(25); // Default 25 markets
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -44,27 +50,57 @@ const Terminal = ({ onLogout }) => {
   const [lastRefresh, setLastRefresh] = useState(null);
   const dragStateRef = useRef({ type: null, startX: 0, startY: 0, startVal: 0 });
 
-  // Load markets from Polymarket API
+  // Feed and Arbitrage state
+  const [feedItems, setFeedItems] = useState([]);
+  const [feedSections, setFeedSections] = useState(null);
+  const [feedStats, setFeedStats] = useState(null);
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [arbitrageOpportunities, setArbitrageOpportunities] = useState([]);
+  const [arbitrageStats, setArbitrageStats] = useState(null);
+  const [arbitrageLoading, setArbitrageLoading] = useState(false);
+
+  // Load markets from Polymarket and Kalshi APIs
   const loadMarkets = useCallback(async (limit = marketLimit, isManual = false) => {
     try {
       if (isManual) setLoadingMarkets(true);
       setStatusMessage("Syncing...");
-      const data = await PolymarketAPI.fetchOpenEvents(limit);
 
-      // Add price history and orderbook to each market
-      const enrichedMarkets = data.map(market => ({
+      // Load from both exchanges in parallel
+      const [polyData, kalshiData] = await Promise.all([
+        PolymarketAPI.fetchOpenEvents(limit),
+        KalshiAPI.fetchKalshiEvents(Math.floor(limit / 2)).catch(() => []),
+      ]);
+
+      // Add price history and orderbook to Polymarket markets
+      const enrichedPolymarkets = polyData.map(market => ({
         ...market,
         price_history: generatePriceHistory(market.market_prob, 90),
         orderbook: generateOrderbook(market.market_prob),
       }));
 
-      setMarkets(enrichedMarkets);
-      if (enrichedMarkets.length > 0 && !selectedMarket) {
-        setSelectedMarket(enrichedMarkets[0]);
+      // Add price history and orderbook to Kalshi markets
+      const enrichedKalshi = kalshiData.map(market => ({
+        ...market,
+        price_history: generatePriceHistory(market.market_prob, 90),
+        orderbook: generateOrderbook(market.market_prob),
+      }));
+
+      setMarkets(enrichedPolymarkets);
+      setKalshiMarkets(enrichedKalshi);
+
+      // Combine all markets for feed
+      const allMarkets = [...enrichedPolymarkets, ...enrichedKalshi];
+
+      if (enrichedPolymarkets.length > 0 && !selectedMarket) {
+        setSelectedMarket(enrichedPolymarkets[0]);
       }
       setLastRefresh(new Date());
-      setStatusMessage(`${enrichedMarkets.length} markets`);
+      setStatusMessage(`${enrichedPolymarkets.length}+${enrichedKalshi.length} markets`);
       setTimeout(() => setStatusMessage(""), 2000);
+
+      // Generate feed asynchronously
+      generateFeedData(allMarkets);
+
     } catch (error) {
       console.error('Failed to load markets:', error);
       setStatusMessage("Sync failed");
@@ -73,12 +109,62 @@ const Terminal = ({ onLogout }) => {
     }
   }, [marketLimit, selectedMarket]);
 
+  // Generate feed data
+  const generateFeedData = useCallback(async (allMarkets) => {
+    setFeedLoading(true);
+    try {
+      // Generate feed items
+      const feed = FeedAlgorithm.generateFeed(allMarkets, arbitrageOpportunities);
+      const sections = FeedAlgorithm.getFeedSections(feed);
+      const stats = FeedAlgorithm.getFeedStats(feed);
+
+      setFeedItems(feed);
+      setFeedSections(sections);
+      setFeedStats(stats);
+    } catch (error) {
+      console.error('Failed to generate feed:', error);
+    } finally {
+      setFeedLoading(false);
+    }
+  }, [arbitrageOpportunities]);
+
+  // Scan for arbitrage opportunities
+  const scanArbitrage = useCallback(async () => {
+    setArbitrageLoading(true);
+    try {
+      const result = await ArbitrageEngine.scanArbitrageOpportunities();
+      setArbitrageOpportunities(result.actionable);
+      setArbitrageStats(result.stats);
+
+      // Regenerate feed with arbitrage data
+      const allMarkets = [...markets, ...kalshiMarkets];
+      const feed = FeedAlgorithm.generateFeed(allMarkets, result.actionable);
+      const sections = FeedAlgorithm.getFeedSections(feed);
+      const stats = FeedAlgorithm.getFeedStats(feed);
+
+      setFeedItems(feed);
+      setFeedSections(sections);
+      setFeedStats(stats);
+    } catch (error) {
+      console.error('Arbitrage scan failed:', error);
+    } finally {
+      setArbitrageLoading(false);
+    }
+  }, [markets, kalshiMarkets]);
+
   // Initial load and refresh interval
   useEffect(() => {
     loadMarkets(marketLimit, true);
     const interval = setInterval(() => loadMarkets(marketLimit, false), REFRESH_INTERVAL);
     return () => clearInterval(interval);
   }, [marketLimit]);
+
+  // Scan arbitrage when markets change
+  useEffect(() => {
+    if (markets.length > 0) {
+      scanArbitrage();
+    }
+  }, [markets.length > 0]); // Only on initial load
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -147,10 +233,15 @@ const Terminal = ({ onLogout }) => {
       if (["ANALYSIS", "ANA"].includes(cmdUpper)) setWorkspace("analysis");
       else if (["PORTFOLIO", "PORT"].includes(cmdUpper)) setWorkspace("portfolio");
       else if (["LAB", "QUANTUM"].includes(cmdUpper)) setWorkspace("lab");
-      else if (["NEWS", "FEED"].includes(cmdUpper)) setWorkspace("news");
+      else if (["NEWS"].includes(cmdUpper)) setWorkspace("news");
+      else if (["FEED", "DISCOVER"].includes(cmdUpper)) setWorkspace("feed");
       else if (["BETS", "MARKETS"].includes(cmdUpper)) setWorkspace("bets");
+      else if (["ARB", "ARBITRAGE"].includes(cmdUpper)) setWorkspace("arbitrage");
       else if (["REFRESH", "RELOAD"].includes(cmdUpper)) {
         loadMarkets(marketLimit, true);
+      }
+      else if (["SCAN", "RESCAN"].includes(cmdUpper)) {
+        scanArbitrage();
       }
       setCommand("");
     }
@@ -164,14 +255,14 @@ const Terminal = ({ onLogout }) => {
 
   // Filter and group markets
   const { filteredMarkets, groupedMarkets } = useMemo(() => {
-    const allMarkets = [...markets, ...watchlist];
+    const allMarkets = [...markets, ...kalshiMarkets, ...watchlist];
     const uniqueMarkets = Array.from(
       new Map(allMarkets.map((m) => [m.id, m])).values()
     );
 
     let filtered = uniqueMarkets;
     if (platformFilter !== "all") {
-      filtered = filtered.filter(m => m.platform?.toLowerCase() === platformFilter);
+      filtered = filtered.filter(m => m.platform?.toLowerCase() === platformFilter.toLowerCase());
     }
     if (categoryFilter !== "all") {
       filtered = filtered.filter(m => m.category === categoryFilter);
@@ -195,7 +286,7 @@ const Terminal = ({ onLogout }) => {
     });
 
     return { filteredMarkets: filtered, groupedMarkets: grouped };
-  }, [markets, watchlist, platformFilter, categoryFilter]);
+  }, [markets, kalshiMarkets, watchlist, platformFilter, categoryFilter]);
 
   const handleNewsSelect = (newsItem) => {
     const tickers = newsItem.markets || [];
@@ -273,16 +364,18 @@ const Terminal = ({ onLogout }) => {
 
   // Bloomberg-style ticker tape
   const tickerItems = useMemo(() => {
-    return markets.slice(0, 20).map((m) => {
+    const allTickerMarkets = [...markets.slice(0, 15), ...kalshiMarkets.slice(0, 5)];
+    return allTickerMarkets.map((m) => {
       const edge = m.model_prob - m.market_prob;
       const change = m.market_prob - (m.prev_prob || m.market_prob);
+      const isKalshi = m.platform === 'Kalshi';
       return (
         <span
           key={m.id}
           className="inline-flex items-center gap-1.5 mx-4 text-xs cursor-pointer hover:bg-gray-800/50 px-2 py-0.5 rounded"
           onClick={() => setSelectedMarket(m)}
         >
-          <span className="text-orange-500 font-bold">{m.ticker}</span>
+          <span className={`font-bold ${isKalshi ? 'text-blue-400' : 'text-orange-500'}`}>{m.ticker}</span>
           <span className="text-white font-medium">{(m.market_prob * 100).toFixed(1)}¢</span>
           <span className={change > 0 ? "text-green-400" : change < 0 ? "text-red-400" : "text-gray-500"}>
             {change > 0 ? "+" : ""}{(change * 100).toFixed(2)}
@@ -297,7 +390,7 @@ const Terminal = ({ onLogout }) => {
         </span>
       );
     });
-  }, [markets]);
+  }, [markets, kalshiMarkets]);
 
   const renderRightGrid = () => {
     if (workspace === "analysis") {
@@ -380,6 +473,46 @@ const Terminal = ({ onLogout }) => {
       );
     }
 
+    if (workspace === "feed") {
+      return (
+        <div className="h-full overflow-hidden">
+          <FeedPanel
+            feedItems={feedItems}
+            sections={feedSections}
+            stats={feedStats}
+            onAnalyze={(market) => {
+              setSelectedMarket(market);
+              setWorkspace("analysis");
+            }}
+            onRefresh={() => {
+              const allMarkets = [...markets, ...kalshiMarkets];
+              generateFeedData(allMarkets);
+            }}
+            loading={feedLoading}
+            fullPage
+          />
+        </div>
+      );
+    }
+
+    if (workspace === "arbitrage") {
+      return (
+        <div className="h-full overflow-hidden">
+          <ArbitragePanel
+            opportunities={arbitrageOpportunities}
+            stats={arbitrageStats}
+            onAnalyze={(market) => {
+              setSelectedMarket(market);
+              setWorkspace("analysis");
+            }}
+            onRefresh={scanArbitrage}
+            loading={arbitrageLoading}
+            fullPage
+          />
+        </div>
+      );
+    }
+
     if (workspace === "bets") {
       return (
         <div className="h-full overflow-hidden">
@@ -426,7 +559,7 @@ const Terminal = ({ onLogout }) => {
           </div>
           <div className="h-4 w-px bg-gray-700" />
           <div className="flex">
-            {["analysis", "portfolio", "lab", "news", "bets"].map((ws) => (
+            {["analysis", "feed", "arbitrage", "portfolio", "lab", "bets"].map((ws) => (
               <button
                 key={ws}
                 onClick={() => setWorkspace(ws)}
@@ -437,6 +570,11 @@ const Terminal = ({ onLogout }) => {
                 }`}
               >
                 {ws.toUpperCase()}
+                {ws === 'arbitrage' && arbitrageOpportunities.length > 0 && (
+                  <span className="ml-1 bg-purple-500 text-white text-[9px] px-1 rounded">
+                    {arbitrageOpportunities.length}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -567,14 +705,19 @@ const Terminal = ({ onLogout }) => {
             <span className="text-gray-500">{loadingMarkets ? 'SYNCING' : 'LIVE'}</span>
           </span>
           <span className="text-gray-600">
-            Markets: <span className="text-orange-400 font-medium">{filteredMarkets.length}</span>
-            {categoryFilter !== 'all' && <span className="text-gray-500">/{markets.length}</span>}
+            Markets: <span className="text-orange-400 font-medium">{markets.length}</span>
+            {kalshiMarkets.length > 0 && <span className="text-blue-400">+{kalshiMarkets.length}</span>}
           </span>
           <span className="text-gray-600">
             Signals: <span className="text-green-400 font-medium">
               {filteredMarkets.filter((m) => Math.abs(m.model_prob - m.market_prob) > 0.03).length}
             </span>
           </span>
+          {arbitrageOpportunities.length > 0 && (
+            <span className="text-gray-600">
+              Arb: <span className="text-purple-400 font-medium">{arbitrageOpportunities.length}</span>
+            </span>
+          )}
           <span className="text-gray-600">
             Refresh: <span className="text-gray-500">15s</span>
           </span>
@@ -587,7 +730,7 @@ const Terminal = ({ onLogout }) => {
         <div className="flex items-center gap-4">
           <span className="text-orange-500/70 font-medium">LEET QUANTUM TERMINAL</span>
           <span className="text-yellow-500/80">ANALYSIS ONLY</span>
-          <span className="text-gray-600">v3.1.0</span>
+          <span className="text-gray-600">v3.2.0</span>
         </div>
       </div>
     </div>

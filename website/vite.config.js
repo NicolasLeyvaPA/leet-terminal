@@ -41,6 +41,34 @@ export default defineConfig({
           });
         },
       },
+      '/api/kalshi': {
+        target: 'https://api.elections.kalshi.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/kalshi/, ''),
+        secure: true,
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.warn('Kalshi proxy error:', err.message);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            proxyReq.setHeader('Accept', 'application/json');
+          });
+        },
+      },
+      '/api/kalshi-demo': {
+        target: 'https://demo-api.kalshi.co',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/kalshi-demo/, ''),
+        secure: true,
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.warn('Kalshi demo proxy error:', err.message);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            proxyReq.setHeader('Accept', 'application/json');
+          });
+        },
+      },
     },
   },
 })
