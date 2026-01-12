@@ -7,9 +7,9 @@ import { useState, useEffect, useCallback } from 'react';
 
 // Default panel configuration
 const DEFAULT_PANELS = {
-  analysis: ['marketOverview', 'priceChart', 'confluence', 'modelBreakdown', 'monteCarlo', 'greeks', 'orderBook'],
-  portfolio: ['portfolio', 'priceChart', 'orderBook', 'monteCarlo', 'greeks'],
-  lab: ['quantumLab', 'monteCarlo', 'confluence', 'modelBreakdown', 'greeks'],
+  analysis: ['marketOverview', 'priceChart', 'confluence', 'modelBreakdown', 'monteCarlo', 'profitTester', 'orderBook'],
+  portfolio: ['portfolio', 'priceChart', 'orderBook', 'monteCarlo', 'profitTester'],
+  lab: ['quantumLab', 'monteCarlo', 'confluence', 'modelBreakdown', 'profitTester'],
 };
 
 // Panel metadata
@@ -19,7 +19,7 @@ const PANEL_INFO = {
   confluence: { name: 'Confluence', icon: '🎯', color: 'purple' },
   modelBreakdown: { name: 'Model Analysis', icon: '🔬', color: 'cyan' },
   monteCarlo: { name: 'Outcome Simulator', icon: '🎲', color: 'green' },
-  greeks: { name: 'Greeks', icon: 'Δ', color: 'yellow' },
+  profitTester: { name: 'Profit Tester', icon: '💰', color: 'green' },
   orderBook: { name: 'Order Book', icon: '📖', color: 'red' },
   portfolio: { name: 'Portfolio', icon: '💼', color: 'orange' },
   quantumLab: { name: 'Quantum Lab', icon: '⚛️', color: 'purple' },

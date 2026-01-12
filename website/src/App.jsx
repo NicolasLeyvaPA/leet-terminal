@@ -10,7 +10,7 @@ import { PriceChartPanel } from './components/panels/PriceChartPanel';
 import { OrderBookPanel } from './components/panels/OrderBookPanel';
 import { ConfluencePanel } from './components/panels/ConfluencePanel';
 import { ModelBreakdownPanel } from './components/panels/ModelBreakdownPanel';
-import { GreeksPanel } from './components/panels/GreeksPanel';
+import { ProfitTesterPanel } from './components/panels/ProfitTesterPanel';
 import { MonteCarloPanel } from './components/panels/MonteCarloPanel';
 import { PortfolioPanel } from './components/panels/PortfolioPanel';
 import { QuantumLabPanel } from './components/panels/QuantumLabPanel';
@@ -424,7 +424,7 @@ const Terminal = ({ onLogout }) => {
             <MonteCarloPanel market={selectedMarket} />
           </div>
           <div className="col-span-1 min-h-0 overflow-hidden">
-            <GreeksPanel market={selectedMarket} />
+            <ProfitTesterPanel market={selectedMarket} />
           </div>
           {/* Row 3: OrderBook spanning full width */}
           <div className="col-span-3 min-h-0 overflow-hidden">
@@ -450,7 +450,7 @@ const Terminal = ({ onLogout }) => {
             <MonteCarloPanel market={selectedMarket} />
           </div>
           <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <GreeksPanel market={selectedMarket} />
+            <ProfitTesterPanel market={selectedMarket} />
           </div>
         </div>
       );
@@ -472,7 +472,7 @@ const Terminal = ({ onLogout }) => {
             <ModelBreakdownPanel market={selectedMarket} />
           </div>
           <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <GreeksPanel market={selectedMarket} />
+            <ProfitTesterPanel market={selectedMarket} />
           </div>
         </div>
       );
@@ -614,7 +614,7 @@ const Terminal = ({ onLogout }) => {
           <MonteCarloPanel market={selectedMarket} />
         </div>
         <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-          <GreeksPanel market={selectedMarket} />
+          <ProfitTesterPanel market={selectedMarket} />
         </div>
       </div>
     );

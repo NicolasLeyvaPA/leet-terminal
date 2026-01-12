@@ -1,9 +1,17 @@
 import { useState, useMemo } from 'react';
+import {
+  getTickerFromName,
+  getPartyInfo,
+  getTickerColor,
+  detectMarketType,
+  formatVolume,
+  getInitials,
+} from '../utils/tickerMapping';
 
 // ============================================
 // MARKET DETAIL MODAL
-// Polymarket/Kalshi-style with YES/NO payouts
-// Shows all options with clear names and payouts
+// Polymarket/Kalshi-style multi-option view
+// With profile images, party affiliations, inline Yes/No buttons
 // ============================================
 
 // Format currency
@@ -12,203 +20,292 @@ const formatCurrency = (value) => {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-// Format large numbers
-const formatNumber = (num) => {
-  if (!num || isNaN(num)) return '0';
-  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-  if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
-  return num.toFixed(0);
-};
-
-// Single option card with YES/NO payout calculator
-const OptionCard = ({ option, investAmount, isSelected, onSelect, index }) => {
+// ============================================
+// OPTION ROW - Kalshi/Polymarket style
+// Profile | Name + Party | Percentage | Yes/No buttons
+// ============================================
+const OptionRow = ({ option, index, isSelected, onSelect, onBuyYes, onBuyNo }) => {
   const yesPrice = option.probability || option.price || 0.5;
   const noPrice = 1 - yesPrice;
-  const yesCents = (yesPrice * 100).toFixed(0);
-  const noCents = (noPrice * 100).toFixed(0);
+  const yesCents = Math.round(yesPrice * 100);
+  const noCents = Math.round(noPrice * 100);
 
-  // YES calculations - buy YES shares
-  const yesShares = yesPrice > 0 ? investAmount / yesPrice : 0;
-  const yesWinPayout = yesShares * 1; // Each share pays $1 if YES wins
-  const yesWinProfit = yesWinPayout - investAmount;
-  const yesLoseLoss = investAmount; // Lose entire investment if NO wins
-  const yesReturnMultiple = yesPrice > 0 ? (1 / yesPrice) : 0;
-
-  // NO calculations - buy NO shares
-  const noShares = noPrice > 0 ? investAmount / noPrice : 0;
-  const noWinPayout = noShares * 1; // Each share pays $1 if NO wins
-  const noWinProfit = noWinPayout - investAmount;
-  const noLoseLoss = investAmount; // Lose entire investment if YES wins
-  const noReturnMultiple = noPrice > 0 ? (1 / noPrice) : 0;
-
-  // Clean up option name - remove common prefixes
+  const ticker = getTickerFromName(option.name);
+  const partyInfo = getPartyInfo(option.name, option.subtitle || '');
+  const tickerColor = getTickerColor(ticker);
+  const initials = getInitials(option.name);
   const displayName = option.name || `Option ${index + 1}`;
+
+  // Price change (mock for now - could come from historical data)
+  const priceChange = option.priceChange24h || (Math.random() > 0.5 ? Math.random() * 5 : -Math.random() * 5);
+  const hasChange = Math.abs(priceChange) > 0.1;
 
   return (
     <div
-      className={`rounded-xl border transition-all cursor-pointer overflow-hidden ${
-        isSelected
-          ? 'border-orange-500 shadow-lg shadow-orange-500/20'
-          : 'border-gray-800 hover:border-gray-600'
+      className={`flex items-center px-4 py-3 border-b border-gray-800/50 transition-all hover:bg-gray-800/30 cursor-pointer ${
+        isSelected ? 'bg-gray-800/50' : ''
       }`}
       onClick={() => onSelect(option)}
     >
-      {/* Option Header */}
-      <div className={`p-4 ${isSelected ? 'bg-orange-500/10' : 'bg-gray-900/80'}`}>
-        <div className="flex items-start justify-between gap-3">
+      {/* Profile Image / Initials */}
+      <div
+        className="w-12 h-12 rounded-lg flex items-center justify-center text-sm font-bold mr-4 flex-shrink-0"
+        style={{
+          backgroundColor: partyInfo?.bgColor || `${tickerColor}20`,
+          color: partyInfo?.color || tickerColor,
+          border: `1px solid ${partyInfo?.color || tickerColor}40`,
+        }}
+      >
+        {option.image ? (
+          <img src={option.image} alt={displayName} className="w-full h-full rounded-lg object-cover" />
+        ) : (
+          initials
+        )}
+      </div>
+
+      {/* Name + Party */}
+      <div className="flex-1 min-w-0 mr-4">
+        <div className="text-white font-semibold text-sm truncate">{displayName}</div>
+        {partyInfo ? (
+          <div className="text-xs" style={{ color: partyInfo.color }}>
+            {partyInfo.name}
+          </div>
+        ) : (
+          <div className="text-xs text-gray-500">
+            {formatVolume(option.volume24h || 0)} Vol
+          </div>
+        )}
+      </div>
+
+      {/* Percentage + Change */}
+      <div className="flex items-center gap-2 mr-6 min-w-[100px] justify-end">
+        <span className="text-2xl font-bold text-white">{yesCents}%</span>
+        {hasChange && (
+          <span className={`text-sm ${priceChange > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+            {priceChange > 0 ? '▼' : '▲'}{Math.abs(priceChange).toFixed(0)}
+          </span>
+        )}
+      </div>
+
+      {/* Yes Button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onBuyYes(option);
+        }}
+        className="px-5 py-2.5 rounded-lg font-semibold text-sm mr-2 transition-all bg-emerald-500 hover:bg-emerald-400 text-white min-w-[100px]"
+      >
+        Yes {yesCents}¢
+      </button>
+
+      {/* No Button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onBuyNo(option);
+        }}
+        className="px-5 py-2.5 rounded-lg font-semibold text-sm transition-all bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 min-w-[100px]"
+      >
+        No {noCents}¢
+      </button>
+    </div>
+  );
+};
+
+// ============================================
+// RIGHT SIDEBAR - Trade Panel
+// Shows when an option is selected
+// ============================================
+const TradeSidebar = ({ option, market, investAmount, setInvestAmount, onTrade, onClose }) => {
+  const [tradeType, setTradeType] = useState('buy');
+  const [selectedSide, setSelectedSide] = useState('yes');
+
+  if (!option) return null;
+
+  const ticker = getTickerFromName(option.name);
+  const partyInfo = getPartyInfo(option.name);
+  const initials = getInitials(option.name);
+  const tickerColor = getTickerColor(ticker);
+
+  const yesPrice = option.probability || option.price || 0.5;
+  const noPrice = 1 - yesPrice;
+  const yesCents = (yesPrice * 100).toFixed(1);
+  const noCents = (noPrice * 100).toFixed(1);
+
+  // Calculate based on selected side
+  const price = selectedSide === 'yes' ? yesPrice : noPrice;
+  const shares = price > 0 ? investAmount / price : 0;
+  const potentialProfit = shares - investAmount;
+
+  return (
+    <div className="w-80 border-l border-gray-800 bg-gray-900/95 flex flex-col h-full">
+      {/* Header */}
+      <div className="p-4 border-b border-gray-800">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold"
+            style={{
+              backgroundColor: partyInfo?.bgColor || `${tickerColor}20`,
+              color: partyInfo?.color || tickerColor,
+            }}
+          >
+            {initials}
+          </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] text-gray-500 font-mono">#{index + 1}</span>
-              {option.volume24h > 10000 && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
-                  HOT
-                </span>
-              )}
-            </div>
-            <h3 className="text-base text-white font-bold leading-tight">{displayName}</h3>
-            <div className="text-[10px] text-gray-500 mt-1">
-              Vol: ${formatNumber(option.volume24h || 0)} • Liq: ${formatNumber(option.liquidity || 0)}
-            </div>
+            <div className="text-white font-semibold text-sm truncate">{option.name}</div>
+            <div className="text-xs text-gray-500">{market?.question}</div>
           </div>
-
-          {/* Current Price Badge */}
-          <div className="text-center">
-            <div className="text-2xl font-black text-orange-400">{yesCents}¢</div>
-            <div className="text-[10px] text-gray-500">{(yesPrice * 100).toFixed(1)}% chance</div>
-          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white p-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       </div>
 
-      {/* YES/NO Payout Section */}
-      <div className="grid grid-cols-2 divide-x divide-gray-800">
-        {/* BUY YES */}
-        <div className="p-3 bg-green-500/5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-green-400">BUY YES</span>
-            <span className="text-sm font-bold text-white">{yesCents}¢</span>
-          </div>
-          <div className="space-y-1.5 text-[10px]">
-            <div className="flex justify-between">
-              <span className="text-gray-500">If YES wins:</span>
-              <span className="text-green-400 font-bold">+{formatCurrency(yesWinProfit)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">If NO wins:</span>
-              <span className="text-red-400 font-bold">-{formatCurrency(yesLoseLoss)}</span>
-            </div>
-            <div className="flex justify-between pt-1 border-t border-gray-800">
-              <span className="text-gray-500">Payout:</span>
-              <span className="text-orange-400 font-bold">{yesReturnMultiple.toFixed(2)}x</span>
-            </div>
-          </div>
-        </div>
-
-        {/* BUY NO */}
-        <div className="p-3 bg-red-500/5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-red-400">BUY NO</span>
-            <span className="text-sm font-bold text-white">{noCents}¢</span>
-          </div>
-          <div className="space-y-1.5 text-[10px]">
-            <div className="flex justify-between">
-              <span className="text-gray-500">If NO wins:</span>
-              <span className="text-green-400 font-bold">+{formatCurrency(noWinProfit)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">If YES wins:</span>
-              <span className="text-red-400 font-bold">-{formatCurrency(noLoseLoss)}</span>
-            </div>
-            <div className="flex justify-between pt-1 border-t border-gray-800">
-              <span className="text-gray-500">Payout:</span>
-              <span className="text-orange-400 font-bold">{noReturnMultiple.toFixed(2)}x</span>
-            </div>
-          </div>
+      {/* Buy/Sell Toggle */}
+      <div className="flex border-b border-gray-800">
+        <button
+          onClick={() => setTradeType('buy')}
+          className={`flex-1 py-3 text-sm font-medium transition-colors ${
+            tradeType === 'buy'
+              ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-400/5'
+              : 'text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          Buy
+        </button>
+        <button
+          onClick={() => setTradeType('sell')}
+          className={`flex-1 py-3 text-sm font-medium transition-colors ${
+            tradeType === 'sell'
+              ? 'text-rose-400 border-b-2 border-rose-400 bg-rose-400/5'
+              : 'text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          Sell
+        </button>
+        <div className="flex items-center px-3 border-l border-gray-800">
+          <span className="text-xs text-gray-500">Dollars</span>
         </div>
       </div>
 
-      {/* Bid/Ask Spread */}
-      {(option.bestBid || option.bestAsk) && (
-        <div className="px-3 py-2 bg-gray-900/50 border-t border-gray-800 flex items-center justify-between text-[10px]">
-          <div className="flex items-center gap-3">
-            <span className="text-gray-500">Bid: <span className="text-green-400 font-mono">{((option.bestBid || 0) * 100).toFixed(1)}¢</span></span>
-            <span className="text-gray-500">Ask: <span className="text-red-400 font-mono">{((option.bestAsk || 0) * 100).toFixed(1)}¢</span></span>
+      {/* Yes/No Price Buttons */}
+      <div className="p-4 grid grid-cols-2 gap-3">
+        <button
+          onClick={() => setSelectedSide('yes')}
+          className={`p-4 rounded-xl text-center transition-all ${
+            selectedSide === 'yes'
+              ? 'bg-emerald-500 text-white'
+              : 'bg-gray-800 text-gray-400 hover:bg-gray-700 border border-gray-700'
+          }`}
+        >
+          <div className="text-sm font-medium mb-1">Yes</div>
+          <div className="text-xl font-bold">{yesCents}¢</div>
+        </button>
+        <button
+          onClick={() => setSelectedSide('no')}
+          className={`p-4 rounded-xl text-center transition-all ${
+            selectedSide === 'no'
+              ? 'bg-rose-500/80 text-white'
+              : 'bg-gray-800 text-gray-400 hover:bg-gray-700 border border-gray-700'
+          }`}
+        >
+          <div className="text-sm font-medium mb-1">No</div>
+          <div className="text-xl font-bold">{noCents}¢</div>
+        </button>
+      </div>
+
+      {/* Amount Input */}
+      <div className="px-4">
+        <div className="flex items-center justify-between text-xs mb-2">
+          <span className="text-gray-500">Amount</span>
+          <span className="text-emerald-400">Earn 3.25% Interest</span>
+        </div>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">$</span>
+          <input
+            type="number"
+            value={investAmount}
+            onChange={(e) => setInvestAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-8 pr-4 py-4 text-right text-3xl font-light text-white outline-none focus:border-emerald-500"
+            placeholder="0"
+          />
+        </div>
+
+        {/* Quick Amount Buttons */}
+        <div className="flex gap-2 mt-3">
+          {[1, 20, 100, 'Max'].map((amt) => (
+            <button
+              key={amt}
+              onClick={() => setInvestAmount(amt === 'Max' ? 1000 : amt)}
+              className="flex-1 py-2 text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg transition-colors border border-gray-700"
+            >
+              +${amt === 'Max' ? amt : amt}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Potential Return */}
+      {investAmount > 0 && (
+        <div className="mx-4 mt-4 p-3 bg-gray-800/50 rounded-xl border border-gray-700/50">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Potential return</span>
+            <span className="text-emerald-400 font-bold">
+              +${potentialProfit.toFixed(2)} ({((potentialProfit / investAmount) * 100).toFixed(0)}%)
+            </span>
           </div>
-          <span className="text-gray-500">Spread: <span className="text-yellow-400 font-mono">{(((option.bestAsk || yesPrice) - (option.bestBid || yesPrice)) * 100).toFixed(1)}¢</span></span>
+          <div className="flex justify-between text-xs mt-1">
+            <span className="text-gray-600">Shares</span>
+            <span className="text-gray-400">{shares.toFixed(2)}</span>
+          </div>
         </div>
       )}
-    </div>
-  );
-};
 
-// Compact row view for long lists
-const OptionRow = ({ option, investAmount, isSelected, onSelect, index }) => {
-  const yesPrice = option.probability || option.price || 0.5;
-  const noPrice = 1 - yesPrice;
-  const yesCents = (yesPrice * 100).toFixed(0);
-  const noCents = (noPrice * 100).toFixed(0);
+      {/* Action Button */}
+      <div className="p-4 mt-auto">
+        <button
+          onClick={() => onTrade && onTrade({ ...option, side: selectedSide, amount: investAmount })}
+          className={`w-full py-4 rounded-xl font-bold text-base transition-all ${
+            selectedSide === 'yes'
+              ? 'bg-emerald-500 hover:bg-emerald-400 text-white'
+              : 'bg-rose-500 hover:bg-rose-400 text-white'
+          }`}
+        >
+          {tradeType === 'buy' ? 'Buy' : 'Sell'} {selectedSide.charAt(0).toUpperCase() + selectedSide.slice(1)}
+        </button>
+        <p className="text-center text-[10px] text-gray-600 mt-2">
+          By trading, you agree to the <span className="underline cursor-pointer">Terms of Use</span>
+        </p>
+      </div>
 
-  // YES payout
-  const yesShares = yesPrice > 0 ? investAmount / yesPrice : 0;
-  const yesWinProfit = (yesShares * 1) - investAmount;
-
-  // NO payout
-  const noShares = noPrice > 0 ? investAmount / noPrice : 0;
-  const noWinProfit = (noShares * 1) - investAmount;
-
-  const displayName = option.name || `Option ${index + 1}`;
-
-  return (
-    <div
-      className={`p-3 rounded-lg border transition-all cursor-pointer ${
-        isSelected
-          ? 'bg-orange-500/10 border-orange-500/50'
-          : 'bg-gray-900/50 border-gray-800 hover:border-gray-700'
-      }`}
-      onClick={() => onSelect(option)}
-    >
-      <div className="flex items-center gap-4">
-        {/* Index */}
-        <span className="text-[10px] text-gray-600 font-mono w-6">#{index + 1}</span>
-
-        {/* Name */}
-        <div className="flex-1 min-w-0">
-          <div className="text-sm text-white font-medium truncate">{displayName}</div>
-          <div className="text-[9px] text-gray-500">
-            Vol: ${formatNumber(option.volume24h || 0)}
-          </div>
-        </div>
-
-        {/* YES Price & Payout */}
-        <div className="text-center w-24">
-          <div className="text-[10px] text-green-400 font-medium">YES {yesCents}¢</div>
-          <div className="text-[10px] text-gray-500">
-            Win: <span className="text-green-400">+{formatCurrency(yesWinProfit)}</span>
-          </div>
-        </div>
-
-        {/* NO Price & Payout */}
-        <div className="text-center w-24">
-          <div className="text-[10px] text-red-400 font-medium">NO {noCents}¢</div>
-          <div className="text-[10px] text-gray-500">
-            Win: <span className="text-green-400">+{formatCurrency(noWinProfit)}</span>
-          </div>
-        </div>
-
-        {/* Main Price */}
-        <div className="text-right w-16">
-          <div className="text-lg font-bold text-orange-400">{yesCents}¢</div>
+      {/* Related Markets */}
+      <div className="p-4 border-t border-gray-800">
+        <div className="text-xs text-gray-500 mb-3">Related markets</div>
+        <div className="space-y-2">
+          {[
+            { name: 'Will Trump run in 2028?', chance: '42%' },
+            { name: 'GOP primary winner?', chance: '—' },
+          ].map((related, idx) => (
+            <div key={idx} className="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg hover:bg-gray-800 cursor-pointer">
+              <span className="text-xs text-gray-400 truncate flex-1">{related.name}</span>
+              <span className="text-xs text-white font-medium ml-2">{related.chance}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
 };
 
-// Main Modal Component
+// ============================================
+// MAIN MODAL
+// ============================================
 export const MarketDetailModal = ({ market, isOpen, onClose, onTrade }) => {
   const [investAmount, setInvestAmount] = useState(100);
   const [selectedOption, setSelectedOption] = useState(null);
   const [sortBy, setSortBy] = useState('probability');
-  const [viewMode, setViewMode] = useState('cards'); // cards or list
 
   // Get all outcomes
   const outcomes = useMemo(() => {
@@ -218,11 +315,14 @@ export const MarketDetailModal = ({ market, isOpen, onClose, onTrade }) => {
 
     // If no allOutcomes, create from basic market data
     if (options.length === 0 && market.outcomes) {
-      const prices = market.outcomePrices ? JSON.parse(market.outcomePrices) : [];
+      const prices = market.outcomePrices
+        ? (typeof market.outcomePrices === 'string' ? JSON.parse(market.outcomePrices) : market.outcomePrices)
+        : [];
       options = market.outcomes.map((name, idx) => ({
-        name,
+        name: typeof name === 'string' ? name : name.name || `Option ${idx + 1}`,
         probability: parseFloat(prices[idx]) || 0.5,
         price: parseFloat(prices[idx]) || 0.5,
+        volume24h: market.volume_24h ? market.volume_24h / market.outcomes.length : 0,
       }));
     }
 
@@ -239,228 +339,134 @@ export const MarketDetailModal = ({ market, isOpen, onClose, onTrade }) => {
     }
   }, [market, sortBy]);
 
-  // Calculate total probability
-  const totalProbability = useMemo(() => {
-    return outcomes.reduce((sum, o) => sum + (o.probability || 0), 0);
-  }, [outcomes]);
+  const marketType = detectMarketType(market);
 
-  // Determine market type for better labeling
-  const marketType = useMemo(() => {
-    if (!market?.question) return 'OPTIONS';
-    const q = market.question.toLowerCase();
-    if (q.includes('who will win') || q.includes('winner')) return 'TEAMS';
-    if (q.includes('when') || q.includes('date') || q.includes('by')) return 'DATES';
-    if (q.includes('how many') || q.includes('total')) return 'OUTCOMES';
-    return 'OPTIONS';
-  }, [market]);
+  const handleBuyYes = (option) => {
+    setSelectedOption(option);
+  };
+
+  const handleBuyNo = (option) => {
+    setSelectedOption(option);
+  };
 
   if (!isOpen || !market) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
-      <div className="bg-gray-900 rounded-xl border border-gray-800 shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex bg-black/95 backdrop-blur-sm">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="p-4 border-b border-gray-800 bg-gradient-to-r from-gray-900 via-gray-900 to-orange-900/30">
-          <div className="flex items-start justify-between">
+        <div className="p-6 border-b border-gray-800">
+          <div className="flex items-start gap-4">
+            {/* Market Icon */}
+            <div className="w-16 h-16 rounded-xl bg-gray-800 flex items-center justify-center flex-shrink-0 border border-gray-700">
+              {marketType === 'politics' ? (
+                <span className="text-2xl">🏛️</span>
+              ) : marketType === 'sports' ? (
+                <span className="text-2xl">🏆</span>
+              ) : (
+                <span className="text-2xl">📊</span>
+              )}
+            </div>
+
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 font-bold">
-                  {market.platform || 'POLYMARKET'}
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                  {outcomes.length} {marketType}
-                </span>
-                {market.category && (
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
-                    {market.category}
-                  </span>
-                )}
+              {/* Breadcrumb */}
+              <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                <span>{market.category || 'Markets'}</span>
+                <span>·</span>
+                <span>{market.platform || 'Polymarket'}</span>
               </div>
-              <h2 className="text-xl text-white font-bold leading-tight">{market.question}</h2>
+              {/* Title */}
+              <h1 className="text-2xl font-bold text-white leading-tight">{market.question}</h1>
             </div>
-            <button
-              onClick={onClose}
-              className="ml-4 p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+              </button>
+              <button className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
 
-          {/* Market Stats */}
-          <div className="flex items-center gap-6 mt-3 text-[11px]">
-            <div>
-              <span className="text-gray-500">24h Volume:</span>
-              <span className="text-white font-bold ml-1">${formatNumber(market.volume_24h || 0)}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Liquidity:</span>
-              <span className="text-white font-bold ml-1">${formatNumber(market.liquidity || 0)}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Total Prob:</span>
-              <span className={`font-bold ml-1 ${Math.abs(totalProbability - 1) > 0.05 ? 'text-yellow-400' : 'text-green-400'}`}>
-                {(totalProbability * 100).toFixed(1)}%
-              </span>
-            </div>
-            <div className="ml-auto flex items-center gap-2 text-gray-500">
-              <span>Press ESC to close</span>
-            </div>
+          {/* Volume */}
+          <div className="mt-4 text-sm text-gray-500">
+            {formatVolume(market.volume_total || market.volume_24h || 0)} vol
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="p-3 border-b border-gray-800 bg-gray-900/50 flex items-center justify-between flex-wrap gap-2">
-          {/* Investment Amount */}
+        {/* Column Header */}
+        <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between bg-gray-900/50">
+          <div className="flex items-center gap-8">
+            <span className="text-sm text-gray-500 w-48">Chance</span>
+          </div>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-gray-500">Investment:</span>
-            <div className="flex items-center gap-1">
-              {[10, 50, 100, 500, 1000].map(amt => (
-                <button
-                  key={amt}
-                  onClick={() => setInvestAmount(amt)}
-                  className={`px-2 py-1 text-[10px] rounded transition-colors ${
-                    investAmount === amt
-                      ? 'bg-orange-500 text-black font-bold'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                  }`}
-                >
-                  ${amt}
-                </button>
-              ))}
-              <input
-                type="number"
-                value={investAmount}
-                onChange={(e) => setInvestAmount(Math.max(1, parseInt(e.target.value) || 0))}
-                className="w-20 px-2 py-1 text-[10px] bg-gray-800 border border-gray-700 rounded text-white outline-none focus:border-orange-500"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* View Mode */}
-            <div className="flex items-center bg-gray-800 rounded-lg p-0.5">
-              <button
-                onClick={() => setViewMode('cards')}
-                className={`px-2 py-1 text-[10px] rounded transition-colors ${
-                  viewMode === 'cards' ? 'bg-orange-500 text-black font-bold' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Cards
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-2 py-1 text-[10px] rounded transition-colors ${
-                  viewMode === 'list' ? 'bg-orange-500 text-black font-bold' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                List
-              </button>
-            </div>
-
-            {/* Sort */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-gray-500">Sort:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="text-[10px] bg-gray-800 text-gray-300 border border-gray-700 rounded px-2 py-1 outline-none"
-              >
-                <option value="probability">Probability</option>
-                <option value="volume">Volume</option>
-                <option value="name">Name</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Explanation Banner */}
-        <div className="px-4 py-2 bg-blue-500/10 border-b border-blue-500/20">
-          <div className="flex items-center gap-3 text-[11px]">
-            <span className="text-blue-400 font-bold">How it works:</span>
-            <span className="text-gray-400">
-              Buy <span className="text-green-400 font-medium">YES</span> if you think this option will win.
-              Buy <span className="text-red-400 font-medium">NO</span> if you think it won't.
-              If correct, you receive <span className="text-white font-medium">$1.00 per share</span>.
-            </span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="text-xs bg-gray-800 text-gray-400 border border-gray-700 rounded-lg px-3 py-1.5 outline-none"
+            >
+              <option value="probability">Sort by Chance</option>
+              <option value="volume">Sort by Volume</option>
+              <option value="name">Sort by Name</option>
+            </select>
           </div>
         </div>
 
         {/* Options List */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto">
           {outcomes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <div className="text-gray-500 text-sm">No options available for this market</div>
-            </div>
-          ) : viewMode === 'cards' ? (
-            <div className="grid grid-cols-2 gap-4">
-              {outcomes.map((option, idx) => (
-                <OptionCard
-                  key={option.marketId || option.name || idx}
-                  option={option}
-                  investAmount={investAmount}
-                  isSelected={selectedOption?.name === option.name}
-                  onSelect={setSelectedOption}
-                  index={idx}
-                />
-              ))}
+            <div className="flex items-center justify-center h-64 text-gray-500">
+              No options available
             </div>
           ) : (
-            <div className="space-y-2">
-              {/* List Header */}
-              <div className="flex items-center gap-4 px-3 py-2 text-[10px] text-gray-500 border-b border-gray-800">
-                <span className="w-6">#</span>
-                <span className="flex-1">{marketType.slice(0, -1)}</span>
-                <span className="w-24 text-center">BUY YES</span>
-                <span className="w-24 text-center">BUY NO</span>
-                <span className="w-16 text-right">PRICE</span>
-              </div>
-              {outcomes.map((option, idx) => (
-                <OptionRow
-                  key={option.marketId || option.name || idx}
-                  option={option}
-                  investAmount={investAmount}
-                  isSelected={selectedOption?.name === option.name}
-                  onSelect={setSelectedOption}
-                  index={idx}
-                />
-              ))}
-            </div>
+            outcomes.map((option, idx) => (
+              <OptionRow
+                key={option.marketId || option.name || idx}
+                option={option}
+                index={idx}
+                isSelected={selectedOption?.name === option.name}
+                onSelect={setSelectedOption}
+                onBuyYes={handleBuyYes}
+                onBuyNo={handleBuyNo}
+              />
+            ))
           )}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-800 bg-gray-900/80">
-          <div className="flex items-center justify-between">
-            <div className="text-[10px] text-gray-500">
-              {selectedOption ? (
-                <span>
-                  Selected: <span className="text-orange-400 font-bold">{selectedOption.name}</span>
-                </span>
-              ) : (
-                <span>Click a {marketType.toLowerCase().slice(0, -1)} to see detailed payouts</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-[11px] rounded bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors"
-              >
-                Close
-              </button>
-              {selectedOption && onTrade && (
-                <button
-                  onClick={() => onTrade(selectedOption)}
-                  className="px-4 py-2 text-[11px] rounded bg-orange-500 text-black font-bold hover:bg-orange-400 transition-colors"
-                >
-                  Trade {selectedOption.name}
-                </button>
-              )}
-            </div>
-          </div>
+        {/* More Markets Link */}
+        <div className="p-4 border-t border-gray-800">
+          <button className="text-sm text-emerald-400 hover:text-emerald-300 font-medium">
+            More markets →
+          </button>
         </div>
       </div>
+
+      {/* Right Sidebar - Trade Panel */}
+      {selectedOption && (
+        <TradeSidebar
+          option={selectedOption}
+          market={market}
+          investAmount={investAmount}
+          setInvestAmount={setInvestAmount}
+          onTrade={onTrade}
+          onClose={() => setSelectedOption(null)}
+        />
+      )}
     </div>
   );
 };
