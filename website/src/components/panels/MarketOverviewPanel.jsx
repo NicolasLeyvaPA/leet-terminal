@@ -1,7 +1,40 @@
+import { useState } from 'react';
 import { PanelHeader } from '../PanelHeader';
 import { DataRow } from '../DataRow';
 import { Tag } from '../Tag';
 import { QuantEngine } from '../../utils/quantEngine';
+
+// ============================================
+// BEGINNER-FRIENDLY TOOLTIP COMPONENT
+// ============================================
+const HelpTip = ({ children, tip }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <span
+      className="relative cursor-help"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      {children}
+      <span className="ml-0.5 text-gray-500 text-[8px]">ⓘ</span>
+      {show && (
+        <div className="absolute z-50 bottom-full left-0 mb-1 w-44 p-2 bg-gray-800 border border-gray-700 rounded shadow-lg text-[10px] text-gray-300 leading-relaxed">
+          {tip}
+        </div>
+      )}
+    </span>
+  );
+};
+
+// Beginner-friendly explanations
+const TIPS = {
+  marketPrice: "What other traders think the chance is. This is the current trading price.",
+  modelEstimate: "What our AI model thinks the real chance is. Compare to market price to find opportunities.",
+  edge: "The difference between our estimate and the market. Positive = underpriced, negative = overpriced.",
+  kelly: "Suggested bet size based on your edge. Smaller = safer. Never bet more than you can afford to lose!",
+  ev: "Expected Value - the average profit you'd make on a $1,000 bet. Positive = good bet, negative = bad bet.",
+  cents: "In prediction markets, 50¢ means 50% chance. Think of it as cents on the dollar for a $1 payout.",
+};
 
 // Validate probability is a valid number between 0 and 1
 const isValidProbability = (prob) => {
@@ -87,29 +120,35 @@ export const MarketOverviewPanel = ({ market }) => {
           )}
         </div>
 
-        {/* Main Probability Display */}
+        {/* Main Probability Display - Beginner-friendly */}
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
-            <div className="text-[10px] text-gray-500 mb-0.5">MARKET PRICE</div>
+            <HelpTip tip={TIPS.marketPrice}>
+              <div className="text-[10px] text-gray-500 mb-0.5">MARKET SAYS</div>
+            </HelpTip>
             <div className="text-xl font-bold text-white mono">
-              {(marketProb * 100).toFixed(1)}¢
+              {(marketProb * 100).toFixed(1)}%
             </div>
             <div className="text-[10px] text-gray-600">
-              Bid: {((market.bestBid || marketProb) * 100).toFixed(1)}¢ / Ask: {((market.bestAsk || marketProb) * 100).toFixed(1)}¢
+              Buy: {((market.bestAsk || marketProb) * 100).toFixed(1)}% / Sell: {((market.bestBid || marketProb) * 100).toFixed(1)}%
             </div>
           </div>
           <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
-            <div className="text-[10px] text-gray-500 mb-0.5">MODEL ESTIMATE</div>
+            <HelpTip tip={TIPS.modelEstimate}>
+              <div className="text-[10px] text-gray-500 mb-0.5">OUR MODEL SAYS</div>
+            </HelpTip>
             <div className={`text-xl font-bold mono ${signalColor}`}>
-              {(modelProb * 100).toFixed(1)}¢
+              {(modelProb * 100).toFixed(1)}%
             </div>
-            <div className={`text-[10px] ${signalColor}`}>
-              Edge: {edge > 0 ? '+' : ''}{edgePct.toFixed(2)}%
-            </div>
+            <HelpTip tip={TIPS.edge}>
+              <div className={`text-[10px] ${signalColor}`}>
+                {edge > 0 ? 'Underpriced by ' : edge < 0 ? 'Overpriced by ' : 'Fair price '}{Math.abs(edgePct).toFixed(1)}%
+              </div>
+            </HelpTip>
           </div>
         </div>
 
-        {/* Edge Analysis */}
+        {/* Edge Analysis - Beginner friendly */}
         <div className={`rounded p-2 mb-3 border ${
           Math.abs(edge) > 0.03
             ? edge > 0
@@ -119,11 +158,15 @@ export const MarketOverviewPanel = ({ market }) => {
         }`}>
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-[10px] text-gray-500">SIGNAL</div>
-              <div className={`text-lg font-bold ${signalColor}`}>{signal}</div>
+              <div className="text-[10px] text-gray-500">RECOMMENDATION</div>
+              <div className={`text-lg font-bold ${signalColor}`}>
+                {signal === 'BUY' ? '📈 BUY' : signal === 'SELL' ? '📉 SELL' : '⏸️ WAIT'}
+              </div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-gray-500">EV / $1,000</div>
+              <HelpTip tip={TIPS.ev}>
+                <div className="text-[10px] text-gray-500">PROFIT ON $1,000</div>
+              </HelpTip>
               <div className={`text-lg font-bold mono ${ev.ev > 0 ? 'text-green-400' : ev.ev < 0 ? 'text-red-400' : 'text-gray-400'}`}>
                 {ev.ev > 0 ? '+' : ''}{formatValue(ev.ev, 2, '$', '')}
               </div>
@@ -131,24 +174,31 @@ export const MarketOverviewPanel = ({ market }) => {
           </div>
         </div>
 
-        {/* Kelly Sizing */}
-        <div className="grid grid-cols-3 gap-1 mb-3">
-          <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
-            <div className="text-[9px] text-gray-500">KELLY 1/4</div>
-            <div className="text-xs font-bold text-orange-400 mono">
-              {formatValue((kelly.quarter || 0) * 100, 1, '', '%')}
-            </div>
+        {/* Kelly Sizing - Beginner friendly with clear explanations */}
+        <div className="mb-3">
+          <div className="flex items-center gap-1 mb-1">
+            <HelpTip tip={TIPS.kelly}>
+              <div className="text-[10px] text-gray-500">SUGGESTED BET SIZE (% of bankroll)</div>
+            </HelpTip>
           </div>
-          <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
-            <div className="text-[9px] text-gray-500">KELLY 1/2</div>
-            <div className="text-xs font-bold text-orange-300 mono">
-              {formatValue((kelly.half || 0) * 100, 1, '', '%')}
+          <div className="grid grid-cols-3 gap-1">
+            <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
+              <div className="text-[9px] text-green-400">SAFE</div>
+              <div className="text-xs font-bold text-orange-400 mono">
+                {formatValue((kelly.quarter || 0) * 100, 1, '', '%')}
+              </div>
             </div>
-          </div>
-          <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
-            <div className="text-[9px] text-gray-500">KELLY FULL</div>
-            <div className="text-xs font-bold text-orange-200 mono">
-              {formatValue((kelly.full || 0) * 100, 1, '', '%')}
+            <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
+              <div className="text-[9px] text-yellow-400">MODERATE</div>
+              <div className="text-xs font-bold text-orange-300 mono">
+                {formatValue((kelly.half || 0) * 100, 1, '', '%')}
+              </div>
+            </div>
+            <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
+              <div className="text-[9px] text-red-400">AGGRESSIVE</div>
+              <div className="text-xs font-bold text-orange-200 mono">
+                {formatValue((kelly.full || 0) * 100, 1, '', '%')}
+              </div>
             </div>
           </div>
         </div>

@@ -2,6 +2,55 @@ import { useState, useEffect, useMemo } from 'react';
 import { PanelHeader } from '../PanelHeader';
 import { Tag } from '../Tag';
 
+// ============================================
+// BEGINNER-FRIENDLY TOOLTIPS & EXPLANATIONS
+// ============================================
+
+// Tooltip component for hover explanations
+const Tooltip = ({ children, text, position = 'top' }) => {
+  const [show, setShow] = useState(false);
+
+  const positionClasses = {
+    top: 'bottom-full left-1/2 -translate-x-1/2 mb-1',
+    bottom: 'top-full left-1/2 -translate-x-1/2 mt-1',
+    left: 'right-full top-1/2 -translate-y-1/2 mr-1',
+    right: 'left-full top-1/2 -translate-y-1/2 ml-1',
+  };
+
+  return (
+    <div
+      className="relative inline-flex items-center"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      {children}
+      <span className="ml-0.5 text-gray-500 cursor-help text-[8px]">ⓘ</span>
+      {show && (
+        <div className={`absolute ${positionClasses[position]} z-50 w-48 p-2 bg-gray-800 border border-gray-700 rounded shadow-lg text-[10px] text-gray-300 leading-relaxed`}>
+          {text}
+          <div className="absolute w-2 h-2 bg-gray-800 border-gray-700 transform rotate-45
+            ${position === 'top' ? 'bottom-[-5px] left-1/2 -translate-x-1/2 border-r border-b' : ''}
+            ${position === 'bottom' ? 'top-[-5px] left-1/2 -translate-x-1/2 border-l border-t' : ''}
+          " />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Plain English explanations for key concepts
+const EXPLANATIONS = {
+  overround: "The market is charging too much! All options together cost more than 100%. Like paying $1.05 for a lottery that only pays $1.",
+  underround: "A rare opportunity! All options together cost less than 100%. Like getting $1.05 lottery for $0.95.",
+  probabilitySum: "Add up all the chances. In a fair market, they equal 100%. If higher = overpriced. If lower = underpriced.",
+  deviation: "How far off from fair value (100%). A 5% deviation means the market is 5% overpriced or underpriced.",
+  edge: "Your potential profit percentage before costs. Higher is better!",
+  equivalence: "How well two markets match. IDENTICAL = same event, safe to trade. SIMILAR = likely same, some risk. DIFFERENT = don't trade.",
+  basisRisk: "The chance that two seemingly identical markets settle differently. Lower is safer.",
+  spreadProfit: "The difference between buy and sell prices. This is where arbitrage profit comes from.",
+  netProfit: "Your actual profit after ALL costs (fees, gas, slippage). This is what matters!",
+};
+
 // Format currency
 const formatCurrency = (value, decimals = 2) => {
   if (value === undefined || value === null || isNaN(value)) return '$0.00';
@@ -66,7 +115,7 @@ const CostBreakdown = ({ costs }) => {
   );
 };
 
-// Equivalence badge component
+// Equivalence badge component - shows how well two markets match
 const EquivalenceBadge = ({ equivalence }) => {
   if (!equivalence) return null;
 
@@ -77,10 +126,27 @@ const EquivalenceBadge = ({ equivalence }) => {
     UNKNOWN: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
   };
 
+  // Beginner-friendly labels
+  const labels = {
+    IDENTICAL: 'PERFECT MATCH',
+    SIMILAR: 'LIKELY MATCH',
+    DIFFERENT: 'NOT A MATCH',
+    UNKNOWN: 'UNKNOWN',
+  };
+
+  const explanations = {
+    IDENTICAL: "Both markets track the exact same event. Safe to trade!",
+    SIMILAR: "Markets look similar but may have slight differences. Some risk.",
+    DIFFERENT: "These markets are NOT the same event. Do NOT trade!",
+    UNKNOWN: "Unable to verify if markets match. Proceed with caution.",
+  };
+
   return (
-    <span className={`text-[9px] px-1.5 py-0.5 rounded border ${colors[equivalence.result] || colors.UNKNOWN}`}>
-      {equivalence.result} ({formatPercent(equivalence.confidence * 100, 0)})
-    </span>
+    <Tooltip text={explanations[equivalence.result] || explanations.UNKNOWN} position="bottom">
+      <span className={`text-[9px] px-1.5 py-0.5 rounded border ${colors[equivalence.result] || colors.UNKNOWN}`}>
+        {labels[equivalence.result] || 'UNKNOWN'} ({formatPercent(equivalence.confidence * 100, 0)})
+      </span>
+    </Tooltip>
   );
 };
 
@@ -114,6 +180,7 @@ const RiskMeter = ({ level, label }) => {
 };
 
 // Polymarket internal opportunity card (overround/underround)
+// BEGINNER-FRIENDLY: This card shows when a market's prices don't add up correctly
 const PolymarketOpportunityCard = ({ opportunity }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -125,56 +192,68 @@ const PolymarketOpportunityCard = ({ opportunity }) => {
   // Format total probability as percentage (1.05 → "105.0%")
   const totalProbDisplay = (totalProbability * 100).toFixed(1);
 
+  // Plain English type label
+  const typeLabel = isOverround ? 'OVERPRICED' : 'UNDERPRICED';
+  const typeExplanation = isOverround ? EXPLANATIONS.overround : EXPLANATIONS.underround;
+
   return (
-    <div className="bg-gray-900/50 rounded border border-gray-800 p-3 mb-2">
+    <div className="bg-gray-900/50 rounded border border-gray-800 p-3 mb-2 hover:border-gray-700 transition-colors">
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
           <div className="text-[11px] text-gray-300 font-medium truncate">{market?.question}</div>
           <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold ${
-              isOverround
-                ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                : 'bg-green-500/20 text-green-400 border-green-500/30'
-            }`}>
-              {type}
-            </span>
+            <Tooltip text={typeExplanation} position="bottom">
+              <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold ${
+                isOverround
+                  ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                  : 'bg-green-500/20 text-green-400 border-green-500/30'
+              }`}>
+                {typeLabel}
+              </span>
+            </Tooltip>
             <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
               {market?.outcomes?.length || 0} OPTIONS
             </span>
           </div>
         </div>
         <div className="text-right">
-          <div className={`text-xl font-bold ${isOverround ? 'text-red-400' : 'text-green-400'}`}>
-            {deviationPercent}%
-          </div>
-          <div className="text-[9px] text-gray-500">edge</div>
+          <Tooltip text={EXPLANATIONS.edge} position="left">
+            <div className={`text-xl font-bold ${isOverround ? 'text-red-400' : 'text-green-400'}`}>
+              {deviationPercent}%
+            </div>
+          </Tooltip>
+          <div className="text-[9px] text-gray-500">potential profit</div>
         </div>
       </div>
 
-      {/* Probability analysis - clean display */}
+      {/* Probability analysis - beginner-friendly labels */}
       <div className="bg-gray-800/50 rounded p-2 mb-2 space-y-1.5">
         <div className="flex justify-between text-[10px]">
-          <span className="text-gray-500">Probability Sum</span>
+          <Tooltip text={EXPLANATIONS.probabilitySum} position="right">
+            <span className="text-gray-500">Total of all options</span>
+          </Tooltip>
           <span className={totalProbability > 1 ? 'text-red-400 font-bold' : 'text-green-400 font-bold'}>
             {totalProbDisplay}%
           </span>
         </div>
         <div className="flex justify-between text-[10px]">
-          <span className="text-gray-500">Fair Value</span>
+          <span className="text-gray-500">Should be</span>
           <span className="text-gray-400">100.0%</span>
         </div>
         <div className="flex justify-between text-[10px]">
-          <span className="text-gray-500">Deviation</span>
+          <Tooltip text={EXPLANATIONS.deviation} position="right">
+            <span className="text-gray-500">Mispricing</span>
+          </Tooltip>
           <span className={`font-bold ${isOverround ? 'text-red-400' : 'text-green-400'}`}>
             {isOverround ? '+' : '-'}{deviationPercent}%
           </span>
         </div>
       </div>
 
-      {/* Strategy */}
+      {/* Strategy - what to do */}
       <div className="text-[10px] text-yellow-400 bg-yellow-500/10 rounded px-2 py-1.5 mb-2 border border-yellow-500/20">
-        {action}
+        <span className="font-bold">💡 Strategy: </span>{action}
       </div>
 
       {/* Expandable outcomes */}
@@ -183,7 +262,7 @@ const PolymarketOpportunityCard = ({ opportunity }) => {
         className="text-[9px] text-gray-500 hover:text-gray-300 w-full text-left flex items-center gap-1"
       >
         <span>{expanded ? '▼' : '▶'}</span>
-        <span>Show {market?.outcomes?.length || 0} Outcomes</span>
+        <span>See all {market?.outcomes?.length || 0} options and their prices</span>
       </button>
 
       {expanded && market?.outcomes && (

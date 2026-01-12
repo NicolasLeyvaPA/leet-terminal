@@ -1,6 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { PanelHeader } from '../PanelHeader';
 
+// ============================================
+// BEGINNER-FRIENDLY LIVE TRADES PANEL
+// Shows trades as they execute in real-time
+// ============================================
+
+// Tooltip for help text
+const QuickTip = ({ tip }) => (
+  <span className="ml-1 text-gray-500 cursor-help text-[8px] group relative">
+    ⓘ
+    <span className="hidden group-hover:block absolute z-50 bottom-full left-0 mb-1 w-40 p-2 bg-gray-800 border border-gray-700 rounded shadow-lg text-[10px] text-gray-300">
+      {tip}
+    </span>
+  </span>
+);
+
 // Format currency with proper decimals
 const formatCurrency = (value, decimals = 2) => {
   if (value === undefined || value === null || isNaN(value)) return '$0.00';
@@ -19,10 +34,35 @@ const formatTimeAgo = (timestamp) => {
   return `${Math.floor(seconds / 3600)}h ago`;
 };
 
+// Friendly trade type labels
+const getTradeTypeLabel = (trade) => {
+  const direction = trade.opportunity?.direction;
+  const type = trade.opportunity?.type;
+
+  if (direction === 'BUY_POLY_SELL_KALSHI') return 'CROSS-VENUE ARB';
+  if (direction === 'BUY_KALSHI_SELL_POLY') return 'CROSS-VENUE ARB';
+  if (type === 'OVERROUND') return 'SELL OVERPRICED';
+  if (type === 'UNDERROUND') return 'BUY UNDERPRICED';
+  return 'TRADE';
+};
+
+// Friendly status labels
+const getStatusLabel = (status) => {
+  const labels = {
+    'FILLED': '✓ Completed',
+    'SIMULATED': '🔄 Simulated',
+    'PENDING': '⏳ Processing',
+    'FAILED': '✗ Failed',
+  };
+  return labels[status] || status;
+};
+
 // Single trade row component
 const TradeRow = ({ trade, isNew }) => {
   const pnl = trade.profit || 0;
   const isProfitable = pnl >= 0;
+  const tradeLabel = getTradeTypeLabel(trade);
+  const statusLabel = getStatusLabel(trade.status);
 
   return (
     <div className={`
@@ -46,19 +86,19 @@ const TradeRow = ({ trade, isNew }) => {
             {trade.opportunity?.polymarket?.question?.slice(0, 40) || trade.opportunity?.market?.question?.slice(0, 40) || 'Unknown Market'}...
           </span>
           <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
-            trade.opportunity?.direction === 'BUY_POLY_SELL_KALSHI'
+            trade.opportunity?.direction
               ? 'bg-blue-500/20 text-blue-400'
               : trade.opportunity?.type === 'OVERROUND'
                 ? 'bg-red-500/20 text-red-400'
                 : 'bg-green-500/20 text-green-400'
           }`}>
-            {trade.opportunity?.direction || trade.opportunity?.type || 'TRADE'}
+            {tradeLabel}
           </span>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-gray-500">
           <span>{formatTimeAgo(trade.executedAt)}</span>
-          <span>Size: ${trade.opportunity?.tradeSize?.toFixed(0) || '--'}</span>
-          <span className="text-gray-600">{trade.status}</span>
+          <span>Amount: ${trade.opportunity?.tradeSize?.toFixed(0) || '--'}</span>
+          <span className="text-gray-600">{statusLabel}</span>
         </div>
       </div>
 
@@ -68,7 +108,7 @@ const TradeRow = ({ trade, isNew }) => {
           {formatCurrency(pnl)}
         </div>
         <div className={`text-[10px] ${isProfitable ? 'text-green-400/60' : 'text-red-400/60'}`}>
-          {isProfitable ? 'PROFIT' : 'LOSS'}
+          {isProfitable ? '✓ PROFIT' : '✗ LOSS'}
         </div>
       </div>
     </div>
@@ -143,12 +183,15 @@ export const LiveTradesPanel = ({ bot }) => {
         }
       />
 
-      {/* Stats bar */}
+      {/* Stats bar - Beginner-friendly labels */}
       <div className="p-3 border-b border-gray-800 bg-gray-900/30">
         <div className="grid grid-cols-5 gap-3">
           {/* Total P&L - Large display */}
           <div className="col-span-2 bg-gray-800/50 rounded-lg p-3 border border-gray-700">
-            <div className="text-[10px] text-gray-500 mb-1">TOTAL P&L</div>
+            <div className="text-[10px] text-gray-500 mb-1 flex items-center">
+              TOTAL PROFIT/LOSS
+              <QuickTip tip="Your combined profit or loss from all executed trades" />
+            </div>
             <div className={`text-2xl font-bold mono ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
               {formatCurrency(stats.totalPnL)}
             </div>
@@ -156,7 +199,10 @@ export const LiveTradesPanel = ({ bot }) => {
 
           {/* Win Rate */}
           <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
-            <div className="text-[10px] text-gray-500 mb-1">WIN RATE</div>
+            <div className="text-[10px] text-gray-500 mb-1 flex items-center">
+              SUCCESS RATE
+              <QuickTip tip="Percentage of trades that made money" />
+            </div>
             <div className="text-lg font-bold text-orange-400 mono">
               {stats.winRate.toFixed(1)}%
             </div>
@@ -164,7 +210,7 @@ export const LiveTradesPanel = ({ bot }) => {
 
           {/* Wins */}
           <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
-            <div className="text-[10px] text-gray-500 mb-1">WINS</div>
+            <div className="text-[10px] text-gray-500 mb-1">PROFITABLE</div>
             <div className="text-lg font-bold text-green-400 mono">
               {stats.wins}
             </div>
@@ -172,7 +218,7 @@ export const LiveTradesPanel = ({ bot }) => {
 
           {/* Losses */}
           <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
-            <div className="text-[10px] text-gray-500 mb-1">LOSSES</div>
+            <div className="text-[10px] text-gray-500 mb-1">UNPROFITABLE</div>
             <div className="text-lg font-bold text-red-400 mono">
               {stats.losses}
             </div>

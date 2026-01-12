@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { PORTFOLIO_POSITIONS } from './data/constants';
 import { PolymarketAPI } from './services/polymarketAPI';
+import { KalshiAPI } from './services/kalshiAPI';
 import { generatePriceHistory, generateOrderbook } from './utils/helpers';
 import { WatchlistPanel } from './components/panels/WatchlistPanel';
 import { MarketOverviewPanel } from './components/panels/MarketOverviewPanel';
@@ -34,7 +35,9 @@ const REFRESH_INTERVAL = 15000; // 15 seconds
 const Terminal = ({ onLogout }) => {
   const { watchlist } = useWatchlist();
   const [markets, setMarkets] = useState([]);
+  const [kalshiMarkets, setKalshiMarkets] = useState([]);
   const [loadingMarkets, setLoadingMarkets] = useState(true);
+  const [loadingKalshi, setLoadingKalshi] = useState(false);
   const [marketLimit, setMarketLimit] = useState(25); // Default 25 markets
   const [platformFilter, setPlatformFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -59,7 +62,7 @@ const Terminal = ({ onLogout }) => {
   const loadMarkets = useCallback(async (limit = marketLimit, isManual = false) => {
     try {
       if (isManual) setLoadingMarkets(true);
-      setStatusMessage("Syncing...");
+      setStatusMessage("Syncing Polymarket...");
       const data = await PolymarketAPI.fetchOpenEvents(limit);
 
       // Add price history and orderbook to each market
@@ -74,8 +77,8 @@ const Terminal = ({ onLogout }) => {
         setSelectedMarket(enrichedMarkets[0]);
       }
 
-      // Pass market data to the prediction arbitrage bot
-      predictionArbBot.setMarketData(enrichedMarkets);
+      // Pass market data to the prediction arbitrage bot (with current Kalshi data)
+      predictionArbBot.setMarketData(enrichedMarkets, kalshiMarkets);
 
       setLastRefresh(new Date());
       setStatusMessage(`${enrichedMarkets.length} markets`);
@@ -86,14 +89,51 @@ const Terminal = ({ onLogout }) => {
     } finally {
       setLoadingMarkets(false);
     }
-  }, [marketLimit, selectedMarket, predictionArbBot]);
+  }, [marketLimit, selectedMarket, predictionArbBot, kalshiMarkets]);
 
-  // Initial load and refresh interval
+  // Load Kalshi markets (separate to avoid blocking Polymarket)
+  const loadKalshiMarkets = useCallback(async () => {
+    try {
+      setLoadingKalshi(true);
+      console.log('[Kalshi] Fetching markets...');
+
+      // Use demo API for now (no auth required for public data)
+      const kalshiData = await KalshiAPI.fetchAllOpenMarkets(false);
+
+      setKalshiMarkets(kalshiData);
+      console.log(`[Kalshi] Loaded ${kalshiData.length} markets`);
+
+      // Update arbitrage bot with new Kalshi data
+      predictionArbBot.setMarketData(markets, kalshiData);
+
+      return kalshiData;
+    } catch (error) {
+      console.warn('[Kalshi] Failed to load markets:', error.message);
+      // Don't fail silently - Kalshi may have CORS issues in browser
+      return [];
+    } finally {
+      setLoadingKalshi(false);
+    }
+  }, [predictionArbBot, markets]);
+
+  // Initial load and refresh interval for Polymarket
   useEffect(() => {
     loadMarkets(marketLimit, true);
     const interval = setInterval(() => loadMarkets(marketLimit, false), REFRESH_INTERVAL);
     return () => clearInterval(interval);
   }, [marketLimit]);
+
+  // Load Kalshi markets on startup and refresh every 30 seconds
+  useEffect(() => {
+    // Initial load after a short delay (let Polymarket load first)
+    const initialLoad = setTimeout(() => loadKalshiMarkets(), 2000);
+    // Refresh Kalshi every 30 seconds (less aggressive due to rate limits)
+    const kalshiInterval = setInterval(() => loadKalshiMarkets(), 30000);
+    return () => {
+      clearTimeout(initialLoad);
+      clearInterval(kalshiInterval);
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -432,9 +472,15 @@ const Terminal = ({ onLogout }) => {
                     <span className="text-gray-500">MULTI:</span>
                     <span className="text-purple-400 font-bold ml-1">{markets.filter(m => m.isMultiOption).length}</span>
                   </div>
-                  <div>
+                  <div className="flex items-center">
                     <span className="text-gray-500">KALSHI:</span>
-                    <span className="text-blue-400 font-bold ml-1">--</span>
+                    {loadingKalshi ? (
+                      <span className="text-blue-400/50 font-bold ml-1 animate-pulse">...</span>
+                    ) : (
+                      <span className={`font-bold ml-1 ${kalshiMarkets.length > 0 ? 'text-blue-400' : 'text-gray-500'}`}>
+                        {kalshiMarkets.length || '0'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
