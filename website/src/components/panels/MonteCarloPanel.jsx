@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { PanelHeader } from '../PanelHeader';
 import { DataRow } from '../DataRow';
-import { MonteCarloChart } from '../MonteCarloChart';
+import { MonteCarloChart } from '../charts/MonteCarloChart';
 import { QuantEngine } from '../../utils/quantEngine';
 
 // Validate probability is a valid number between 0 and 1
@@ -90,8 +90,24 @@ export const MonteCarloPanel = ({ market }) => {
         subtitle="5k sims × 100 trades"
       />
       <div className="panel-content">
-        <div className="h-20 p-1">
-          <MonteCarloChart paths={simulation.paths} />
+        <div className="p-1" style={{ height: '120px' }}>
+          <MonteCarloChart
+            samplePaths={simulation.paths}
+            medianPath={(() => {
+              const paths = simulation.paths;
+              if (!paths || paths.length === 0) return [];
+              const numTrades = paths[0]?.length || 0;
+              const median = [];
+              for (let i = 0; i < numTrades; i++) {
+                const vals = paths.map(p => p[i] || 0).sort((a, b) => a - b);
+                median.push(vals[Math.floor(vals.length / 2)]);
+              }
+              return median;
+            })()}
+            startingCapital={10000}
+            height={110}
+            showExpand={true}
+          />
         </div>
         <div className="px-2 pb-2 border-t border-gray-800">
           <div className="grid grid-cols-2 gap-x-3 mt-1">

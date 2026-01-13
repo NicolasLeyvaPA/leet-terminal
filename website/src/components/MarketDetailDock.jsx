@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PriceChart } from './PriceChart';
+import { TradingViewChart } from './charts/TradingViewChart';
 import { MarketTradesPanel } from './panels/MarketTradesPanel';
 import { BuySellPanel } from './panels/BuySellPanel';
 
@@ -69,9 +69,15 @@ export const MarketDetailDock = ({ market, show, onToggle }) => {
                   </span>
                 </div>
                 <div className="flex-1 p-1">
-                  <PriceChart
-                    data={market.price_history}
-                    height={150}
+                  <TradingViewChart
+                    data={(market.price_history || []).map(p => ({
+                      ...p,
+                      timestamp: p.time || p.timestamp || Date.now()
+                    }))}
+                    height={140}
+                    chartType="area"
+                    priceFormat="percent"
+                    showExpand={false}
                   />
                 </div>
               </div>
