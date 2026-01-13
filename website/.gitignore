@@ -1,8 +1,31 @@
 node_modules
 dist
+dist-ssr
 .DS_Store
 *.log
 .env
 .env.local
 .env.*.local
+
+# Vite cache
+.vite
+
+# Build outputs
+*.local
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Test coverage
+coverage
+
+# TypeScript
+*.tsbuildinfo
 

@@ -1,0 +1,27 @@
+{
+  "name": "@leet-terminal/shared",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./contracts": {
+      "import": "./dist/contracts/index.js",
+      "types": "./dist/contracts/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
