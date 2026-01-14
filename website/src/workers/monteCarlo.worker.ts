@@ -134,13 +134,14 @@ function generateOutcome(
       }
       break;
 
-    case 'student_t_parametric':
+    case 'student_t_parametric': {
       // Fat-tail distribution using Student's t with 5 degrees of freedom
       const tNoise = rng.randomStudentT(5) * 0.05;
       effectiveProb = config.modelProb + tNoise;
       break;
+    }
 
-    case 'regime_switching':
+    case 'regime_switching': {
       // Two-regime model: low volatility and high volatility
       // Transition probability
       if (regimeState.highVol) {
@@ -152,6 +153,7 @@ function generateOutcome(
       const volatility = regimeState.highVol ? 0.15 : 0.05;
       effectiveProb = config.modelProb + rng.randomNormal(0, volatility);
       break;
+    }
   }
 
   // Clamp probability

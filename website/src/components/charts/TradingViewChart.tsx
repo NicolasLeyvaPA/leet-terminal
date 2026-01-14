@@ -55,13 +55,13 @@ const chartTheme = {
     mode: CrosshairMode.Normal,
     vertLine: {
       color: '#ff6b00',
-      width: 1,
+      width: 1 as const,
       style: LineStyle.Dashed,
       labelBackgroundColor: '#ff6b00',
     },
     horzLine: {
       color: '#ff6b00',
-      width: 1,
+      width: 1 as const,
       style: LineStyle.Dashed,
       labelBackgroundColor: '#ff6b00',
     },
@@ -75,7 +75,7 @@ const chartTheme = {
     borderColor: '#333',
     scaleMargins: { top: 0.1, bottom: 0.2 },
   },
-};
+} as const;
 
 export function TradingViewChart({
   data,
@@ -194,7 +194,10 @@ export function TradingViewChart({
 
         const seriesData = param.seriesData.get(seriesRef.current!);
         if (seriesData) {
-          const price = 'value' in seriesData ? seriesData.value : seriesData.close;
+          // Type-safe access to price data (line/area has 'value', candlestick has 'close')
+          const price = 'value' in seriesData
+            ? (seriesData as { value: number }).value
+            : (seriesData as { close: number }).close;
           const firstPrice = formattedData[0]?.value || formattedData[0]?.close || price;
           setTooltipData({
             price: price as number,

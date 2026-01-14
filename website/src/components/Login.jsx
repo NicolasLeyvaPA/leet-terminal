@@ -355,7 +355,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
 
         <div className="mt-6 pt-6 border-t border-[#222]">
           <p className="text-xs text-gray-600 text-center">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <button
               onClick={onSwitchToSignup}
               className="text-orange-500 hover:text-orange-400 underline"

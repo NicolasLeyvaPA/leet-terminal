@@ -36,7 +36,8 @@ export class SeededRNG {
    * Returns a 64-bit unsigned integer
    */
   private next(): bigint {
-    let [s0, s1] = this.state;
+    const s0 = this.state[0];
+    let s1 = this.state[1];
     const result = (s0 + s1) & 0xffffffffffffffffn;
 
     s1 ^= s0;

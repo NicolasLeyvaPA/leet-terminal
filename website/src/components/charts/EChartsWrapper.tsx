@@ -20,7 +20,8 @@ import {
   ToolboxComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
-import type { EChartsOption, ECharts } from 'echarts';
+import type { EChartsOption } from 'echarts';
+import type { EChartsType } from 'echarts/core';
 
 // Register ECharts components
 echarts.use([
@@ -102,7 +103,7 @@ interface EChartsWrapperProps {
   option: EChartsOption;
   height?: number | string;
   loading?: boolean;
-  onChartReady?: (chart: ECharts) => void;
+  onChartReady?: (chart: EChartsType) => void;
   className?: string;
   showDataZoom?: boolean;
   showToolbox?: boolean;
@@ -118,7 +119,7 @@ export function EChartsWrapper({
   showToolbox = false,
 }: EChartsWrapperProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<ECharts | null>(null);
+  const chartRef = useRef<EChartsType | null>(null);
 
   // Merge default options with provided options
   const mergedOption = useMemo<EChartsOption>(() => {
