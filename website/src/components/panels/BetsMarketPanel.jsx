@@ -4,6 +4,9 @@ import { DataRow } from '../DataRow';
 import { Tag } from '../Tag';
 import { useWatchlist } from '../../utils/useWatchlist';
 
+// Use backend API - NO CORS PROXIES
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+
 export const BetsMarketPanel = () => {
   const { addToWatchlist, isInWatchlist } = useWatchlist();
   const [events, setEvents] = useState([]);
@@ -16,38 +19,44 @@ export const BetsMarketPanel = () => {
       try {
         setLoading(true);
         setError(null);
-        
-        // Use proxy in development, direct API with CORS proxy fallback in production
-        const apiUrl = import.meta.env.DEV
-          ? '/api/polymarket/events?order=id&ascending=false&closed=false&limit=100'
-          : 'https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=100';
-        
-        let response;
-        try {
-          response = await fetch(apiUrl);
-        } catch (corsError) {
-          // Fallback to CORS proxy if direct fetch fails
-          console.warn('Direct fetch failed, trying CORS proxy:', corsError);
-          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=100')}`;
-          response = await fetch(proxyUrl);
-        }
-        
+
+        // Fetch from backend API - no CORS proxies needed
+        const response = await fetch(`${API_BASE}/markets?limit=100&platform=polymarket`);
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        // Validate response data
-        if (!Array.isArray(data)) {
+
+        if (!data.success || !Array.isArray(data.data)) {
           throw new Error('Invalid response format');
         }
-        setEvents(data);
+
+        // Transform backend format to expected format
+        const transformedEvents = data.data.map(market => ({
+          id: market.id,
+          ticker: market.ticker,
+          title: market.question,
+          description: market.description,
+          endDate: market.end_date,
+          liquidity: market.liquidity,
+          tags: market.category ? [{ id: market.category, label: market.category }] : [],
+          markets: [{
+            bestBid: market.best_bid,
+            bestAsk: market.best_ask,
+            liquidityNum: market.liquidity,
+            volumeNum: market.volume_total,
+            outcomes: JSON.stringify(market.outcomes || ['Yes', 'No']),
+            outcomePrices: JSON.stringify(market.outcome_prices || [market.market_prob, 1 - market.market_prob]),
+          }],
+          resolutionSource: 'Polymarket resolution',
+        }));
+
+        setEvents(transformedEvents);
       } catch (err) {
         console.error('Failed to fetch markets:', err);
-        const errorMessage = err.message.includes('CORS') || err.message.includes('Failed to fetch')
-          ? 'CORS error: Unable to fetch from Polymarket API. The proxy should handle this in development.'
-          : err.message;
-        setError(errorMessage);
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -71,7 +80,7 @@ export const BetsMarketPanel = () => {
       <div className="terminal-panel h-full flex flex-col items-center justify-center text-red-500 text-xs p-4">
         <div className="mb-2">Error loading markets: {error}</div>
         <div className="text-gray-500 text-[10px] mt-2">
-          If this is a CORS error, you may need to use a proxy or enable CORS on the API.
+          Make sure the backend server is running on port 3001.
         </div>
       </div>
     );
@@ -93,7 +102,7 @@ export const BetsMarketPanel = () => {
               const bestBid = market?.bestBid ? (market.bestBid * 100).toFixed(1) : 'N/A';
               const bestAsk = market?.bestAsk ? (market.bestAsk * 100).toFixed(1) : 'N/A';
               const liquidity = market?.liquidityNum || event.liquidity || 0;
-            
+
             return (
               <div
                 key={event.id}
@@ -152,8 +161,8 @@ export const BetsMarketPanel = () => {
       <div className="flex-1 terminal-panel h-full">
         {selectedEvent ? (
           <>
-            <PanelHeader 
-              title={selectedEvent.ticker} 
+            <PanelHeader
+              title={selectedEvent.ticker}
               subtitle="Market Details"
               actions={
                 <button
@@ -285,4 +294,3 @@ export const BetsMarketPanel = () => {
     </div>
   );
 };
-

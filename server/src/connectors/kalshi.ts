@@ -334,18 +334,16 @@ export async function fetchOrderbook(
       };
     }
 
-    const bids = (response.orderbook.yes || []).map(([price, size], _, arr) => {
-      const cumulative = arr
-        .slice(0, arr.indexOf([price, size]) + 1)
-        .reduce((sum, [, s]) => sum + s, 0);
-      return { price: price / 100, size, cumulative };
+    let bidCumulative = 0;
+    const bids = (response.orderbook.yes || []).map(([price, size]) => {
+      bidCumulative += size;
+      return { price: price / 100, size, cumulative: bidCumulative };
     });
 
-    const asks = (response.orderbook.no || []).map(([price, size], _, arr) => {
-      const cumulative = arr
-        .slice(0, arr.indexOf([price, size]) + 1)
-        .reduce((sum, [, s]) => sum + s, 0);
-      return { price: (100 - price) / 100, size, cumulative };
+    let askCumulative = 0;
+    const asks = (response.orderbook.no || []).map(([price, size]) => {
+      askCumulative += size;
+      return { price: (100 - price) / 100, size, cumulative: askCumulative };
     });
 
     const totalBids = bids.reduce((sum, b) => sum + b.size, 0);

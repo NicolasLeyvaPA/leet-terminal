@@ -1,84 +1,7 @@
-// Polymarket API Service - Real market data integration
-const GAMMA_API = 'https://gamma-api.polymarket.com';
-const CLOB_API = 'https://clob.polymarket.com';
+// Polymarket API Service - Routes through backend to avoid CORS issues
+// NO CORS PROXIES - All data fetched via backend server
 
-// CORS proxy options (fallbacks if direct/vite proxy fails)
-const CORS_PROXIES = [
-  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://cors-anywhere.herokuapp.com/${url}`,
-];
-
-// Helper to handle API calls with CORS fallback
-async function fetchWithFallback(url, options = {}) {
-  // First try: Vite proxy in development
-  if (import.meta.env.DEV) {
-    const proxyUrl = url
-      .replace(GAMMA_API, '/api/polymarket')
-      .replace(CLOB_API, '/api/clob');
-
-    try {
-      const response = await fetch(proxyUrl, {
-        ...options,
-        headers: {
-          'Accept': 'application/json',
-          ...options.headers,
-        },
-      });
-      if (response.ok) {
-        return await response.json();
-      }
-      console.warn(`Vite proxy returned ${response.status}, trying fallbacks...`);
-    } catch (error) {
-      console.warn('Vite proxy failed:', error.message);
-    }
-  }
-
-  // Second try: Direct fetch (may work in some environments)
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Accept': 'application/json',
-        ...options.headers,
-      },
-    });
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch (error) {
-    console.warn('Direct fetch failed:', error.message);
-  }
-
-  // Third try: CORS proxies as fallback
-  for (const makeProxyUrl of CORS_PROXIES) {
-    try {
-      const proxyUrl = makeProxyUrl(url);
-      const response = await fetch(proxyUrl, {
-        ...options,
-        headers: {
-          'Accept': 'application/json',
-          ...options.headers,
-        },
-      });
-      if (response.ok) {
-        const text = await response.text();
-        try {
-          return JSON.parse(text);
-        } catch {
-          console.warn('Proxy returned non-JSON response');
-          continue;
-        }
-      }
-    } catch (error) {
-      console.warn('CORS proxy failed:', error.message);
-      continue;
-    }
-  }
-
-  // All methods failed
-  throw new Error(`Failed to fetch from ${url}. All proxy methods exhausted.`);
-}
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
 // Extract event slug from Polymarket URL
 export function extractEventSlug(url) {
@@ -95,157 +18,163 @@ export function extractEventSlug(url) {
   }
 }
 
-// Fetch event by slug
+// Fetch all open events via backend
+export async function fetchOpenEvents(limit = 50) {
+  try {
+    const response = await fetch(`${API_BASE}/markets?limit=${limit}&platform=polymarket`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.data) {
+      console.warn('Unexpected response format:', data);
+      return [];
+    }
+
+    // Transform backend format to frontend format
+    return data.data.map(market => transformMarketFromBackend(market));
+  } catch (error) {
+    console.error('Error loading markets:', error.message);
+    return [];
+  }
+}
+
+// Fetch event by slug via backend
 export async function fetchEventBySlug(slug) {
   const cleanSlug = extractEventSlug(slug);
-  const url = `${GAMMA_API}/events?slug=${cleanSlug}`;
 
   try {
-    const data = await fetchWithFallback(url);
+    // Try to fetch by ID first
+    const response = await fetch(`${API_BASE}/markets/${encodeURIComponent(cleanSlug)}`);
 
-    if (Array.isArray(data) && data.length > 0) {
-      return transformEventToMarket(data[0]);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
-    throw new Error('Event not found');
+
+    const data = await response.json();
+
+    if (!data.success || !data.data) {
+      throw new Error('Market not found');
+    }
+
+    return transformMarketFromBackend(data.data);
   } catch (error) {
     console.error('Error loading market:', error.message);
     throw error;
   }
 }
 
-// Fetch all open events
-export async function fetchOpenEvents(limit = 50) {
-  const url = `${GAMMA_API}/events?closed=false&order=volume&ascending=false&limit=${limit}`;
-
-  try {
-    const data = await fetchWithFallback(url);
-
-    if (!Array.isArray(data)) {
-      console.warn('Unexpected response format, returning empty array');
-      return [];
-    }
-    return data.map(transformEventToMarket).filter(Boolean);
-  } catch (error) {
-    console.error('Error loading markets:', error.message);
-    // Return empty array instead of throwing to prevent app crash
-    return [];
-  }
-}
-
-// Fetch market price history
+// Fetch market price history via backend
 export async function fetchPriceHistory(marketId, days = 90) {
   try {
-    const endTs = Math.floor(Date.now() / 1000);
-    const startTs = endTs - (days * 24 * 60 * 60);
-    const url = `${CLOB_API}/prices-history?market=${marketId}&startTs=${startTs}&endTs=${endTs}&fidelity=60`;
-    const data = await fetchWithFallback(url);
+    const response = await fetch(`${API_BASE}/markets/${encodeURIComponent(marketId)}/history?days=${days}`);
 
-    if (data && data.history) {
-      return data.history.map(point => ({
-        date: new Date(point.t * 1000).toISOString().split('T')[0],
-        time: point.t * 1000,
-        price: parseFloat(point.p),
-        volume: 0,
-        high: parseFloat(point.p),
-        low: parseFloat(point.p),
-      }));
+    if (!response.ok) {
+      return generateFallbackPriceHistory(0.5, days);
     }
-    return generateFallbackPriceHistory(0.5, days);
+
+    const data = await response.json();
+
+    if (!data.success || !data.data || !data.data.points) {
+      return generateFallbackPriceHistory(0.5, days);
+    }
+
+    return data.data.points.map(point => ({
+      date: point.date,
+      time: point.timestamp,
+      price: point.price,
+      volume: point.volume || 0,
+      high: point.high || point.price,
+      low: point.low || point.price,
+    }));
   } catch (error) {
     console.warn('Failed to fetch price history:', error);
     return generateFallbackPriceHistory(0.5, days);
   }
 }
 
-// Fetch orderbook
-export async function fetchOrderbook(tokenId) {
+// Fetch orderbook via backend
+export async function fetchOrderbook(marketId) {
   try {
-    const url = `${CLOB_API}/book?token_id=${tokenId}`;
-    const data = await fetchWithFallback(url);
+    const response = await fetch(`${API_BASE}/markets/${encodeURIComponent(marketId)}/orderbook`);
 
-    if (data && data.bids && data.asks) {
-      return transformOrderbook(data);
+    if (!response.ok) {
+      return generateFallbackOrderbook(0.5);
     }
-    return generateFallbackOrderbook(0.5);
+
+    const data = await response.json();
+
+    if (!data.success || !data.data) {
+      return generateFallbackOrderbook(0.5);
+    }
+
+    return {
+      bids: data.data.bids || [],
+      asks: data.data.asks || [],
+      imbalance: data.data.imbalance || 0,
+    };
   } catch (error) {
     console.warn('Failed to fetch orderbook:', error);
     return generateFallbackOrderbook(0.5);
   }
 }
 
-// Transform Polymarket event to our market format
-function transformEventToMarket(event) {
-  if (!event || !event.markets || event.markets.length === 0) return null;
+// Transform backend MarketSummary to frontend format
+function transformMarketFromBackend(market) {
+  if (!market) return null;
 
-  const market = event.markets[0];
-  const bestBid = parseFloat(market.bestBid) || 0;
-  const bestAsk = parseFloat(market.bestAsk) || 0;
-  const midPrice = (bestBid + bestAsk) / 2 || parseFloat(market.lastTradePrice) || 0.5;
-
-  // Parse outcomes and prices safely
-  let outcomes = [];
-  let outcomePrices = [];
-  try {
-    outcomes = JSON.parse(market.outcomes || '[]');
-    outcomePrices = JSON.parse(market.outcomePrices || '[]');
-  } catch {}
-
-  // Calculate edge (we'll use a simple model based on volume and price movement)
-  const volume24h = parseFloat(market.volume24hr) || 0;
-  const volumeTotal = parseFloat(market.volumeNum) || parseFloat(event.volume) || 0;
-  const liquidity = parseFloat(market.liquidityNum) || 0;
-
-  // Simple model probability estimation based on market dynamics
-  // In a real system, this would be a sophisticated ML model
-  const modelProb = calculateModelProbability(midPrice, volume24h, liquidity, market);
+  const modelProb = market.model_prob || market.market_prob;
+  const edge = modelProb - market.market_prob;
 
   return {
-    id: event.id,
-    ticker: event.ticker || generateTicker(event.title),
-    platform: 'Polymarket',
-    question: event.title,
-    description: event.description,
-    category: event.tags?.[0]?.label || 'General',
-    subcategory: event.tags?.[1]?.label || '',
+    id: market.id,
+    ticker: market.ticker,
+    platform: market.platform,
+    question: market.question,
+    description: market.description,
+    category: market.category || 'General',
+    subcategory: market.subcategory || '',
 
     // Core pricing
-    market_prob: midPrice,
+    market_prob: market.market_prob,
     model_prob: modelProb,
-    prev_prob: midPrice - (Math.random() * 0.02 - 0.01), // Simulated previous
+    prev_prob: market.prev_prob || market.market_prob,
 
     // Market metrics
-    bestBid,
-    bestAsk,
-    spread: bestAsk - bestBid,
-    volume_24h: volume24h,
-    volume_total: volumeTotal,
-    liquidity,
-    open_interest: volumeTotal * 0.8,
-    trades_24h: Math.floor(volume24h / 50),
+    bestBid: market.best_bid,
+    bestAsk: market.best_ask,
+    spread: market.spread,
+    volume_24h: market.volume_24h,
+    volume_total: market.volume_total,
+    liquidity: market.liquidity,
+    open_interest: market.open_interest,
+    trades_24h: market.trades_24h,
 
     // Dates
-    end_date: event.endDate,
-    created: event.createdAt,
-    resolution_source: event.resolutionSource || 'Polymarket resolution',
+    end_date: market.end_date,
+    created: market.created_at,
 
     // Market IDs for API calls
-    marketId: market.id,
-    conditionId: market.conditionId,
-    clobTokenIds: market.clobTokenIds,
+    marketId: market.platform_ids?.market_id || market.id,
+    conditionId: market.platform_ids?.condition_id,
+    clobTokenIds: market.platform_ids?.clob_token_ids,
 
     // Outcomes
-    outcomes,
-    outcomePrices,
+    outcomes: market.outcomes || ['Yes', 'No'],
+    outcomePrices: market.outcome_prices || [market.market_prob, 1 - market.market_prob],
 
-    // Generated analysis (will be calculated from real data)
-    factors: generateFactors(midPrice, modelProb, volume24h, liquidity),
+    // Generated analysis
+    factors: generateFactors(market.market_prob, modelProb, market.volume_24h, market.liquidity),
     model_breakdown: generateModelBreakdown(modelProb),
-    greeks: calculateGreeks(midPrice, event.endDate),
+    greeks: calculateGreeks(market.market_prob, market.end_date),
     correlations: {},
     related_news: [],
 
-    // Raw event data for reference
-    _raw: event,
+    // Freshness metadata from backend
+    _freshness: market.freshness,
   };
 }
 
@@ -258,56 +187,18 @@ function generateTicker(title) {
   return words.map(w => w[0]).join('').toUpperCase() || 'MKT';
 }
 
-// Calculate model probability (simplified edge detection)
-function calculateModelProbability(marketProb, volume24h, liquidity, market) {
-  // Base: start with market probability
-  let modelProb = marketProb;
-
-  // Volume momentum factor: high recent volume may indicate informed trading
-  const volumeFactor = Math.min(volume24h / 100000, 0.05);
-
-  // Liquidity factor: more liquidity = more efficient pricing
-  const liquidityFactor = Math.min(liquidity / 500000, 0.03);
-
-  // Bid/Ask imbalance: more bids than asks = bullish signal
-  const bestBid = parseFloat(market.bestBid) || 0;
-  const bestAsk = parseFloat(market.bestAsk) || 0;
-  const imbalance = bestBid > 0 && bestAsk > 0
-    ? (bestBid / bestAsk - 1) * 0.1
-    : 0;
-
-  // Spread factor: tight spread = more confidence in price
-  const spread = bestAsk - bestBid;
-  const spreadFactor = spread < 0.02 ? 0.01 : spread > 0.1 ? -0.02 : 0;
-
-  // Combine factors
-  modelProb += volumeFactor + imbalance + spreadFactor;
-
-  // Add slight random noise for variation (simulating model uncertainty)
-  modelProb += (Math.random() - 0.5) * 0.04;
-
-  // Clamp to valid probability range
-  return Math.max(0.01, Math.min(0.99, modelProb));
-}
-
 // Generate analysis factors from real data
 function generateFactors(marketProb, modelProb, volume24h, liquidity) {
   const edge = modelProb - marketProb;
   const direction = edge > 0.02 ? 'bullish' : edge < -0.02 ? 'bearish' : 'neutral';
 
-  // Orderbook imbalance (simulated from edge)
-  const obImbalance = 0.5 + edge * 2;
-
-  // Volume trend
-  const volumeScore = Math.min(volume24h / 200000, 1);
+  const volumeScore = Math.min((volume24h || 0) / 200000, 1);
   const volumeDirection = volumeScore > 0.5 ? 'bullish' : volumeScore < 0.3 ? 'bearish' : 'neutral';
-
-  // Liquidity score
-  const liqScore = Math.min(liquidity / 1000000, 1);
+  const liqScore = Math.min((liquidity || 0) / 1000000, 1);
 
   return {
     orderbook_imbalance: {
-      value: Math.max(0, Math.min(1, obImbalance)),
+      value: Math.max(0, Math.min(1, 0.5 + edge * 2)),
       contribution: edge * 0.3,
       direction,
       desc: edge > 0 ? 'Buy-side pressure detected' : 'Sell-side pressure detected'
@@ -322,7 +213,7 @@ function generateFactors(marketProb, modelProb, volume24h, liquidity) {
       value: volumeScore,
       contribution: volumeScore * 0.1,
       direction: volumeDirection,
-      desc: `24h volume: $${(volume24h / 1000).toFixed(1)}K`
+      desc: `24h volume: $${((volume24h || 0) / 1000).toFixed(1)}K`
     },
     news_sentiment: {
       value: 0.5,
@@ -358,7 +249,7 @@ function generateFactors(marketProb, modelProb, volume24h, liquidity) {
       value: liqScore,
       contribution: liqScore * 0.05,
       direction: liqScore > 0.5 ? 'bullish' : 'neutral',
-      desc: `Liquidity: $${(liquidity / 1000).toFixed(1)}K`
+      desc: `Liquidity: $${((liquidity || 0) / 1000).toFixed(1)}K`
     },
     model_confidence: {
       value: Math.abs(edge) > 0.05 ? 0.8 : 0.5,
@@ -386,51 +277,13 @@ function calculateGreeks(marketProb, endDate) {
     ? Math.max(1, (new Date(endDate) - new Date()) / (1000 * 60 * 60 * 24))
     : 30;
 
-  // Delta: rate of change of price with respect to outcome probability
   const delta = marketProb;
-
-  // Gamma: rate of change of delta (highest near 50%)
   const gamma = 4 * marketProb * (1 - marketProb);
-
-  // Theta: time decay (negative, accelerates near expiry)
   const theta = -0.01 * (1 / Math.sqrt(daysToExpiry));
-
-  // Vega: sensitivity to volatility
   const vega = Math.sqrt(marketProb * (1 - marketProb)) * 0.5;
-
-  // Rho: sensitivity to "risk-free rate" (minimal in prediction markets)
   const rho = 0.01;
 
   return { delta, gamma, theta, vega, rho };
-}
-
-// Transform orderbook to our format
-function transformOrderbook(data) {
-  const bids = (data.bids || []).slice(0, 15).map((bid, i) => ({
-    price: parseFloat(bid.price),
-    size: parseFloat(bid.size) * 1000,
-    cumulative: 0,
-  }));
-
-  const asks = (data.asks || []).slice(0, 15).map((ask, i) => ({
-    price: parseFloat(ask.price),
-    size: parseFloat(ask.size) * 1000,
-    cumulative: 0,
-  }));
-
-  // Calculate cumulative
-  let bidCum = 0, askCum = 0;
-  bids.forEach(b => { bidCum += b.size; b.cumulative = bidCum; });
-  asks.forEach(a => { askCum += a.size; a.cumulative = askCum; });
-
-  const totalBids = bids.reduce((sum, b) => sum + b.size, 0);
-  const totalAsks = asks.reduce((sum, a) => sum + a.size, 0);
-
-  return {
-    bids,
-    asks,
-    imbalance: (totalBids - totalAsks) / (totalBids + totalAsks || 1),
-  };
 }
 
 // Fallback generators when API fails
@@ -481,10 +334,8 @@ function generateFallbackOrderbook(midPrice) {
   };
 }
 
-// News fetching (placeholder - would connect to real news API)
+// News fetching (placeholder)
 export async function fetchMarketNews(keywords) {
-  // In production, this would connect to a news aggregation API
-  // For now, return empty array - no fake news
   return [];
 }
 

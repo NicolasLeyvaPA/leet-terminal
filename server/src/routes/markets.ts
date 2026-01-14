@@ -33,7 +33,7 @@ async function fetchAllMarkets(
   platform: 'kalshi' | 'polymarket' | 'all'
 ): Promise<{ markets: MarketSummary[]; freshness: DataFreshness }> {
   const results: MarketSummary[] = [];
-  const sourcesStatus: Record<string, 'ok' | 'error'> = {};
+  const sourcesStatus: Record<string, 'ok' | 'error' | 'timeout' | 'rate_limited'> = {};
   let partial = false;
 
   // Fetch from selected platforms
