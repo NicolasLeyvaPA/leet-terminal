@@ -11,6 +11,7 @@ import type {
   OrderbookSnapshot,
   MarketHistoryPoint,
   DataFreshness,
+  NormalizedOutcome,
 } from '@leet-terminal/shared/contracts';
 import { createFreshness } from '@leet-terminal/shared/contracts';
 import { CACHE_TTL } from '../services/cache.js';
@@ -129,6 +130,10 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 /**
  * Transform Kalshi market to normalized MarketSummary
+ *
+ * Note: Kalshi markets are typically binary (Yes/No).
+ * For multi-outcome events, Kalshi creates separate markets under one event_ticker.
+ * This connector handles individual markets; event grouping would require additional logic.
  */
 function transformMarket(market: KalshiMarket): MarketSummary {
   const yesBid = (market.yes_bid || 0) / 100; // Convert cents to decimal
@@ -145,6 +150,30 @@ function transformMarket(market: KalshiMarket): MarketSummary {
   const spreadFactor = yesAsk - yesBid < 0.03 ? 0.01 : 0;
   modelProb = Math.max(0.01, Math.min(0.99, modelProb + volumeFactor + spreadFactor));
 
+  // Build normalized outcomes - Kalshi markets are binary
+  const normalizedOutcomes: NormalizedOutcome[] = [
+    {
+      id: `${market.ticker}-yes`,
+      label: 'Yes',
+      type: 'YES',
+      probability: midPrice,
+      best_bid: yesBid,
+      best_ask: yesAsk,
+      volume: volume24h,
+      liquidity,
+    },
+    {
+      id: `${market.ticker}-no`,
+      label: 'No',
+      type: 'NO',
+      probability: 1 - midPrice,
+      best_bid: 1 - yesAsk, // No bid = 1 - Yes ask
+      best_ask: 1 - yesBid, // No ask = 1 - Yes bid
+      volume: undefined,
+      liquidity: undefined,
+    },
+  ];
+
   return {
     id: `kalshi-${market.ticker}`,
     ticker: market.ticker,
@@ -153,6 +182,9 @@ function transformMarket(market: KalshiMarket): MarketSummary {
     description: market.subtitle,
     category: market.category || 'General',
     subcategory: undefined,
+
+    // Kalshi individual markets are binary
+    market_type: 'BINARY',
 
     market_prob: midPrice,
     model_prob: modelProb,
@@ -175,6 +207,10 @@ function transformMarket(market: KalshiMarket): MarketSummary {
       event_ticker: market.event_ticker,
     },
 
+    // CRITICAL: Include normalized outcomes
+    normalized_outcomes: normalizedOutcomes,
+
+    // Legacy fields for backward compatibility
     outcomes: ['Yes', 'No'],
     outcome_prices: [midPrice, 1 - midPrice],
   };
@@ -189,6 +225,31 @@ function generateMockMarkets(count: number = 10): MarketSummary[] {
 
   for (let i = 0; i < count; i++) {
     const prob = 0.2 + Math.random() * 0.6;
+    const volume24h = Math.floor(Math.random() * 50000);
+    const liquidity = Math.floor(Math.random() * 100000);
+
+    // Build normalized outcomes
+    const normalizedOutcomes: NormalizedOutcome[] = [
+      {
+        id: `MOCK${i}-yes`,
+        label: 'Yes',
+        type: 'YES',
+        probability: prob,
+        best_bid: prob - 0.01,
+        best_ask: prob + 0.01,
+        volume: volume24h,
+        liquidity,
+      },
+      {
+        id: `MOCK${i}-no`,
+        label: 'No',
+        type: 'NO',
+        probability: 1 - prob,
+        best_bid: 1 - (prob + 0.01),
+        best_ask: 1 - (prob - 0.01),
+      },
+    ];
+
     markets.push({
       id: `kalshi-mock-${i}`,
       ticker: `MOCK${i}`,
@@ -198,6 +259,8 @@ function generateMockMarkets(count: number = 10): MarketSummary[] {
       category: categories[i % categories.length],
       subcategory: undefined,
 
+      market_type: 'BINARY',
+
       market_prob: prob,
       model_prob: prob + (Math.random() - 0.5) * 0.04,
       prev_prob: prob - 0.005,
@@ -205,9 +268,9 @@ function generateMockMarkets(count: number = 10): MarketSummary[] {
       best_bid: prob - 0.01,
       best_ask: prob + 0.01,
       spread: 0.02,
-      volume_24h: Math.floor(Math.random() * 50000),
+      volume_24h: volume24h,
       volume_total: Math.floor(Math.random() * 500000),
-      liquidity: Math.floor(Math.random() * 100000),
+      liquidity,
       open_interest: Math.floor(Math.random() * 200000),
       trades_24h: Math.floor(Math.random() * 500),
 
@@ -219,6 +282,7 @@ function generateMockMarkets(count: number = 10): MarketSummary[] {
         event_ticker: `MOCKEVENT${i}`,
       },
 
+      normalized_outcomes: normalizedOutcomes,
       outcomes: ['Yes', 'No'],
       outcome_prices: [prob, 1 - prob],
     });

@@ -23,6 +23,28 @@ export const DataFreshnessSchema = z.object({
 });
 export type DataFreshness = z.infer<typeof DataFreshnessSchema>;
 
+// === MARKET TYPE ===
+export const MarketTypeSchema = z.enum(['BINARY', 'CATEGORICAL', 'SCALAR']);
+export type MarketType = z.infer<typeof MarketTypeSchema>;
+
+// === OUTCOME TYPE ===
+export const OutcomeTypeSchema = z.enum(['YES', 'NO', 'OPTION']);
+export type OutcomeType = z.infer<typeof OutcomeTypeSchema>;
+
+// === NORMALIZED OUTCOME ===
+export const NormalizedOutcomeSchema = z.object({
+  id: z.string(), // Platform-specific outcome/token ID
+  label: z.string(), // Display label (e.g., "Kansas City Chiefs", "Yes", "No")
+  type: OutcomeTypeSchema,
+  probability: z.number().min(0).max(1), // Implied probability from price
+  best_bid: z.number().min(0).max(1).optional(),
+  best_ask: z.number().min(0).max(1).optional(),
+  volume: z.number().min(0).optional(),
+  liquidity: z.number().min(0).optional(),
+  is_winner: z.boolean().optional(), // If market resolved
+});
+export type NormalizedOutcome = z.infer<typeof NormalizedOutcomeSchema>;
+
 // === PLATFORM IDS ===
 export const PlatformIdsSchema = z.object({
   market_id: z.string(),
@@ -42,12 +64,15 @@ export const MarketSummarySchema = z.object({
   category: z.string(),
   subcategory: z.string().optional(),
 
-  // Pricing (0-1 probability scale)
+  // Market type - CRITICAL for correct UI rendering
+  market_type: MarketTypeSchema.default('BINARY'),
+
+  // Pricing (0-1 probability scale) - for binary markets or top outcome
   market_prob: z.number().min(0).max(1),
   model_prob: z.number().min(0).max(1),
   prev_prob: z.number().min(0).max(1),
 
-  // Market metrics
+  // Market metrics (aggregate for categorical)
   best_bid: z.number().min(0).max(1),
   best_ask: z.number().min(0).max(1),
   spread: z.number().min(0),
@@ -64,11 +89,44 @@ export const MarketSummarySchema = z.object({
   // Platform-specific IDs
   platform_ids: PlatformIdsSchema,
 
-  // Outcomes (for multi-outcome markets)
+  // NORMALIZED OUTCOMES - proper multi-outcome support
+  normalized_outcomes: z.array(NormalizedOutcomeSchema),
+
+  // Legacy fields for backward compatibility (deprecated)
   outcomes: z.array(z.string()).optional(),
   outcome_prices: z.array(z.number()).optional(),
 });
 export type MarketSummary = z.infer<typeof MarketSummarySchema>;
+
+/**
+ * Helper to detect market type from outcomes
+ */
+export function detectMarketType(outcomes: NormalizedOutcome[]): MarketType {
+  if (outcomes.length === 2) {
+    const labels = outcomes.map(o => o.label.toLowerCase());
+    const isBinary =
+      (labels.includes('yes') && labels.includes('no')) ||
+      (labels.includes('true') && labels.includes('false'));
+    return isBinary ? 'BINARY' : 'CATEGORICAL';
+  }
+  return outcomes.length > 2 ? 'CATEGORICAL' : 'BINARY';
+}
+
+/**
+ * Helper to check if market is categorical (multi-outcome)
+ */
+export function isCategoricalMarket(market: MarketSummary): boolean {
+  return market.market_type === 'CATEGORICAL';
+}
+
+/**
+ * Helper to get top N outcomes sorted by probability
+ */
+export function getTopOutcomes(market: MarketSummary, n: number = 5): NormalizedOutcome[] {
+  return [...market.normalized_outcomes]
+    .sort((a, b) => b.probability - a.probability)
+    .slice(0, n);
+}
 
 // === ORDERBOOK ===
 export const OrderbookLevelSchema = z.object({

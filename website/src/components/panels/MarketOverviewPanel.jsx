@@ -2,6 +2,7 @@ import { PanelHeader } from '../PanelHeader';
 import { DataRow } from '../DataRow';
 import { Tag } from '../Tag';
 import { QuantEngine } from '../../utils/quantEngine';
+import { OutcomesTable } from '../markets/OutcomesTable';
 
 // Validate probability is a valid number between 0 and 1
 const isValidProbability = (prob) => {
@@ -40,6 +41,10 @@ export const MarketOverviewPanel = ({ market }) => {
         </div>
       </div>
     );
+
+  // Check if this is a categorical (multi-outcome) market
+  const isCategorical = market.market_type === 'CATEGORICAL' ||
+    (market.normalized_outcomes && market.normalized_outcomes.length > 2);
 
   // Safely get probabilities with defaults
   const marketProb = isValidProbability(market.market_prob) ? market.market_prob : 0;
@@ -80,79 +85,102 @@ export const MarketOverviewPanel = ({ market }) => {
         {/* Tags */}
         <div className="flex gap-1 mb-3 flex-wrap">
           {market.category && <Tag type="category">{market.category}</Tag>}
-          <Tag type={signal === 'BUY' ? 'buy' : signal === 'SELL' ? 'sell' : 'hold'}>
-            {signal}
-          </Tag>
-          {Math.abs(edge) > 0.05 && (
-            <Tag type={edge > 0 ? 'buy' : 'sell'}>STRONG</Tag>
+          {isCategorical ? (
+            <Tag type="category">MULTI-OUTCOME</Tag>
+          ) : (
+            <>
+              <Tag type={signal === 'BUY' ? 'buy' : signal === 'SELL' ? 'sell' : 'hold'}>
+                {signal}
+              </Tag>
+              {Math.abs(edge) > 0.05 && (
+                <Tag type={edge > 0 ? 'buy' : 'sell'}>STRONG</Tag>
+              )}
+            </>
           )}
         </div>
 
-        {/* Main Probability Display */}
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
-            <div className="text-[10px] text-gray-500 mb-0.5">MARKET PRICE</div>
-            <div className="text-xl font-bold text-white mono">
-              {(marketProb * 100).toFixed(1)}¢
-            </div>
-            <div className="text-[10px] text-gray-600">
-              Bid: {((market.bestBid || marketProb) * 100).toFixed(1)}¢ / Ask: {((market.bestAsk || marketProb) * 100).toFixed(1)}¢
-            </div>
+        {/* CATEGORICAL MARKET: Show outcomes table */}
+        {isCategorical && market.normalized_outcomes && (
+          <div className="mb-3">
+            <div className="text-[10px] text-gray-600 mb-1.5">OUTCOMES ({market.normalized_outcomes.length})</div>
+            <OutcomesTable
+              outcomes={market.normalized_outcomes}
+              maxVisible={6}
+              showSearch={market.normalized_outcomes.length > 6}
+              compact={false}
+            />
           </div>
-          <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
-            <div className="text-[10px] text-gray-500 mb-0.5">MODEL ESTIMATE</div>
-            <div className={`text-xl font-bold mono ${signalColor}`}>
-              {(modelProb * 100).toFixed(1)}¢
-            </div>
-            <div className={`text-[10px] ${signalColor}`}>
-              Edge: {edge > 0 ? '+' : ''}{edgePct.toFixed(2)}%
-            </div>
-          </div>
-        </div>
+        )}
 
-        {/* Edge Analysis */}
-        <div className={`rounded p-2 mb-3 border ${
-          Math.abs(edge) > 0.03
-            ? edge > 0
-              ? 'bg-green-500/10 border-green-500/30'
-              : 'bg-red-500/10 border-red-500/30'
-            : 'bg-gray-800/50 border-gray-700'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[10px] text-gray-500">SIGNAL</div>
-              <div className={`text-lg font-bold ${signalColor}`}>{signal}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] text-gray-500">EV / $1,000</div>
-              <div className={`text-lg font-bold mono ${ev.ev > 0 ? 'text-green-400' : ev.ev < 0 ? 'text-red-400' : 'text-gray-400'}`}>
-                {ev.ev > 0 ? '+' : ''}{formatValue(ev.ev, 2, '$', '')}
+        {/* BINARY MARKET: Main Probability Display */}
+        {!isCategorical && (
+          <>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
+                <div className="text-[10px] text-gray-500 mb-0.5">MARKET PRICE</div>
+                <div className="text-xl font-bold text-white mono">
+                  {(marketProb * 100).toFixed(1)}¢
+                </div>
+                <div className="text-[10px] text-gray-600">
+                  Bid: {((market.bestBid || marketProb) * 100).toFixed(1)}¢ / Ask: {((market.bestAsk || marketProb) * 100).toFixed(1)}¢
+                </div>
+              </div>
+              <div className="bg-gray-900/50 rounded p-2 border border-gray-800">
+                <div className="text-[10px] text-gray-500 mb-0.5">MODEL ESTIMATE</div>
+                <div className={`text-xl font-bold mono ${signalColor}`}>
+                  {(modelProb * 100).toFixed(1)}¢
+                </div>
+                <div className={`text-[10px] ${signalColor}`}>
+                  Edge: {edge > 0 ? '+' : ''}{edgePct.toFixed(2)}%
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Kelly Sizing */}
-        <div className="grid grid-cols-3 gap-1 mb-3">
-          <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
-            <div className="text-[9px] text-gray-500">KELLY 1/4</div>
-            <div className="text-xs font-bold text-orange-400 mono">
-              {formatValue((kelly.quarter || 0) * 100, 1, '', '%')}
+            {/* Edge Analysis */}
+            <div className={`rounded p-2 mb-3 border ${
+              Math.abs(edge) > 0.03
+                ? edge > 0
+                  ? 'bg-green-500/10 border-green-500/30'
+                  : 'bg-red-500/10 border-red-500/30'
+                : 'bg-gray-800/50 border-gray-700'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] text-gray-500">SIGNAL</div>
+                  <div className={`text-lg font-bold ${signalColor}`}>{signal}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] text-gray-500">EV / $1,000</div>
+                  <div className={`text-lg font-bold mono ${ev.ev > 0 ? 'text-green-400' : ev.ev < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                    {ev.ev > 0 ? '+' : ''}{formatValue(ev.ev, 2, '$', '')}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
-            <div className="text-[9px] text-gray-500">KELLY 1/2</div>
-            <div className="text-xs font-bold text-orange-300 mono">
-              {formatValue((kelly.half || 0) * 100, 1, '', '%')}
+
+            {/* Kelly Sizing */}
+            <div className="grid grid-cols-3 gap-1 mb-3">
+              <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
+                <div className="text-[9px] text-gray-500">KELLY 1/4</div>
+                <div className="text-xs font-bold text-orange-400 mono">
+                  {formatValue((kelly.quarter || 0) * 100, 1, '', '%')}
+                </div>
+              </div>
+              <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
+                <div className="text-[9px] text-gray-500">KELLY 1/2</div>
+                <div className="text-xs font-bold text-orange-300 mono">
+                  {formatValue((kelly.half || 0) * 100, 1, '', '%')}
+                </div>
+              </div>
+              <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
+                <div className="text-[9px] text-gray-500">KELLY FULL</div>
+                <div className="text-xs font-bold text-orange-200 mono">
+                  {formatValue((kelly.full || 0) * 100, 1, '', '%')}
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="bg-gray-900/30 rounded p-1.5 text-center border border-gray-800">
-            <div className="text-[9px] text-gray-500">KELLY FULL</div>
-            <div className="text-xs font-bold text-orange-200 mono">
-              {formatValue((kelly.full || 0) * 100, 1, '', '%')}
-            </div>
-          </div>
-        </div>
+          </>
+        )}
 
         {/* Market Metrics */}
         <div className="border-t border-gray-800 pt-2">

@@ -10,8 +10,10 @@ import type {
   OrderbookSnapshot,
   MarketHistoryPoint,
   DataFreshness,
+  NormalizedOutcome,
+  MarketType,
 } from '@leet-terminal/shared/contracts';
-import { createFreshness } from '@leet-terminal/shared/contracts';
+import { createFreshness, detectMarketType } from '@leet-terminal/shared/contracts';
 import { CACHE_TTL } from '../services/cache.js';
 
 const GAMMA_API = 'https://gamma-api.polymarket.com';
@@ -155,20 +157,119 @@ function calculateModelProbability(
 }
 
 /**
+ * Determine outcome type based on label
+ */
+function getOutcomeType(label: string, allLabels: string[]): 'YES' | 'NO' | 'OPTION' {
+  const lower = label.toLowerCase();
+  if (lower === 'yes' || lower === 'true') return 'YES';
+  if (lower === 'no' || lower === 'false') return 'NO';
+  // If only two outcomes and not yes/no, still treat as binary structure
+  if (allLabels.length === 2) {
+    const index = allLabels.findIndex(l => l.toLowerCase() === lower);
+    return index === 0 ? 'YES' : 'NO';
+  }
+  return 'OPTION';
+}
+
+/**
  * Transform Polymarket event to normalized MarketSummary
+ *
+ * CRITICAL: Properly handles multi-outcome markets (e.g., "Who will win the Super Bowl?")
  */
 function transformEvent(event: PolymarketEvent): MarketSummary | null {
   if (!event || !event.markets || event.markets.length === 0) return null;
 
+  // Parse outcomes from all markets in the event
+  let allOutcomes: string[] = [];
+  let allOutcomePrices: number[] = [];
+  let allClobTokenIds: string[] = [];
+
+  // Check if this is a multi-market event (categorical)
+  // Polymarket represents multi-outcome as multiple markets under one event
+  const isMultiMarketEvent = event.markets.length > 1;
+
+  if (isMultiMarketEvent) {
+    // Each market represents a different outcome
+    event.markets.forEach((m) => {
+      // For multi-market events, the market title/outcome is the choice
+      let outcomeLabel = m.outcomes ? 'Yes' : 'Option';
+      try {
+        const parsedOutcomes = JSON.parse(m.outcomes || '[]');
+        // Usually ["Yes", "No"] - we want the "Yes" side as the choice label
+        // But for multi-market events, the market itself is the outcome
+        outcomeLabel = parsedOutcomes[0] || 'Yes';
+      } catch {
+        // Use market ID as fallback
+      }
+
+      // The outcome is essentially "this market wins"
+      // We infer the outcome label from the market structure
+      // In Polymarket, multi-outcome events have each outcome as a separate market
+      const price = parseFloat(m.bestBid || '0') + parseFloat(m.bestAsk || '0');
+      const midPrice = price / 2 || parseFloat(m.lastTradePrice || '0') || 0;
+
+      allOutcomes.push(outcomeLabel);
+      allOutcomePrices.push(midPrice);
+
+      // Get CLOB token IDs
+      try {
+        const tokens = m.clobTokenIds ? JSON.parse(m.clobTokenIds) : [];
+        allClobTokenIds.push(...tokens);
+      } catch {
+        if (m.clobTokenIds) allClobTokenIds.push(m.clobTokenIds);
+      }
+    });
+  } else {
+    // Single market - parse outcomes from the market data
+    const market = event.markets[0];
+    try {
+      allOutcomes = JSON.parse(market.outcomes || '["Yes", "No"]');
+      allOutcomePrices = JSON.parse(market.outcomePrices || '[0.5, 0.5]').map(Number);
+    } catch {
+      allOutcomes = ['Yes', 'No'];
+      allOutcomePrices = [0.5, 0.5];
+    }
+
+    try {
+      allClobTokenIds = market.clobTokenIds ? JSON.parse(market.clobTokenIds) : [];
+    } catch {
+      if (market.clobTokenIds) allClobTokenIds = [market.clobTokenIds];
+    }
+  }
+
+  // Build normalized outcomes array
+  const normalizedOutcomes: NormalizedOutcome[] = allOutcomes.map((label, index) => ({
+    id: allClobTokenIds[index] || `outcome-${index}`,
+    label,
+    type: getOutcomeType(label, allOutcomes),
+    probability: allOutcomePrices[index] || 0,
+    best_bid: undefined, // Per-outcome bid/ask would need separate API calls
+    best_ask: undefined,
+    volume: undefined,
+    liquidity: undefined,
+    is_winner: undefined,
+  }));
+
+  // Detect market type
+  const marketType: MarketType = detectMarketType(normalizedOutcomes);
+
+  // Use first market for aggregate metrics
   const market = event.markets[0];
   const bestBid = parseFloat(market.bestBid || '0') || 0;
   const bestAsk = parseFloat(market.bestAsk || '0') || 0;
   const midPrice =
     (bestBid + bestAsk) / 2 || parseFloat(market.lastTradePrice || '0.5') || 0.5;
 
-  const volume24h = parseFloat(market.volume24hr || '0') || 0;
-  const volumeTotal = parseFloat(market.volumeNum || '0') || parseFloat(event.volume || '0') || 0;
-  const liquidity = parseFloat(market.liquidityNum || '0') || 0;
+  // Aggregate volume and liquidity across all markets
+  let volume24h = 0;
+  let volumeTotal = 0;
+  let liquidity = 0;
+  event.markets.forEach((m) => {
+    volume24h += parseFloat(m.volume24hr || '0') || 0;
+    volumeTotal += parseFloat(m.volumeNum || '0') || 0;
+    liquidity += parseFloat(m.liquidityNum || '0') || 0;
+  });
+  volumeTotal = volumeTotal || parseFloat(event.volume || '0') || 0;
 
   const modelProb = calculateModelProbability(
     midPrice,
@@ -177,26 +278,6 @@ function transformEvent(event: PolymarketEvent): MarketSummary | null {
     bestBid,
     bestAsk
   );
-
-  // Parse outcomes
-  let outcomes: string[] = [];
-  let outcomePrices: number[] = [];
-  try {
-    outcomes = JSON.parse(market.outcomes || '[]');
-    outcomePrices = JSON.parse(market.outcomePrices || '[]').map(Number);
-  } catch {
-    // Ignore parsing errors
-  }
-
-  // Parse clob token IDs
-  let clobTokenIds: string[] = [];
-  try {
-    clobTokenIds = market.clobTokenIds ? JSON.parse(market.clobTokenIds) : [];
-  } catch {
-    if (market.clobTokenIds) {
-      clobTokenIds = [market.clobTokenIds];
-    }
-  }
 
   return {
     id: event.id,
@@ -207,9 +288,15 @@ function transformEvent(event: PolymarketEvent): MarketSummary | null {
     category: event.tags?.[0]?.label || 'General',
     subcategory: event.tags?.[1]?.label,
 
-    market_prob: midPrice,
+    // CRITICAL: Set market type
+    market_type: marketType,
+
+    // For binary: first outcome prob. For categorical: highest prob outcome
+    market_prob: marketType === 'BINARY'
+      ? midPrice
+      : Math.max(...normalizedOutcomes.map(o => o.probability)),
     model_prob: modelProb,
-    prev_prob: midPrice - 0.005, // Small deterministic delta
+    prev_prob: midPrice - 0.005,
 
     best_bid: bestBid,
     best_ask: bestAsk,
@@ -226,11 +313,15 @@ function transformEvent(event: PolymarketEvent): MarketSummary | null {
     platform_ids: {
       market_id: market.id,
       condition_id: market.conditionId,
-      clob_token_ids: clobTokenIds,
+      clob_token_ids: allClobTokenIds,
     },
 
-    outcomes,
-    outcome_prices: outcomePrices,
+    // CRITICAL: Include normalized outcomes
+    normalized_outcomes: normalizedOutcomes,
+
+    // Legacy fields for backward compatibility
+    outcomes: allOutcomes,
+    outcome_prices: allOutcomePrices,
   };
 }
 
