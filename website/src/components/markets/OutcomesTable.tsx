@@ -3,13 +3,16 @@
  *
  * Renders a table/list of outcomes for categorical (multi-outcome) markets.
  * Supports sorting, search/filter, and displays probabilities/prices.
+ * For TIME_BUCKET markets, delegates to DateTabs component.
  */
 
 import React, { useState, useMemo } from 'react';
-import type { NormalizedOutcome } from '@leet-terminal/shared/contracts';
+import type { NormalizedOutcome, MarketType } from '@leet-terminal/shared/contracts';
+import { DateTabs } from './DateTabs';
 
 interface OutcomesTableProps {
   outcomes: NormalizedOutcome[];
+  marketType?: MarketType;
   maxVisible?: number;
   showSearch?: boolean;
   compact?: boolean;
@@ -21,6 +24,7 @@ type SortDirection = 'asc' | 'desc';
 
 export function OutcomesTable({
   outcomes,
+  marketType,
   maxVisible = 10,
   showSearch = true,
   compact = false,
@@ -31,7 +35,7 @@ export function OutcomesTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showAll, setShowAll] = useState(false);
 
-  // Filter and sort outcomes
+  // Filter and sort outcomes - must be called before any returns (React hooks rules)
   const processedOutcomes = useMemo(() => {
     let filtered = outcomes;
 
@@ -86,6 +90,17 @@ export function OutcomesTable({
     if (prob >= 0.2) return 'text-orange-400';
     return 'text-gray-400';
   };
+
+  // Delegate to DateTabs for TIME_BUCKET markets (after all hooks are called)
+  if (marketType === 'TIME_BUCKET') {
+    return (
+      <DateTabs
+        outcomes={outcomes}
+        onOutcomeClick={onOutcomeClick}
+        compact={compact}
+      />
+    );
+  }
 
   if (outcomes.length === 0) {
     return (

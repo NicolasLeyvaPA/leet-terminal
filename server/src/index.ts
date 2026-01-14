@@ -10,6 +10,11 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import { marketsRoutes } from './routes/markets.js';
 import { healthRoutes } from './routes/health.js';
+import { streamingRoutes } from './routes/streaming.js';
+import { getWebSocketManager, shutdownWebSocketManager } from './services/websocket-manager.js';
+import { shutdownSubscriptionRegistry } from './services/subscription-registry.js';
+import { shutdownSSEHandler } from './services/sse-handler.js';
+import { initializeMessageNormalizer } from './services/message-normalizer.js';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -113,9 +118,25 @@ async function main() {
     async (app) => {
       await app.register(marketsRoutes);
       await app.register(healthRoutes);
+      await app.register(streamingRoutes);
     },
     { prefix: '/api/v1' }
   );
+
+  // Initialize streaming services
+  initializeMessageNormalizer();
+  const wsManager = getWebSocketManager();
+
+  // Connect to upstream WebSockets (optional - they'll auto-connect on first subscription)
+  if (process.env.ENABLE_STREAMING === 'true') {
+    console.log('[Server] Streaming enabled, connecting to upstream WebSockets...');
+    wsManager.connect('polymarket').catch(err => {
+      console.warn('[Server] Failed to connect to Polymarket WS:', err.message);
+    });
+    wsManager.connect('kalshi').catch(err => {
+      console.warn('[Server] Failed to connect to Kalshi WS:', err.message);
+    });
+  }
 
   // Root endpoint
   fastify.get('/', async () => {
@@ -141,6 +162,9 @@ async function main() {
 ║    GET /api/v1/markets/:id       - Get market details         ║
 ║    GET /api/v1/markets/:id/orderbook - Get orderbook          ║
 ║    GET /api/v1/markets/:id/history   - Get price history      ║
+║    GET /api/v1/stream            - SSE streaming endpoint     ║
+║    POST /api/v1/stream/subscribe - Subscribe to channels      ║
+║    GET /api/v1/stream/status     - Streaming status           ║
 ║    GET /api/v1/health            - Health check               ║
 ║    GET /api/v1/status            - Detailed status            ║
 ╚═══════════════════════════════════════════════════════════════╝
@@ -153,6 +177,12 @@ async function main() {
   // Graceful shutdown
   const shutdown = async () => {
     console.log('\nShutting down server...');
+
+    // Shutdown streaming services
+    shutdownSSEHandler();
+    shutdownSubscriptionRegistry();
+    await shutdownWebSocketManager();
+
     await fastify.close();
     process.exit(0);
   };

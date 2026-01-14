@@ -24,8 +24,17 @@ export const DataFreshnessSchema = z.object({
 export type DataFreshness = z.infer<typeof DataFreshnessSchema>;
 
 // === MARKET TYPE ===
-export const MarketTypeSchema = z.enum(['BINARY', 'CATEGORICAL', 'SCALAR']);
+export const MarketTypeSchema = z.enum(['BINARY', 'CATEGORICAL', 'SCALAR', 'TIME_BUCKET']);
 export type MarketType = z.infer<typeof MarketTypeSchema>;
+
+// === TIME BUCKET (for date-based outcomes) ===
+export const TimeBucketSchema = z.object({
+  bucket_date: z.string().datetime(), // "2026-01-31T00:00:00Z"
+  label: z.string(), // "Jan 31"
+  sort_order: z.number().int().min(0),
+  is_current_bucket: z.boolean().optional(),
+});
+export type TimeBucket = z.infer<typeof TimeBucketSchema>;
 
 // === OUTCOME TYPE ===
 export const OutcomeTypeSchema = z.enum(['YES', 'NO', 'OPTION']);
@@ -42,6 +51,7 @@ export const NormalizedOutcomeSchema = z.object({
   volume: z.number().min(0).optional(),
   liquidity: z.number().min(0).optional(),
   is_winner: z.boolean().optional(), // If market resolved
+  time_bucket: TimeBucketSchema.optional(), // For TIME_BUCKET markets
 });
 export type NormalizedOutcome = z.infer<typeof NormalizedOutcomeSchema>;
 
@@ -407,6 +417,80 @@ export const AgentAuditLogEntrySchema = z.object({
   details: z.record(z.unknown()).optional(),
 });
 export type AgentAuditLogEntry = z.infer<typeof AgentAuditLogEntrySchema>;
+
+// === STREAMING EVENTS (SSE) ===
+export const StreamEventTypeSchema = z.enum([
+  'price_update',
+  'orderbook_delta',
+  'orderbook_snapshot',
+  'trade',
+  'market_status',
+  'heartbeat',
+  'error',
+  'subscription_ack',
+]);
+export type StreamEventType = z.infer<typeof StreamEventTypeSchema>;
+
+export const PriceUpdatePayloadSchema = z.object({
+  market_id: z.string(),
+  outcome_id: z.string().optional(),
+  price: z.number().min(0).max(1),
+  best_bid: z.number().min(0).max(1).optional(),
+  best_ask: z.number().min(0).max(1).optional(),
+  timestamp: z.number().int(),
+});
+export type PriceUpdatePayload = z.infer<typeof PriceUpdatePayloadSchema>;
+
+export const OrderbookDeltaPayloadSchema = z.object({
+  market_id: z.string(),
+  side: z.enum(['bid', 'ask']),
+  price: z.number().min(0).max(1),
+  size: z.number().min(0),
+  timestamp: z.number().int(),
+});
+export type OrderbookDeltaPayload = z.infer<typeof OrderbookDeltaPayloadSchema>;
+
+export const TradePayloadSchema = z.object({
+  market_id: z.string(),
+  outcome_id: z.string().optional(),
+  price: z.number().min(0).max(1),
+  size: z.number().min(0),
+  side: z.enum(['buy', 'sell']),
+  timestamp: z.number().int(),
+});
+export type TradePayload = z.infer<typeof TradePayloadSchema>;
+
+export const StreamEventSchema = z.object({
+  type: StreamEventTypeSchema,
+  channel: z.string(), // e.g., "price:pm-123", "orderbook:kalshi-ABC"
+  payload: z.union([
+    PriceUpdatePayloadSchema,
+    OrderbookDeltaPayloadSchema,
+    TradePayloadSchema,
+    z.object({ message: z.string() }), // For heartbeat, error, subscription_ack
+  ]),
+  timestamp: z.number().int(),
+  sequence: z.number().int().optional(), // For ordering/dedup
+});
+export type StreamEvent = z.infer<typeof StreamEventSchema>;
+
+// Subscription tiers
+export const SubscriptionTierSchema = z.enum(['free', 'pro', 'enterprise']);
+export type SubscriptionTier = z.infer<typeof SubscriptionTierSchema>;
+
+export const SUBSCRIPTION_LIMITS: Record<SubscriptionTier, number> = {
+  free: 5,
+  pro: 50,
+  enterprise: 500,
+};
+
+export const SubscriptionRequestSchema = z.object({
+  clientId: z.string(),
+  channels: z.array(z.string()),
+  action: z.enum(['subscribe', 'unsubscribe']),
+  tier: SubscriptionTierSchema.optional().default('free'),
+});
+export type SubscriptionRequest = z.infer<typeof SubscriptionRequestSchema>;
 
 // === UTILITY FUNCTIONS ===
 
