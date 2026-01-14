@@ -4,6 +4,13 @@ import { DataRow } from '../DataRow';
 import { MonteCarloChart } from '../charts/MonteCarloChart';
 import { QuantEngine } from '../../utils/quantEngine';
 
+// Simulation configuration (can be made user-configurable)
+const SIM_CONFIG = {
+  simulations: 5000,
+  tradesPerSim: 100,
+  startingCapital: 10000,
+};
+
 // Validate probability is a valid number between 0 and 1
 const isValidProbability = (prob) => {
   return typeof prob === 'number' && !isNaN(prob) && prob >= 0 && prob <= 1;
@@ -75,41 +82,38 @@ export const MonteCarloPanel = ({ market }) => {
 
   const s = simulation.stats;
 
-  // Safe number formatting helper
-  const formatStat = (value, decimals = 1, prefix = '', suffix = '') => {
-    if (value === undefined || value === null || isNaN(value)) return 'N/A';
-    const formatted = Number(value).toFixed(decimals);
-    const sign = value >= 0 && prefix === '' ? '' : (value >= 0 ? '+' : '');
-    return `${prefix}${sign}${formatted}${suffix}`;
-  };
+  // Compute median path from simulation paths
+  const medianPath = (() => {
+    const paths = simulation.paths;
+    if (!paths || paths.length === 0) return [];
+    const numTrades = paths[0]?.length || 0;
+    const median = [];
+    for (let i = 0; i < numTrades; i++) {
+      const vals = paths.map(p => p[i] || 0).sort((a, b) => a - b);
+      median.push(vals[Math.floor(vals.length / 2)]);
+    }
+    return median;
+  })();
 
   return (
-    <div className="terminal-panel h-full">
+    <div className="terminal-panel h-full flex flex-col">
       <PanelHeader
         title="MONTE CARLO"
-        subtitle="5k sims × 100 trades"
+        subtitle={`${(SIM_CONFIG.simulations / 1000).toFixed(0)}k sims × ${SIM_CONFIG.tradesPerSim} trades`}
       />
-      <div className="panel-content">
-        <div className="p-1" style={{ height: '120px' }}>
+      <div className="panel-content flex-1 flex flex-col min-h-0">
+        {/* Chart container - takes available space */}
+        <div className="flex-1 min-h-[100px] p-1">
           <MonteCarloChart
             samplePaths={simulation.paths}
-            medianPath={(() => {
-              const paths = simulation.paths;
-              if (!paths || paths.length === 0) return [];
-              const numTrades = paths[0]?.length || 0;
-              const median = [];
-              for (let i = 0; i < numTrades; i++) {
-                const vals = paths.map(p => p[i] || 0).sort((a, b) => a - b);
-                median.push(vals[Math.floor(vals.length / 2)]);
-              }
-              return median;
-            })()}
-            startingCapital={10000}
-            height={110}
+            medianPath={medianPath}
+            startingCapital={SIM_CONFIG.startingCapital}
+            height="100%"
             showExpand={true}
           />
         </div>
-        <div className="px-2 pb-2 border-t border-gray-800">
+        {/* Stats section - fixed height */}
+        <div className="px-2 pb-2 border-t border-gray-800 flex-shrink-0">
           <div className="grid grid-cols-2 gap-x-3 mt-1">
             <DataRow
               label="E[Return]"
