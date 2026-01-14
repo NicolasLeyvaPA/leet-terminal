@@ -69,6 +69,7 @@ export const MarketOverviewPanel = ({ market }) => {
       <PanelHeader
         title={market.ticker || 'MARKET'}
         subtitle={market.platform || 'Polymarket'}
+        freshness={market._freshness}
       />
       <div className="panel-content p-2">
         {/* Question */}
