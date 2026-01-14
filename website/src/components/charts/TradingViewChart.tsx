@@ -128,8 +128,14 @@ export function TradingViewChart({
   // Initialize chart
   const initChart = useCallback(
     (container: HTMLDivElement, chartHeight: number) => {
+      // Safely remove existing chart
       if (chartRef.current) {
-        chartRef.current.remove();
+        try {
+          chartRef.current.remove();
+        } catch {
+          // Chart already disposed, ignore
+        }
+        chartRef.current = null;
       }
 
       const chart = createChart(container, {
@@ -217,7 +223,11 @@ export function TradingViewChart({
 
       return () => {
         resizeObserver.disconnect();
-        chart.remove();
+        try {
+          chart.remove();
+        } catch {
+          // Chart already disposed, ignore
+        }
       };
     },
     [chartType, showVolume, priceFormat, formattedData]
