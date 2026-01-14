@@ -22,22 +22,22 @@ export function generatePriceHistory(currentPrice, days) {
   return history;
 }
 
-// Generate orderbook fallback (when API fails)
+// Generate orderbook fallback (when API fails) - reduced to 5 levels to save memory
 export function generateOrderbook(midPrice) {
   const bids = [], asks = [];
   let bidCumulative = 0, askCumulative = 0;
-  for (let i = 1; i <= 15; i++) {
+  for (let i = 1; i <= 5; i++) {
     const bidSize = Math.floor(Math.random() * 80000) + 20000;
     const askSize = Math.floor(Math.random() * 80000) + 20000;
     bidCumulative += bidSize;
     askCumulative += askSize;
     bids.push({
-      price: Math.max(0.01, midPrice - i * 0.005),
+      price: Math.max(0.01, midPrice - i * 0.01),
       size: bidSize,
       cumulative: bidCumulative,
     });
     asks.push({
-      price: Math.min(0.99, midPrice + i * 0.005),
+      price: Math.min(0.99, midPrice + i * 0.01),
       size: askSize,
       cumulative: askCumulative,
     });

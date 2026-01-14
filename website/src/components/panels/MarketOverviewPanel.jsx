@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { PanelHeader } from '../PanelHeader';
 import { DataRow } from '../DataRow';
 import { Tag } from '../Tag';
@@ -41,28 +42,41 @@ export const MarketOverviewPanel = ({ market }) => {
       </div>
     );
 
-  // Safely get probabilities with defaults
-  const marketProb = isValidProbability(market.market_prob) ? market.market_prob : 0;
-  const modelProb = isValidProbability(market.model_prob) ? market.model_prob : 0;
-  const hasValidProbs = isValidProbability(market.market_prob) && isValidProbability(market.model_prob);
+  // Safely get probabilities with defaults - memoized calculations
+  const { marketProb, modelProb, hasValidProbs, edge, edgePct, signal, signalColor, kelly, ev } = useMemo(() => {
+    const mktProb = isValidProbability(market.market_prob) ? market.market_prob : 0;
+    const mdlProb = isValidProbability(market.model_prob) ? market.model_prob : 0;
+    const validProbs = isValidProbability(market.market_prob) && isValidProbability(market.model_prob);
 
-  const edge = modelProb - marketProb;
-  const edgePct = edge * 100;
-  const signal = edge > 0.03 ? 'BUY' : edge < -0.03 ? 'SELL' : 'HOLD';
-  const signalColor = edge > 0.03 ? 'text-green-400' : edge < -0.03 ? 'text-red-400' : 'text-gray-400';
+    const edgeVal = mdlProb - mktProb;
+    const edgePctVal = edgeVal * 100;
+    const signalVal = edgeVal > 0.03 ? 'BUY' : edgeVal < -0.03 ? 'SELL' : 'HOLD';
+    const signalColorVal = edgeVal > 0.03 ? 'text-green-400' : edgeVal < -0.03 ? 'text-red-400' : 'text-gray-400';
 
-  // Safely calculate kelly and EV with error handling
-  let kelly = { quarter: 0, half: 0, full: 0 };
-  let ev = { ev: 0, evPct: 0 };
+    let kellyVal = { quarter: 0, half: 0, full: 0 };
+    let evVal = { ev: 0, evPct: 0 };
 
-  if (hasValidProbs && marketProb > 0) {
-    try {
-      kelly = QuantEngine.kelly(modelProb, marketProb) || { quarter: 0, half: 0, full: 0 };
-      ev = QuantEngine.expectedValue(modelProb, marketProb) || { ev: 0, evPct: 0 };
-    } catch {
-      console.warn('Failed to calculate kelly/ev');
+    if (validProbs && mktProb > 0) {
+      try {
+        kellyVal = QuantEngine.kelly(mdlProb, mktProb) || { quarter: 0, half: 0, full: 0 };
+        evVal = QuantEngine.expectedValue(mdlProb, mktProb) || { ev: 0, evPct: 0 };
+      } catch {
+        // Silent fail
+      }
     }
-  }
+
+    return {
+      marketProb: mktProb,
+      modelProb: mdlProb,
+      hasValidProbs: validProbs,
+      edge: edgeVal,
+      edgePct: edgePctVal,
+      signal: signalVal,
+      signalColor: signalColorVal,
+      kelly: kellyVal,
+      ev: evVal,
+    };
+  }, [market.market_prob, market.model_prob]);
 
   return (
     <div className="terminal-panel h-full">

@@ -87,7 +87,7 @@ export const MonteCarloPanel = ({ market }) => {
     <div className="terminal-panel h-full">
       <PanelHeader
         title="MONTE CARLO"
-        subtitle="5k sims × 100 trades"
+        subtitle="500 sims × 50 trades"
       />
       <div className="panel-content">
         <div className="h-20 p-1">

@@ -18,9 +18,10 @@ export const BetsMarketPanel = () => {
         setError(null);
         
         // Use proxy in development, direct API with CORS proxy fallback in production
+        // Reduced from 100 to 25 markets for memory savings
         const apiUrl = import.meta.env.DEV
-          ? '/api/polymarket/events?order=id&ascending=false&closed=false&limit=100'
-          : 'https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=100';
+          ? '/api/polymarket/events?order=id&ascending=false&closed=false&limit=25'
+          : 'https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=25';
         
         let response;
         try {
@@ -28,7 +29,7 @@ export const BetsMarketPanel = () => {
         } catch (corsError) {
           // Fallback to CORS proxy if direct fetch fails
           console.warn('Direct fetch failed, trying CORS proxy:', corsError);
-          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=100')}`;
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=25')}`;
           response = await fetch(proxyUrl);
         }
         
@@ -54,7 +55,7 @@ export const BetsMarketPanel = () => {
     };
 
     fetchMarkets();
-    const interval = setInterval(fetchMarkets, 30000); // Refresh every 30 seconds
+    const interval = setInterval(fetchMarkets, 60000); // Refresh every 60 seconds (was 30s)
     return () => clearInterval(interval);
   }, []);
 

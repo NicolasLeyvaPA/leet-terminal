@@ -1,13 +1,25 @@
 export const QuantEngine = {
+  // Memory-optimized Monte Carlo: 500 sims (was 5000), 50 trades (was 100), 10 paths (was 40)
   monteCarlo: (marketProb, modelProb, config = {}) => {
-    const { numSims = 5000, numTrades = 100, kellyFraction = 0.25, startingCapital = 10000 } = config;
-    const results = [];
+    const { numSims = 500, numTrades = 50, kellyFraction = 0.25, startingCapital = 10000 } = config;
+
+    // Only store paths for visualization (first 10 sims)
+    const pathsToStore = 10;
+    const storedPaths = [];
+
+    // Stats accumulators - no need to store all results
+    let sumReturns = 0, sumSquaredReturns = 0;
+    let sumMaxDrawdown = 0, sumWinRate = 0;
+    let profitCount = 0, ruinCount = 0;
+    const returns = [];
+
     for (let sim = 0; sim < numSims; sim++) {
       let capital = startingCapital;
-      const path = [capital];
+      const storePath = sim < pathsToStore;
+      const path = storePath ? [capital] : null;
       let wins = 0, losses = 0, maxCapital = capital, maxDrawdown = 0;
+
       for (let t = 0; t < numTrades && capital > 0; t++) {
-        const edge = modelProb - marketProb;
         const odds = 1 / marketProb - 1;
         const kelly = Math.max(0, (odds * modelProb - (1 - modelProb)) / (odds || 1)) * kellyFraction;
         const betSize = capital * Math.min(kelly, 0.05);
@@ -19,32 +31,42 @@ export const QuantEngine = {
           losses++;
         }
         capital = Math.max(0, capital);
-        path.push(capital);
+        if (storePath) path.push(capital);
         if (capital > maxCapital) maxCapital = capital;
         const dd = (maxCapital - capital) / (maxCapital || 1);
         if (dd > maxDrawdown) maxDrawdown = dd;
       }
-      results.push({
-        finalCapital: capital,
-        returnPct: ((capital - startingCapital) / startingCapital) * 100,
-        path,
-        maxDrawdown: maxDrawdown * 100,
-        winRate: (wins / (wins + losses || 1)) * 100,
-      });
+
+      const returnPct = ((capital - startingCapital) / startingCapital) * 100;
+      const winRate = (wins / (wins + losses || 1)) * 100;
+      const drawdownPct = maxDrawdown * 100;
+
+      // Accumulate stats
+      returns.push(returnPct);
+      sumReturns += returnPct;
+      sumSquaredReturns += returnPct * returnPct;
+      sumMaxDrawdown += drawdownPct;
+      sumWinRate += winRate;
+      if (returnPct > 0) profitCount++;
+      if (capital <= 0) ruinCount++;
+
+      if (storePath) storedPaths.push(path);
     }
-    const returns = results.map((r) => r.returnPct).sort((a, b) => a - b);
-    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-    const variance = returns.reduce((a, r) => a + Math.pow(r - mean, 2), 0) / returns.length;
-    const stdDev = Math.sqrt(variance);
+
+    // Calculate stats from accumulators
+    returns.sort((a, b) => a - b);
+    const mean = sumReturns / numSims;
+    const variance = (sumSquaredReturns / numSims) - (mean * mean);
+    const stdDev = Math.sqrt(Math.max(0, variance));
     const idx = (p) => returns[Math.floor(returns.length * p)] ?? returns[0];
     const tail = (p) => {
       const n = Math.floor(returns.length * p);
       if (n <= 0) return returns[0] ?? 0;
       return returns.slice(0, n).reduce((a, b) => a + b, 0) / n;
     };
+
     return {
-      paths: results.slice(0, 40).map((r) => r.path),
-      distribution: returns,
+      paths: storedPaths,
       stats: {
         expectedReturn: mean,
         medianReturn: idx(0.5),
@@ -57,10 +79,10 @@ export const QuantEngine = {
         percentile25: idx(0.25),
         percentile75: idx(0.75),
         percentile95: idx(0.95),
-        probProfit: (results.filter((r) => r.returnPct > 0).length / results.length) * 100,
-        probRuin: (results.filter((r) => r.finalCapital <= 0).length / results.length) * 100,
-        avgMaxDrawdown: results.reduce((a, r) => a + r.maxDrawdown, 0) / results.length,
-        avgWinRate: results.reduce((a, r) => a + r.winRate, 0) / results.length,
+        probProfit: (profitCount / numSims) * 100,
+        probRuin: (ruinCount / numSims) * 100,
+        avgMaxDrawdown: sumMaxDrawdown / numSims,
+        avgWinRate: sumWinRate / numSims,
       },
     };
   },
@@ -115,8 +137,9 @@ export const QuantEngine = {
     };
   },
 
+  // Reduced iterations from 1000 to 200 for memory savings
   quantumOptimize: (markets, capital = 10000) => {
-    const iterations = 1000;
+    const iterations = 200;
     let bestAllocation = {};
     let bestScore = -Infinity;
     for (let i = 0; i < iterations; i++) {

@@ -132,8 +132,8 @@ export async function fetchOpenEvents(limit = 50) {
   }
 }
 
-// Fetch market price history
-export async function fetchPriceHistory(marketId, days = 90) {
+// Fetch market price history - reduced to 30 days for memory savings
+export async function fetchPriceHistory(marketId, days = 30) {
   try {
     const endTs = Math.floor(Date.now() / 1000);
     const startTs = endTs - (days * 24 * 60 * 60);
@@ -243,9 +243,7 @@ function transformEventToMarket(event) {
     greeks: calculateGreeks(midPrice, event.endDate),
     correlations: {},
     related_news: [],
-
-    // Raw event data for reference
-    _raw: event,
+    // Removed _raw to save memory
   };
 }
 
@@ -404,15 +402,15 @@ function calculateGreeks(marketProb, endDate) {
   return { delta, gamma, theta, vega, rho };
 }
 
-// Transform orderbook to our format
+// Transform orderbook to our format - reduced to 5 levels to save memory
 function transformOrderbook(data) {
-  const bids = (data.bids || []).slice(0, 15).map((bid, i) => ({
+  const bids = (data.bids || []).slice(0, 5).map((bid, i) => ({
     price: parseFloat(bid.price),
     size: parseFloat(bid.size) * 1000,
     cumulative: 0,
   }));
 
-  const asks = (data.asks || []).slice(0, 15).map((ask, i) => ({
+  const asks = (data.asks || []).slice(0, 5).map((ask, i) => ({
     price: parseFloat(ask.price),
     size: parseFloat(ask.size) * 1000,
     cumulative: 0,
@@ -455,21 +453,22 @@ function generateFallbackPriceHistory(currentPrice, days) {
   return history;
 }
 
+// Reduced to 5 levels to save memory
 function generateFallbackOrderbook(midPrice) {
   const bids = [], asks = [];
   let bidCumulative = 0, askCumulative = 0;
-  for (let i = 1; i <= 15; i++) {
+  for (let i = 1; i <= 5; i++) {
     const bidSize = Math.floor(Math.random() * 80000) + 20000;
     const askSize = Math.floor(Math.random() * 80000) + 20000;
     bidCumulative += bidSize;
     askCumulative += askSize;
     bids.push({
-      price: Math.max(0.01, midPrice - i * 0.005),
+      price: Math.max(0.01, midPrice - i * 0.01),
       size: bidSize,
       cumulative: bidCumulative,
     });
     asks.push({
-      price: Math.min(0.99, midPrice + i * 0.005),
+      price: Math.min(0.99, midPrice + i * 0.01),
       size: askSize,
       cumulative: askCumulative,
     });

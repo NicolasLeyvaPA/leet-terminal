@@ -37,7 +37,7 @@ export const MonteCarloChart = ({ paths }) => {
       const pathLength = validPaths[0]?.length || 0;
       const labels = Array.from({ length: pathLength }, (_, i) => i);
 
-      const datasets = validPaths.slice(0, 25).map((path) => {
+      const datasets = validPaths.slice(0, 10).map((path) => {
         const lastValue = path[path.length - 1];
         return {
           data: path,

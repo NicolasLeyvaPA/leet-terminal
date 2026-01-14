@@ -24,6 +24,10 @@ import { isSupabaseConfigured } from './utils/supabase';
 // Market limit options
 const MARKET_LIMITS = [10, 25, 50, 100];
 const REFRESH_INTERVAL = 15000; // 15 seconds
+const PRICE_HISTORY_DAYS = 30; // Reduced from 90 for memory savings
+
+// Cache for price history to avoid regenerating on every refresh
+const priceHistoryCache = new Map();
 
 const Terminal = ({ onLogout }) => {
   const { watchlist } = useWatchlist();
@@ -51,12 +55,30 @@ const Terminal = ({ onLogout }) => {
       setStatusMessage("Syncing...");
       const data = await PolymarketAPI.fetchOpenEvents(limit);
 
-      // Add price history and orderbook to each market
-      const enrichedMarkets = data.map(market => ({
-        ...market,
-        price_history: generatePriceHistory(market.market_prob, 90),
-        orderbook: generateOrderbook(market.market_prob),
-      }));
+      // Add price history (cached) and orderbook to each market
+      const enrichedMarkets = data.map(market => {
+        // Use cached price history if available, otherwise generate new
+        let priceHistory = priceHistoryCache.get(market.id);
+        if (!priceHistory) {
+          priceHistory = generatePriceHistory(market.market_prob, PRICE_HISTORY_DAYS);
+          priceHistoryCache.set(market.id, priceHistory);
+        }
+        return {
+          ...market,
+          price_history: priceHistory,
+          orderbook: generateOrderbook(market.market_prob),
+        };
+      });
+
+      // Clean up cache for markets no longer loaded (limit cache size)
+      if (priceHistoryCache.size > limit * 2) {
+        const currentIds = new Set(data.map(m => m.id));
+        for (const id of priceHistoryCache.keys()) {
+          if (!currentIds.has(id)) {
+            priceHistoryCache.delete(id);
+          }
+        }
+      }
 
       setMarkets(enrichedMarkets);
       if (enrichedMarkets.length > 0 && !selectedMarket) {
@@ -101,9 +123,15 @@ const Terminal = ({ onLogout }) => {
 
       const market = await PolymarketAPI.fetchEventBySlug(url);
 
+      // Use cached price history if available
+      let priceHistory = priceHistoryCache.get(market.id);
+      if (!priceHistory) {
+        priceHistory = generatePriceHistory(market.market_prob, PRICE_HISTORY_DAYS);
+        priceHistoryCache.set(market.id, priceHistory);
+      }
       const enrichedMarket = {
         ...market,
-        price_history: generatePriceHistory(market.market_prob, 90),
+        price_history: priceHistory,
         orderbook: generateOrderbook(market.market_prob),
       };
 
