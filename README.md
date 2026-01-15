@@ -279,6 +279,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 <td><b>Data</b></td>
 <td>
 <img src="https://img.shields.io/badge/Polymarket-API-000000?style=flat-square" alt="Polymarket">
+<img src="https://img.shields.io/badge/Kalshi-API-4F46E5?style=flat-square" alt="Kalshi">
 </td>
 <td>Market data & order books</td>
 </tr>
@@ -325,12 +326,12 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
               │                         │                         │
               ▼                         ▼                         ▼
      ┌────────────────┐       ┌────────────────┐       ┌────────────────┐
-     │   POLYMARKET   │       │    SUPABASE    │       │     WEB3       │
-     │     APIs       │       │    BACKEND     │       │   PROVIDERS    │
+     │  PREDICTION    │       │    SUPABASE    │       │     WEB3       │
+     │  MARKET APIs   │       │    BACKEND     │       │   PROVIDERS    │
      │                │       │                │       │                │
-     │  • Gamma API   │       │  • Auth        │       │  • Phantom     │
-     │  • CLOB API    │       │  • Database    │       │  • MetaMask    │
-     │  • Prices      │       │  • Storage     │       │  • WalletCon.  │
+     │  • Polymarket  │       │  • Auth        │       │  • Phantom     │
+     │  • Kalshi      │       │  • Database    │       │  • MetaMask    │
+     │  • CLOB/REST   │       │  • Storage     │       │  • WalletCon.  │
      └────────────────┘       └────────────────┘       └────────────────┘
 ```
 
@@ -460,6 +461,19 @@ The terminal supports keyboard-driven navigation:
 |----------|:------:|---------|
 | `/prices-history` | `GET` | 90-day price data |
 | `/book` | `GET` | Order book depth |
+
+### Kalshi API
+
+<img src="https://img.shields.io/badge/Base_URL-trading--api.kalshi.com-4F46E5?style=flat-square" alt="Base URL">
+
+| Endpoint | Method | Purpose |
+|----------|:------:|---------|
+| `/trade-api/v2/markets` | `GET` | Fetch market listings |
+| `/trade-api/v2/markets/{ticker}` | `GET` | Single market details |
+| `/trade-api/v2/markets/{ticker}/orderbook` | `GET` | Order book depth |
+| `/trade-api/v2/markets/{ticker}/history` | `GET` | Price history |
+
+**Authentication:** API Key required for trading endpoints
 
 ---
 
