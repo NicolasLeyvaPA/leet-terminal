@@ -1,218 +1,341 @@
+<div align="center">
+
 # LEET QUANTUM TERMINAL PRO
 
-## Technical Specification & Project Documentation
+### The Bloomberg Terminal for Prediction Markets
 
-**Version:** 3.1.0
-**Document Revision:** 1.0
-**Classification:** Technical Reference
-**Last Updated:** January 2026
+<img src="https://img.shields.io/badge/version-3.1.0-blue?style=for-the-badge" alt="Version">
+<img src="https://img.shields.io/badge/status-Production-brightgreen?style=for-the-badge" alt="Status">
+<img src="https://img.shields.io/badge/license-Proprietary-red?style=for-the-badge" alt="License">
+
+<br/>
+
+<img src="https://img.shields.io/badge/React-18.2.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React">
+<img src="https://img.shields.io/badge/Vite-5.0.8-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite">
+<img src="https://img.shields.io/badge/Chart.js-4.4.0-FF6384?style=flat-square&logo=chartdotjs&logoColor=white" alt="Chart.js">
+<img src="https://img.shields.io/badge/Supabase-2.89.0-3FCF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase">
+<img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white" alt="Tailwind">
+
+<br/><br/>
+
+**Enterprise-grade prediction market analytics with real-time Polymarket & Kalshi integration,**
+**quantitative analysis tools, and Web3-native authentication.**
+
+[Features](#-features) |
+[Quick Start](#-quick-start) |
+[Documentation](#-documentation) |
+[Architecture](#-architecture) |
+[API Reference](#-api-reference)
+
+<br/>
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  ██╗     ███████╗███████╗████████╗     ██████╗ ████████╗██████╗              ║
+║  ██║     ██╔════╝██╔════╝╚══██╔══╝    ██╔═══██╗╚══██╔══╝██╔══██╗             ║
+║  ██║     █████╗  █████╗     ██║       ██║   ██║   ██║   ██████╔╝             ║
+║  ██║     ██╔══╝  ██╔══╝     ██║       ██║▄▄ ██║   ██║   ██╔═══╝              ║
+║  ███████╗███████╗███████╗   ██║       ╚██████╔╝   ██║   ██║                  ║
+║  ╚══════╝╚══════╝╚══════╝   ╚═╝        ╚══▀▀═╝    ╚═╝   ╚═╝                  ║
+║                                                                               ║
+║              Q U A N T U M   T E R M I N A L   P R O   v 3 . 1               ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+```
+
+</div>
 
 ---
 
-## Table of Contents
+## Overview
 
-1. [Executive Summary](#1-executive-summary)
-2. [Project Proposal](#2-project-proposal)
-3. [Technology Stack](#3-technology-stack)
-4. [System Architecture](#4-system-architecture)
-5. [Core Features & Functionality](#5-core-features--functionality)
-6. [API Integrations](#6-api-integrations)
-7. [Authentication & Security](#7-authentication--security)
-8. [Data Models & Schemas](#8-data-models--schemas)
-9. [Quantitative Analysis Engine](#9-quantitative-analysis-engine)
-10. [Development Guide](#10-development-guide)
-11. [Deployment & Infrastructure](#11-deployment--infrastructure)
-12. [Performance Specifications](#12-performance-specifications)
-13. [Roadmap & Future Considerations](#13-roadmap--future-considerations)
-14. [Appendices](#14-appendices)
+**Leet Quantum Terminal Pro** is a professional-grade, browser-based analytics platform engineered for prediction market traders, quantitative analysts, and portfolio managers. Inspired by institutional trading terminals like Bloomberg, it provides a comprehensive suite of tools for analyzing, monitoring, and optimizing prediction market positions.
 
----
+<table>
+<tr>
+<td width="50%">
 
-## 1. Executive Summary
+### Why Leet QTP?
 
-### 1.1 Product Overview
+- **Real-Time Data** - Live Polymarket & Kalshi prices & volumes
+- **Quant Analytics** - Monte Carlo, Kelly Criterion, Greeks
+- **Multi-Model ML** - 4-model ensemble predictions
+- **Web3 Native** - Phantom & MetaMask integration
+- **Zero Setup** - Fully client-side, no backend required
 
-**Leet Quantum Terminal Pro** is an enterprise-grade, real-time prediction markets analytics platform engineered to bridge the gap between retail trading interfaces and institutional-level quantitative analysis tools. The platform delivers a Bloomberg Terminal-inspired experience specifically optimized for prediction market traders, analysts, and quantitative researchers.
+</td>
+<td width="50%">
 
-### 1.2 Value Proposition
+### Who Is It For?
 
-| Stakeholder | Value Delivered |
-|-------------|-----------------|
-| **Retail Traders** | Professional-grade analytics without institutional access requirements |
-| **Quantitative Analysts** | Real-time data feeds with built-in statistical modeling frameworks |
-| **Portfolio Managers** | Multi-position tracking with Monte Carlo risk assessment |
-| **Market Researchers** | Comprehensive market data aggregation and visualization |
+| Audience | Use Case |
+|----------|----------|
+| Traders | Real-time market analysis |
+| Quants | Statistical modeling & risk |
+| PMs | Portfolio tracking & P&L |
+| Researchers | Market data visualization |
 
-### 1.3 Key Differentiators
-
-- **Real-Time Polymarket Integration**: Direct API connectivity to the world's largest prediction market
-- **Multi-Model Ensemble Analytics**: 4-model machine learning ensemble (LightGBM, XGBoost, Logistic Regression, Bayesian)
-- **Quantum-Inspired Optimization**: Simulated quantum annealing for portfolio allocation
-- **Web3 Native Authentication**: Native Phantom (Solana) and MetaMask (Ethereum) wallet integration
-- **Zero Infrastructure Requirements**: Fully client-side architecture with optional backend services
+</td>
+</tr>
+</table>
 
 ---
 
-## 2. Project Proposal
+## Features
 
-### 2.1 Problem Statement
+<table>
+<tr>
+<td align="center" width="33%">
+<br/>
+<img src="https://img.shields.io/badge/-Market_Data-orange?style=for-the-badge" alt="Market Data">
+<br/><br/>
+<b>Real-Time Markets</b>
+<br/>
+Live Polymarket & Kalshi integration<br/>
+with 100+ markets, price history,<br/>
+and order book depth
+<br/><br/>
+</td>
+<td align="center" width="33%">
+<br/>
+<img src="https://img.shields.io/badge/-Analytics-purple?style=for-the-badge" alt="Analytics">
+<br/><br/>
+<b>Quant Engine</b>
+<br/>
+Monte Carlo simulations,<br/>
+Kelly Criterion sizing,<br/>
+VaR/CVaR risk metrics
+<br/><br/>
+</td>
+<td align="center" width="33%">
+<br/>
+<img src="https://img.shields.io/badge/-ML_Models-blue?style=for-the-badge" alt="ML Models">
+<br/><br/>
+<b>Ensemble Predictions</b>
+<br/>
+4-model ML ensemble:<br/>
+LightGBM, XGBoost,<br/>
+Logistic, Bayesian
+<br/><br/>
+</td>
+</tr>
+<tr>
+<td align="center" width="33%">
+<br/>
+<img src="https://img.shields.io/badge/-Portfolio-green?style=for-the-badge" alt="Portfolio">
+<br/><br/>
+<b>Position Tracking</b>
+<br/>
+Multi-position management<br/>
+with real-time P&L,<br/>
+cost basis tracking
+<br/><br/>
+</td>
+<td align="center" width="33%">
+<br/>
+<img src="https://img.shields.io/badge/-Optimization-red?style=for-the-badge" alt="Optimization">
+<br/><br/>
+<b>Quantum Lab</b>
+<br/>
+Simulated quantum annealing<br/>
+for optimal portfolio<br/>
+allocation
+<br/><br/>
+</td>
+<td align="center" width="33%">
+<br/>
+<img src="https://img.shields.io/badge/-Web3-yellow?style=for-the-badge" alt="Web3">
+<br/><br/>
+<b>Wallet Auth</b>
+<br/>
+Native Phantom (Solana)<br/>
+and MetaMask (Ethereum)<br/>
+authentication
+<br/><br/>
+</td>
+</tr>
+</table>
 
-The prediction markets industry has experienced exponential growth, with platforms like Polymarket processing billions of dollars in trading volume. However, existing tools for market analysis remain fragmented:
-
-1. **Lack of Professional Tooling**: No Bloomberg-equivalent exists for prediction markets
-2. **Quantitative Accessibility Gap**: Advanced analytics require custom infrastructure
-3. **Data Fragmentation**: Market data, news, and analysis exist in silos
-4. **Web3 Integration Friction**: Traditional platforms ignore blockchain-native authentication
-
-### 2.2 Solution Architecture
-
-Leet Quantum Terminal Pro addresses these gaps through a unified, browser-based platform that delivers:
+### Workspaces
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    LEET QUANTUM TERMINAL PRO                     │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │  Real-Time  │  │  Quant      │  │  Portfolio  │             │
-│  │  Market     │──│  Analytics  │──│  Management │             │
-│  │  Data       │  │  Engine     │  │  System     │             │
-│  └─────────────┘  └─────────────┘  └─────────────┘             │
-│         │                │                │                      │
-│         └────────────────┴────────────────┘                      │
-│                          │                                       │
-│              ┌───────────┴───────────┐                          │
-│              │   Unified Terminal    │                          │
-│              │      Interface        │                          │
-│              └───────────────────────┘                          │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  ANALYSIS  │  PORTFOLIO  │  LAB  │  NEWS  │  BETS                               │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│   ┌─────────────────┬─────────────────┬─────────────────┐                       │
+│   │ MARKET OVERVIEW │   PRICE CHART   │   ORDER BOOK    │                       │
+│   │                 │                 │                 │                       │
+│   │ Prob: 67.5%     │    [Chart]      │  Bid    Ask     │                       │
+│   │ Edge: +3.2%     │                 │  0.65   0.68    │                       │
+│   │ Vol: $1.2M      │                 │  0.64   0.69    │                       │
+│   ├─────────────────┼─────────────────┼─────────────────┤                       │
+│   │   CONFLUENCE    │ MODEL BREAKDOWN │     GREEKS      │                       │
+│   │                 │                 │                 │                       │
+│   │ Bullish: 72%    │ LightGBM: 0.71  │ Delta:  0.67    │                       │
+│   │ Bearish: 28%    │ XGBoost:  0.69  │ Gamma:  0.12    │                       │
+│   │ Signal: BUY     │ Logistic: 0.68  │ Theta: -0.02    │                       │
+│   │                 │ Bayesian: 0.70  │ Vega:   0.15    │                       │
+│   └─────────────────┴─────────────────┴─────────────────┘                       │
+│                                                                                  │
+│   ┌─────────────────────────────────────────────────────┐                       │
+│   │              MONTE CARLO SIMULATION                  │                       │
+│   │  Expected Return: +12.4%  |  Win Rate: 68%          │                       │
+│   │  Max Drawdown: -18%  |  Sharpe: 1.42  |  VaR: -8%   │                       │
+│   └─────────────────────────────────────────────────────┘                       │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
-
-### 2.3 Target Market
-
-| Segment | TAM Estimate | Primary Use Case |
-|---------|--------------|------------------|
-| Prediction Market Traders | 500K+ active users | Daily trading operations |
-| DeFi Portfolio Managers | 50K+ professionals | Risk management |
-| Quantitative Researchers | 100K+ analysts | Market research & modeling |
-| Financial Content Creators | 25K+ influencers | Data visualization & reporting |
-
-### 2.4 Business Model Considerations
-
-The platform architecture supports multiple monetization vectors:
-
-- **Freemium SaaS**: Basic analytics free, premium features subscription-based
-- **API Access Tiers**: Rate-limited free tier, paid professional tier
-- **White-Label Licensing**: Enterprise deployments for trading firms
-- **Data Services**: Historical data exports and custom analytics
 
 ---
 
-## 3. Technology Stack
+## Quick Start
 
-### 3.1 Stack Overview
+### Prerequisites
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        FRONTEND LAYER                            │
-├─────────────────────────────────────────────────────────────────┤
-│  React 18.2.0         │  Vite 5.0.8          │  Chart.js 4.4.0  │
-│  (UI Framework)       │  (Build Tool)        │  (Visualization) │
-├─────────────────────────────────────────────────────────────────┤
-│                        STYLING LAYER                             │
-├─────────────────────────────────────────────────────────────────┤
-│  Tailwind CSS (CDN)   │  Custom CSS Grid     │  CSS Variables   │
-├─────────────────────────────────────────────────────────────────┤
-│                        BACKEND SERVICES                          │
-├─────────────────────────────────────────────────────────────────┤
-│  Supabase 2.89.0      │  PostgreSQL          │  JWT Auth        │
-│  (BaaS Platform)      │  (Database)          │  (Token Mgmt)    │
-├─────────────────────────────────────────────────────────────────┤
-│                        EXTERNAL APIs                             │
-├─────────────────────────────────────────────────────────────────┤
-│  Polymarket Gamma API │  Polymarket CLOB     │  Web3 Providers  │
-│  (Market Data)        │  (Order Book)        │  (Wallets)       │
-└─────────────────────────────────────────────────────────────────┘
+<img src="https://img.shields.io/badge/Node.js-≥18.0.0-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js">
+<img src="https://img.shields.io/badge/npm-≥9.0.0-CB3837?style=flat-square&logo=npm&logoColor=white" alt="npm">
+<img src="https://img.shields.io/badge/Git-Latest-F05032?style=flat-square&logo=git&logoColor=white" alt="Git">
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/NicolasLeyvaPA/leet-terminal.git
+
+# Navigate to the website directory
+cd leet-terminal/website
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
 ```
 
-### 3.2 Core Dependencies
+### Environment Configuration
 
-| Package | Version | Purpose | License |
-|---------|---------|---------|---------|
-| `react` | 18.2.0 | Component-based UI framework | MIT |
-| `react-dom` | 18.2.0 | React DOM rendering | MIT |
-| `vite` | 5.0.8 | Next-generation build tool | MIT |
-| `@vitejs/plugin-react` | 4.2.1 | React Fast Refresh for Vite | MIT |
-| `chart.js` | 4.4.0 | Canvas-based charting library | MIT |
-| `@supabase/supabase-js` | 2.89.0 | Supabase client SDK | MIT |
+Create a `.env` file in the `website` directory:
 
-### 3.3 Technology Selection Rationale
+```env
+# Supabase Configuration (Optional - for authentication)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
 
-#### React 18.2.0
-- **Concurrent Features**: Automatic batching and transitions for smooth UI
-- **Hooks Architecture**: Simplified state management without Redux overhead
-- **Ecosystem Maturity**: Extensive library support and community resources
-- **Server Components Ready**: Future-proofed for React Server Components
+### Available Scripts
 
-#### Vite 5.0.8
-- **ESM-Native**: Leverages native ES modules for instant dev server startup
-- **Hot Module Replacement**: Sub-second HMR for rapid development
-- **Optimized Builds**: Rollup-based production builds with tree shaking
-- **Plugin Ecosystem**: Extensible architecture for custom tooling
-
-#### Chart.js 4.4.0
-- **Canvas Rendering**: GPU-accelerated rendering for large datasets
-- **Declarative API**: React-friendly configuration patterns
-- **Animation System**: Smooth transitions for real-time data updates
-- **Bundle Size**: ~60KB gzipped vs. 200KB+ alternatives (D3.js)
-
-#### Supabase 2.89.0
-- **PostgreSQL Backend**: Enterprise-grade relational database
-- **Row Level Security**: Fine-grained access control policies
-- **Real-time Subscriptions**: WebSocket-based live data (future enhancement)
-- **Auth Providers**: OAuth, email, phone, and custom JWT support
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server with HMR |
+| `npm run build` | Create optimized production build |
+| `npm run preview` | Preview production build locally |
 
 ---
 
-## 4. System Architecture
+## Technology Stack
 
-### 4.1 High-Level Architecture
+<table>
+<tr>
+<th align="center">Layer</th>
+<th align="center">Technology</th>
+<th align="center">Purpose</th>
+</tr>
+<tr>
+<td><b>Frontend</b></td>
+<td>
+<img src="https://img.shields.io/badge/React-18.2.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React">
+</td>
+<td>Component-based UI with Hooks</td>
+</tr>
+<tr>
+<td><b>Build</b></td>
+<td>
+<img src="https://img.shields.io/badge/Vite-5.0.8-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite">
+</td>
+<td>ESM-native bundler with HMR</td>
+</tr>
+<tr>
+<td><b>Charts</b></td>
+<td>
+<img src="https://img.shields.io/badge/Chart.js-4.4.0-FF6384?style=flat-square&logo=chartdotjs&logoColor=white" alt="Chart.js">
+</td>
+<td>Canvas-based data visualization</td>
+</tr>
+<tr>
+<td><b>Styling</b></td>
+<td>
+<img src="https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white" alt="Tailwind">
+</td>
+<td>Utility-first CSS framework</td>
+</tr>
+<tr>
+<td><b>Backend</b></td>
+<td>
+<img src="https://img.shields.io/badge/Supabase-2.89.0-3FCF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase">
+</td>
+<td>Auth, database, real-time</td>
+</tr>
+<tr>
+<td><b>Data</b></td>
+<td>
+<img src="https://img.shields.io/badge/Polymarket-API-000000?style=flat-square" alt="Polymarket">
+<img src="https://img.shields.io/badge/Kalshi-API-4F46E5?style=flat-square" alt="Kalshi">
+</td>
+<td>Market data & order books</td>
+</tr>
+<tr>
+<td><b>Web3</b></td>
+<td>
+<img src="https://img.shields.io/badge/Phantom-Solana-AB9FF2?style=flat-square&logo=solana&logoColor=white" alt="Phantom">
+<img src="https://img.shields.io/badge/MetaMask-ETH-E2761B?style=flat-square&logo=metamask&logoColor=white" alt="MetaMask">
+</td>
+<td>Wallet authentication</td>
+</tr>
+</table>
+
+---
+
+## Architecture
+
+### System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              CLIENT BROWSER                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │                         REACT APPLICATION                              │  │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐     │  │
-│  │  │   App.jsx  │  │ Components │  │  Services  │  │   Utils    │     │  │
-│  │  │  (Router)  │  │  (Panels)  │  │   (API)    │  │  (Helpers) │     │  │
-│  │  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘     │  │
-│  │        │               │               │               │             │  │
-│  │        └───────────────┴───────────────┴───────────────┘             │  │
-│  │                                │                                      │  │
-│  │                    ┌───────────┴───────────┐                         │  │
-│  │                    │    STATE MANAGEMENT    │                         │  │
-│  │                    │  (React Hooks/Context) │                         │  │
-│  │                    └───────────────────────┘                         │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                     │                                        │
-└─────────────────────────────────────┼────────────────────────────────────────┘
-                                      │
-                    ┌─────────────────┼─────────────────┐
-                    │                 │                 │
-                    ▼                 ▼                 ▼
-           ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-           │  Polymarket  │  │   Supabase   │  │    Web3      │
-           │     APIs     │  │   Backend    │  │  Providers   │
-           │              │  │              │  │              │
-           │ • Gamma API  │  │ • Auth       │  │ • Phantom    │
-           │ • CLOB API   │  │ • Database   │  │ • MetaMask   │
-           │ • Prices     │  │ • Storage    │  │ • WalletCon. │
-           └──────────────┘  └──────────────┘  └──────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              CLIENT APPLICATION                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│   ┌───────────────────────────────────────────────────────────────────────┐    │
+│   │                         REACT APPLICATION                              │    │
+│   │                                                                        │    │
+│   │   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │    │
+│   │   │   App.jsx   │  │ Components  │  │  Services   │  │   Utils     │ │    │
+│   │   │   (Core)    │  │  (Panels)   │  │   (API)     │  │  (Helpers)  │ │    │
+│   │   └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘ │    │
+│   │          │                │                │                │         │    │
+│   │          └────────────────┴────────────────┴────────────────┘         │    │
+│   │                                   │                                    │    │
+│   │                    ┌──────────────┴──────────────┐                    │    │
+│   │                    │     STATE MANAGEMENT        │                    │    │
+│   │                    │   (React Hooks/Context)     │                    │    │
+│   │                    └─────────────────────────────┘                    │    │
+│   └───────────────────────────────────────────────────────────────────────┘    │
+│                                       │                                         │
+└───────────────────────────────────────┼─────────────────────────────────────────┘
+                                        │
+              ┌─────────────────────────┼─────────────────────────┐
+              │                         │                         │
+              ▼                         ▼                         ▼
+     ┌────────────────┐       ┌────────────────┐       ┌────────────────┐
+     │  PREDICTION    │       │    SUPABASE    │       │     WEB3       │
+     │  MARKET APIs   │       │    BACKEND     │       │   PROVIDERS    │
+     │                │       │                │       │                │
+     │  • Polymarket  │       │  • Auth        │       │  • Phantom     │
+     │  • Kalshi      │       │  • Database    │       │  • MetaMask    │
+     │  • CLOB/REST   │       │  • Storage     │       │  • WalletCon.  │
+     └────────────────┘       └────────────────┘       └────────────────┘
 ```
 
-### 4.2 Directory Structure
+### Directory Structure
 
 ```
 leet-terminal/
@@ -227,7 +350,7 @@ leet-terminal/
 │   │   │   ├── MarketDetailDock.jsx   # Bottom detail panel
 │   │   │   ├── PriceChart.jsx         # Chart.js wrapper
 │   │   │   ├── MonteCarloChart.jsx    # Simulation charts
-│   │   │   ├── PanelHeader.jsx        # Reusable header component
+│   │   │   ├── PanelHeader.jsx        # Reusable header
 │   │   │   ├── DataRow.jsx            # Key-value display
 │   │   │   ├── Tag.jsx                # Status indicators
 │   │   │   │
@@ -246,13 +369,14 @@ leet-terminal/
 │   │   │       └── MarketTradesPanel.jsx
 │   │   │
 │   │   ├── services/
-│   │   │   └── polymarketAPI.js       # API integration (500+ LOC)
+│   │   │   ├── polymarketAPI.js       # Polymarket API integration
+│   │   │   └── kalshiAPI.js           # Kalshi API integration
 │   │   │
 │   │   ├── utils/
 │   │   │   ├── auth.js                # Auth orchestration (1000+ LOC)
-│   │   │   ├── phantom.js             # Solana wallet integration
-│   │   │   ├── metamask.js            # Ethereum wallet integration
-│   │   │   ├── quantEngine.js         # Quantitative analysis
+│   │   │   ├── phantom.js             # Solana wallet
+│   │   │   ├── metamask.js            # Ethereum wallet
+│   │   │   ├── quantEngine.js         # Quant analysis
 │   │   │   ├── helpers.js             # Utility functions
 │   │   │   ├── supabase.js            # Database client
 │   │   │   └── jwt.js                 # Token management
@@ -264,203 +388,34 @@ leet-terminal/
 │   │
 │   ├── index.html                     # HTML template
 │   ├── vite.config.js                 # Build configuration
-│   ├── package.json                   # Dependencies manifest
-│   └── package-lock.json              # Dependency lock file
+│   ├── package.json                   # Dependencies
+│   └── package-lock.json              # Dependency lock
 │
-├── PROJECT_DOCUMENTATION.md           # This document
-└── README.md                          # Quick start guide
-```
-
-### 4.3 Component Hierarchy
-
-```
-<App>
-├── <Header>
-│   ├── <TickerTape />
-│   ├── <CommandBar />
-│   └── <WorkspaceTabs />
-│
-├── <MainContent>
-│   ├── <WatchlistPanel />           [Resizable: 140-920px]
-│   │
-│   └── <WorkspaceContainer>
-│       │
-│       ├── [ANALYSIS Workspace]     [3x2 Grid]
-│       │   ├── <MarketOverviewPanel />
-│       │   ├── <PriceChartPanel />
-│       │   ├── <OrderBookPanel />
-│       │   ├── <ConfluencePanel />
-│       │   ├── <ModelBreakdownPanel />
-│       │   └── <GreeksPanel />
-│       │
-│       ├── [PORTFOLIO Workspace]
-│       │   └── <PortfolioPanel />
-│       │
-│       ├── [LAB Workspace]
-│       │   └── <QuantumLabPanel />
-│       │
-│       ├── [NEWS Workspace]
-│       │   └── <NewsFeedPanel />
-│       │
-│       └── [BETS Workspace]
-│           └── <MarketTradesPanel />
-│
-├── <MarketDetailDock />              [Resizable: 80-500px]
-│   └── <MonteCarloPanel />
-│
-└── <StatusBar />
-    ├── <SyncIndicator />
-    ├── <MarketCount />
-    └── <SignalCount />
-```
-
-### 4.4 Data Flow Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        DATA FLOW DIAGRAM                         │
-└─────────────────────────────────────────────────────────────────┘
-
-    ┌─────────────┐          ┌─────────────┐
-    │  Polymarket │          │   Supabase  │
-    │    APIs     │          │   Backend   │
-    └──────┬──────┘          └──────┬──────┘
-           │                        │
-           │  HTTP/REST             │  HTTP/REST
-           │                        │
-           ▼                        ▼
-    ┌─────────────────────────────────────────┐
-    │           polymarketAPI.js              │
-    │  ┌─────────────────────────────────┐   │
-    │  │      Data Transformation        │   │
-    │  │  • Normalize market objects     │   │
-    │  │  • Calculate derived metrics    │   │
-    │  │  • Generate model probabilities │   │
-    │  └─────────────────────────────────┘   │
-    └──────────────────┬──────────────────────┘
-                       │
-                       │  Processed Market[]
-                       │
-                       ▼
-    ┌─────────────────────────────────────────┐
-    │              App.jsx State              │
-    │  ┌─────────────────────────────────┐   │
-    │  │  markets: Market[]              │   │
-    │  │  selectedMarket: Market | null  │   │
-    │  │  workspace: string              │   │
-    │  │  filters: FilterConfig          │   │
-    │  │  layoutDimensions: Dimensions   │   │
-    │  └─────────────────────────────────┘   │
-    └──────────────────┬──────────────────────┘
-                       │
-                       │  Props Drilling
-                       │
-    ┌──────────────────┼──────────────────────┐
-    │                  │                      │
-    ▼                  ▼                      ▼
-┌─────────┐     ┌─────────────┐       ┌─────────────┐
-│Watchlist│     │  Analysis   │       │  Portfolio  │
-│  Panel  │     │   Panels    │       │   Panel     │
-└─────────┘     └─────────────┘       └─────────────┘
+└── README.md                          # This document
 ```
 
 ---
 
-## 5. Core Features & Functionality
+## Documentation
 
-### 5.1 Feature Matrix
+### Feature Matrix
 
 | Feature | Status | Workspace | Description |
-|---------|--------|-----------|-------------|
-| Real-Time Market Data | Production | All | Live Polymarket prices & volumes |
-| Interactive Watchlist | Production | All | Filterable market browser |
-| Price Charts | Production | Analysis | 90-day historical visualization |
-| Order Book Display | Production | Analysis | Bid/ask depth analysis |
-| Confluence Analysis | Production | Analysis | 10-factor signal aggregation |
-| Model Ensemble | Production | Analysis | 4-model ML probability |
-| Greeks Calculation | Production | Analysis | Options-style risk metrics |
-| Monte Carlo Simulation | Production | Detail Dock | 5,000-path risk analysis |
-| Portfolio Tracking | Production | Portfolio | Position & P&L management |
-| Quantum Optimization | Production | Lab | Simulated annealing allocation |
-| News Aggregation | Beta | News | Market-linked news feed |
-| Trade Stream | Beta | Bets | Live transaction feed |
+|---------|:------:|-----------|-------------|
+| Real-Time Market Data | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | All | Live Polymarket & Kalshi prices & volumes |
+| Interactive Watchlist | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | All | Filterable market browser (up to 100) |
+| Price Charts | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | Analysis | 90-day historical visualization |
+| Order Book Display | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | Analysis | 15-level bid/ask depth |
+| Confluence Analysis | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | Analysis | 10-factor signal aggregation |
+| Model Ensemble | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | Analysis | 4-model ML probability |
+| Greeks Calculation | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | Analysis | Delta, Gamma, Theta, Vega, Rho |
+| Monte Carlo Simulation | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | Detail Dock | 5,000-path risk analysis |
+| Portfolio Tracking | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | Portfolio | Position & P&L management |
+| Quantum Optimization | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | Lab | Simulated annealing allocation |
+| News Aggregation | ![Beta](https://img.shields.io/badge/-Beta-yellow?style=flat-square) | News | Market-linked news feed |
+| Trade Stream | ![Beta](https://img.shields.io/badge/-Beta-yellow?style=flat-square) | Bets | Live transaction feed |
 
-### 5.2 Workspace Specifications
-
-#### 5.2.1 Analysis Workspace
-
-The primary workspace featuring a 3x2 responsive grid layout:
-
-```
-┌──────────────────┬──────────────────┬──────────────────┐
-│                  │                  │                  │
-│  Market Overview │   Price Chart    │   Order Book     │
-│                  │                  │                  │
-│  • Current prob  │  • 90-day OHLC   │  • 15-level bid  │
-│  • Bid/ask       │  • Volume bars   │  • 15-level ask  │
-│  • Volume 24h    │  • Trend lines   │  • Imbalance %   │
-│                  │                  │                  │
-├──────────────────┼──────────────────┼──────────────────┤
-│                  │                  │                  │
-│   Confluence     │ Model Breakdown  │     Greeks       │
-│                  │                  │                  │
-│  • 10 factors    │  • LightGBM      │  • Delta         │
-│  • Bull/bear %   │  • XGBoost       │  • Gamma         │
-│  • Signal        │  • Logistic      │  • Theta         │
-│                  │  • Bayesian      │  • Vega/Rho      │
-│                  │                  │                  │
-└──────────────────┴──────────────────┴──────────────────┘
-```
-
-#### 5.2.2 Portfolio Workspace
-
-Position tracking and P&L analysis:
-
-| Column | Data Type | Description |
-|--------|-----------|-------------|
-| Ticker | String | Market identifier |
-| Side | LONG/SHORT | Position direction |
-| Size | Number | Share quantity |
-| Avg Cost | Currency | Entry price basis |
-| Current | Currency | Mark-to-market price |
-| P&L | Currency | Unrealized gain/loss |
-| P&L % | Percentage | Return percentage |
-
-#### 5.2.3 Quantum Lab Workspace
-
-Optimization engine specifications:
-
-- **Algorithm**: Simulated Quantum Annealing
-- **Iterations**: 1,000 optimization cycles
-- **Edge Threshold**: >2% model advantage required
-- **Position Sizing**: Kelly Criterion variants (Full/Half/Quarter)
-- **Risk Limits**: Maximum 5% portfolio per position
-- **Output**: Optimal allocation weights with expected return
-
-### 5.3 Resizable Layout System
-
-```javascript
-// Panel Dimension Constraints
-const LAYOUT_CONSTRAINTS = {
-  watchlist: {
-    min: 140,   // Minimum width (px)
-    max: 920,   // Maximum width (px)
-    default: 180
-  },
-  detailDock: {
-    min: 80,    // Minimum height (px)
-    max: 500,   // Maximum height (px)
-    default: 180
-  },
-  analytics: {
-    min: 260,   // Minimum width (px)
-    max: 1000,  // Maximum width (px)
-    default: 320
-  }
-};
-```
-
-### 5.4 Command Interface
+### Command Interface
 
 The terminal supports keyboard-driven navigation:
 
@@ -473,27 +428,24 @@ The terminal supports keyboard-driven navigation:
 | `NEWS` | Switch to News workspace |
 | `BETS` | Switch to Bets workspace |
 | `REFRESH` | Force data refresh |
-| `[Polymarket URL]` | Load specific market by URL |
+| `[Market URL]` | Load specific Polymarket or Kalshi market by URL |
 
 ---
 
-## 6. API Integrations
+## API Reference
 
-### 6.1 Polymarket Gamma API
+### Polymarket Gamma API
 
-**Base URL**: `https://gamma-api.polymarket.com`
-
-#### Endpoints
+<img src="https://img.shields.io/badge/Base_URL-gamma--api.polymarket.com-blue?style=flat-square" alt="Base URL">
 
 | Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/events` | GET | Fetch market listings |
-| `/events/{id}` | GET | Single market details |
+|----------|:------:|---------|
+| `/events` | `GET` | Fetch market listings |
+| `/events/{id}` | `GET` | Single market details |
 
-#### Query Parameters
+**Query Parameters:**
 
 ```javascript
-// Market Listing Parameters
 {
   closed: false,           // Exclude resolved markets
   order: 'volume24hr',     // Sort field
@@ -502,657 +454,130 @@ The terminal supports keyboard-driven navigation:
 }
 ```
 
-#### Response Schema
+### Polymarket CLOB API
+
+<img src="https://img.shields.io/badge/Base_URL-clob.polymarket.com-blue?style=flat-square" alt="Base URL">
+
+| Endpoint | Method | Purpose |
+|----------|:------:|---------|
+| `/prices-history` | `GET` | 90-day price data |
+| `/book` | `GET` | Order book depth |
+
+### Kalshi API
+
+<img src="https://img.shields.io/badge/Base_URL-trading--api.kalshi.com-4F46E5?style=flat-square" alt="Base URL">
+
+| Endpoint | Method | Purpose |
+|----------|:------:|---------|
+| `/trade-api/v2/markets` | `GET` | Fetch market listings |
+| `/trade-api/v2/markets/{ticker}` | `GET` | Single market details |
+| `/trade-api/v2/markets/{ticker}/orderbook` | `GET` | Order book depth |
+| `/trade-api/v2/markets/{ticker}/history` | `GET` | Price history |
+
+**Authentication:** API Key required for trading endpoints
+
+---
+
+## Quantitative Analysis
+
+### Monte Carlo Simulation
+
+The platform runs **5,000 simulations** with **100 trades each** to generate risk metrics:
+
+| Metric | Description |
+|--------|-------------|
+| **Expected Return** | Average simulation return |
+| **Win Rate** | Percentage of profitable paths |
+| **Max Drawdown** | Worst peak-to-trough decline |
+| **VaR 95%** | Value at Risk at 95% confidence |
+| **CVaR 95%** | Conditional VaR (expected shortfall) |
+| **Sharpe Ratio** | Risk-adjusted return |
+| **Prob. of Ruin** | Bankruptcy probability |
+
+### Kelly Criterion
+
+Optimal position sizing with risk-adjusted variants:
 
 ```javascript
-{
-  id: string,
-  slug: string,
-  title: string,
-  description: string,
-  category: string,
-  volume: number,
-  volume24hr: number,
-  liquidity: number,
-  startDate: ISO8601,
-  endDate: ISO8601,
-  markets: [
-    {
-      id: string,
-      question: string,
-      outcomes: string[],
-      outcomePrices: string[],
-      volume: number,
-      clobTokenIds: string[]
-    }
-  ]
-}
+// Full Kelly (aggressive)
+fullKelly = (p * b - q) / b
+
+// Half Kelly (moderate)
+halfKelly = fullKelly * 0.5
+
+// Quarter Kelly (conservative) - DEFAULT
+quarterKelly = fullKelly * 0.25
+
+// Maximum position: 5% of capital
 ```
 
-### 6.2 Polymarket CLOB API
+### Confluence Factors
 
-**Base URL**: `https://clob.polymarket.com`
+10-factor weighted signal aggregation:
 
-#### Price History
+| Factor | Weight | Description |
+|--------|:------:|-------------|
+| News Sentiment | 15% | NLP-based news analysis |
+| Model Confidence | 15% | ML ensemble agreement |
+| Orderbook Imbalance | 12% | Buy/sell pressure ratio |
+| Smart Money | 12% | Large trader detection |
+| Price Momentum | 10% | Trend strength |
+| Volume Trend | 8% | Volume trajectory |
+| Social Sentiment | 8% | Social media signals |
+| Historical Pattern | 8% | Pattern recognition |
+| Liquidity Score | 7% | Market depth quality |
+| Time Decay | 5% | Expiration proximity |
 
-```javascript
-// Request
-GET /prices-history?market={tokenId}&interval=max&fidelity=60
+---
 
-// Response
-{
-  history: [
-    { t: timestamp, p: price }
-  ]
-}
+## Authentication
+
+### Supported Methods
+
+<table>
+<tr>
+<td align="center">
+<img src="https://img.shields.io/badge/Phantom-Solana-AB9FF2?style=for-the-badge&logo=solana&logoColor=white" alt="Phantom">
+<br/>
+<small>High Security</small>
+</td>
+<td align="center">
+<img src="https://img.shields.io/badge/MetaMask-Ethereum-E2761B?style=for-the-badge&logo=metamask&logoColor=white" alt="MetaMask">
+<br/>
+<small>High Security</small>
+</td>
+<td align="center">
+<img src="https://img.shields.io/badge/Email-Password-gray?style=for-the-badge&logo=gmail&logoColor=white" alt="Email">
+<br/>
+<small>Medium Security</small>
+</td>
+<td align="center">
+<img src="https://img.shields.io/badge/OAuth-Google-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Google">
+<br/>
+<small>Medium Security</small>
+</td>
+</tr>
+</table>
+
+### Wallet Authentication Flow
+
 ```
-
-#### Order Book
-
-```javascript
-// Request
-GET /book?token_id={tokenId}
-
-// Response
-{
-  market: string,
-  asset_id: string,
-  bids: [{ price: string, size: string }],
-  asks: [{ price: string, size: string }]
-}
-```
-
-### 6.3 CORS Proxy Strategy
-
-Due to browser CORS restrictions, the application implements a multi-layer fallback system:
-
-```javascript
-const CORS_FALLBACK_CHAIN = [
-  // 1. Vite Dev Proxy (development only)
-  '/api/polymarket',
-
-  // 2. Direct fetch (may work in some deployments)
-  'https://gamma-api.polymarket.com',
-
-  // 3. Public CORS proxies
-  'https://corsproxy.io/?',
-  'https://api.allorigins.win/raw?url=',
-  'https://cors-anywhere.herokuapp.com/'
-];
-```
-
-### 6.4 Supabase Integration
-
-#### Configuration
-
-```javascript
-// Environment Variables
-VITE_SUPABASE_URL=https://{project}.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-#### Database Schema
-
-```sql
--- Users table (managed by Supabase Auth)
-auth.users (
-  id UUID PRIMARY KEY,
-  email TEXT,
-  encrypted_password TEXT,
-  created_at TIMESTAMPTZ
-)
-
--- Wallet users extension
-public.wallet_users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  wallet_address TEXT UNIQUE NOT NULL,
-  wallet_type TEXT NOT NULL,  -- 'phantom' | 'metamask'
-  auth_user_id UUID REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW()
-)
-
--- User preferences
-public.user_preferences (
-  user_id UUID PRIMARY KEY REFERENCES auth.users(id),
-  default_workspace TEXT DEFAULT 'ANALYSIS',
-  watchlist_width INTEGER DEFAULT 180,
-  detail_dock_height INTEGER DEFAULT 180,
-  auto_refresh_interval INTEGER DEFAULT 15000
-)
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│    Connect   │────▶│    Sign      │────▶│   Verify     │────▶│   Session    │
+│    Wallet    │     │   Message    │     │  Signature   │     │   Created    │
+└──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
 ```
 
 ---
 
-## 7. Authentication & Security
+## Deployment
 
-### 7.1 Authentication Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    AUTHENTICATION FLOW                           │
-└─────────────────────────────────────────────────────────────────┘
-
-                    ┌─────────────────┐
-                    │   User Arrives  │
-                    └────────┬────────┘
-                             │
-              ┌──────────────┴──────────────┐
-              │    Wallet Detected?         │
-              └──────────────┬──────────────┘
-                             │
-           ┌─────────────────┼─────────────────┐
-           │ YES             │                 │ NO
-           ▼                 │                 ▼
-    ┌─────────────┐         │         ┌─────────────┐
-    │  Phantom    │         │         │   Email/    │
-    │  MetaMask   │         │         │  Password   │
-    └──────┬──────┘         │         └──────┬──────┘
-           │                │                │
-           ▼                │                ▼
-    ┌─────────────┐         │         ┌─────────────┐
-    │  Sign       │         │         │  Supabase   │
-    │  Message    │         │         │  Auth       │
-    └──────┬──────┘         │         └──────┬──────┘
-           │                │                │
-           ▼                │                ▼
-    ┌─────────────┐         │         ┌─────────────┐
-    │  Verify     │         │         │  JWT        │
-    │  Signature  │         │         │  Token      │
-    └──────┬──────┘         │         └──────┬──────┘
-           │                │                │
-           └────────────────┴────────────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │  verifyAuth()   │
-                    │  Session Valid  │
-                    └─────────────────┘
-```
-
-### 7.2 Supported Authentication Methods
-
-| Method | Provider | Security Level | Use Case |
-|--------|----------|----------------|----------|
-| Phantom Wallet | Solana | High | Crypto-native users |
-| MetaMask | Ethereum | High | EVM ecosystem users |
-| Email/Password | Supabase | Medium | Traditional users |
-| OAuth (Google) | Supabase | Medium | Consumer convenience |
-| OAuth (GitHub) | Supabase | Medium | Developer users |
-
-### 7.3 Wallet Authentication Flow
-
-```javascript
-// Phantom Authentication
-async function authenticatePhantom() {
-  // 1. Connect wallet
-  const resp = await window.solana.connect();
-  const publicKey = resp.publicKey.toString();
-
-  // 2. Generate challenge message
-  const message = `Sign this message to authenticate with Leet Terminal\n\n` +
-                  `Nonce: ${Date.now()}\n` +
-                  `Public Key: ${publicKey}`;
-
-  // 3. Sign message
-  const encodedMessage = new TextEncoder().encode(message);
-  const signature = await window.solana.signMessage(encodedMessage);
-
-  // 4. Verify and create session
-  return {
-    publicKey,
-    signature: bs58.encode(signature.signature),
-    signedAt: Date.now()
-  };
-}
-```
-
-### 7.4 Security Considerations
-
-| Risk | Mitigation |
-|------|------------|
-| XSS Attacks | React's automatic escaping, CSP headers |
-| CSRF | SameSite cookies, token-based auth |
-| Injection | Parameterized queries via Supabase |
-| Wallet Spoofing | EIP-6963 provider detection |
-| Session Hijacking | Short-lived JWTs, secure storage |
-
----
-
-## 8. Data Models & Schemas
-
-### 8.1 Market Object
-
-The canonical market object used throughout the application:
-
-```typescript
-interface Market {
-  // Identifiers
-  id: string;
-  ticker: string;
-  marketId: string;
-  conditionId: string;
-
-  // Metadata
-  platform: 'Polymarket';
-  question: string;
-  description: string;
-  category: string;
-
-  // Probabilities
-  market_prob: number;      // 0-1, current market price
-  model_prob: number;       // 0-1, model prediction
-  prev_prob: number;        // 0-1, previous price
-
-  // Market Metrics
-  bestBid: number;
-  bestAsk: number;
-  spread: number;
-  volume_24h: number;
-  volume_total: number;
-  liquidity: number;
-  open_interest: number;
-  trades_24h: number;
-
-  // Analytical Data
-  factors: ConfluenceFactors;
-  model_breakdown: ModelBreakdown;
-  greeks: Greeks;
-
-  // Time Series
-  price_history: PricePoint[];
-  orderbook: OrderBook;
-
-  // Token Data
-  clobTokenIds: string[];
-  outcomes: string[];
-  outcomePrices: number[];
-
-  // Dates
-  end_date: string;         // ISO 8601
-
-  // Raw API Response
-  _raw: PolymarketEvent;
-}
-```
-
-### 8.2 Confluence Factors
-
-```typescript
-interface ConfluenceFactors {
-  orderbook_imbalance: Factor;  // Weight: 12%
-  price_momentum: Factor;        // Weight: 10%
-  volume_trend: Factor;          // Weight: 8%
-  news_sentiment: Factor;        // Weight: 15%
-  social_sentiment: Factor;      // Weight: 8%
-  smart_money: Factor;           // Weight: 12%
-  historical_pattern: Factor;    // Weight: 8%
-  time_decay: Factor;            // Weight: 5%
-  liquidity_score: Factor;       // Weight: 7%
-  model_confidence: Factor;      // Weight: 15%
-}
-
-interface Factor {
-  value: number;      // -1 to 1
-  weight: number;     // 0 to 1
-  signal: 'bullish' | 'bearish' | 'neutral';
-}
-```
-
-### 8.3 Model Breakdown
-
-```typescript
-interface ModelBreakdown {
-  lightgbm: ModelOutput;
-  xgboost: ModelOutput;
-  logistic: ModelOutput;
-  bayesian: ModelOutput;
-}
-
-interface ModelOutput {
-  prob: number;         // Model's probability estimate
-  weight: number;       // Ensemble weight
-  confidence: number;   // Model's confidence score
-}
-```
-
-### 8.4 Greeks
-
-```typescript
-interface Greeks {
-  delta: number;    // Price sensitivity
-  gamma: number;    // Delta change rate
-  theta: number;    // Time decay (per day)
-  vega: number;     // Volatility sensitivity
-  rho: number;      // Interest rate sensitivity
-}
-```
-
----
-
-## 9. Quantitative Analysis Engine
-
-### 9.1 Engine Overview
-
-The `quantEngine.js` module provides institutional-grade analytics:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    QUANT ENGINE MODULES                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-│  │  Monte Carlo    │  │  Kelly Criterion │  │  Expected Value │ │
-│  │  Simulation     │  │  Calculator      │  │  Analysis       │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
-│                                                                  │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-│  │  Greeks         │  │  Model          │  │  Confluence     │ │
-│  │  Calculator     │  │  Ensemble       │  │  Aggregator     │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 9.2 Monte Carlo Simulation
-
-#### Algorithm
-
-```javascript
-function runMonteCarloSimulation(market, config = {}) {
-  const {
-    simulations = 5000,
-    tradesPerSimulation = 100,
-    initialCapital = 10000
-  } = config;
-
-  const results = [];
-
-  for (let i = 0; i < simulations; i++) {
-    let capital = initialCapital;
-    const capitalPath = [capital];
-
-    for (let t = 0; t < tradesPerSimulation; t++) {
-      const betSize = calculateKellySize(market, capital);
-      const outcome = Math.random() < market.model_prob;
-
-      if (outcome) {
-        capital += betSize * (1 / market.market_prob - 1);
-      } else {
-        capital -= betSize;
-      }
-
-      capitalPath.push(Math.max(0, capital));
-      if (capital <= 0) break;
-    }
-
-    results.push({
-      finalCapital: capital,
-      maxDrawdown: calculateMaxDrawdown(capitalPath),
-      path: capitalPath
-    });
-  }
-
-  return aggregateResults(results);
-}
-```
-
-#### Output Metrics
-
-| Metric | Formula | Description |
-|--------|---------|-------------|
-| Expected Return | `mean(finalCapital) / initialCapital - 1` | Average simulation return |
-| Win Rate | `count(profitable) / total` | Percentage of winning simulations |
-| Max Drawdown | `max(peak - trough) / peak` | Worst peak-to-trough decline |
-| VaR 95% | `percentile(returns, 5)` | Value at Risk, 95% confidence |
-| CVaR 95% | `mean(returns < VaR)` | Conditional VaR (expected shortfall) |
-| Sharpe Ratio | `(mean - rf) / std` | Risk-adjusted return |
-| Prob. of Ruin | `count(capital <= 0) / total` | Bankruptcy probability |
-
-### 9.3 Kelly Criterion Implementation
-
-```javascript
-function calculateKellySize(market, capital) {
-  const p = market.model_prob;       // Win probability
-  const q = 1 - p;                   // Loss probability
-  const b = 1 / market.market_prob - 1;  // Odds received
-
-  // Full Kelly
-  const fullKelly = (p * b - q) / b;
-
-  // Risk-adjusted variants
-  const halfKelly = fullKelly * 0.5;
-  const quarterKelly = fullKelly * 0.25;
-
-  // Optimal sizing (25% Kelly, max 5% of capital)
-  const optimalSize = Math.min(
-    quarterKelly * capital,
-    capital * 0.05
-  );
-
-  return Math.max(0, optimalSize);
-}
-```
-
-### 9.4 Greeks Calculation
-
-```javascript
-function calculateGreeks(market) {
-  const S = market.market_prob;        // Current price
-  const K = 0.5;                       // Strike (50% reference)
-  const T = market.timeToExpiry / 365; // Time in years
-  const sigma = market.impliedVol;     // Implied volatility
-  const r = 0.05;                      // Risk-free rate
-
-  return {
-    delta: calculateDelta(S, K, T, sigma, r),
-    gamma: calculateGamma(S, K, T, sigma, r),
-    theta: calculateTheta(S, K, T, sigma, r),
-    vega: calculateVega(S, K, T, sigma, r),
-    rho: calculateRho(S, K, T, sigma, r)
-  };
-}
-```
-
-### 9.5 Confluence Algorithm
-
-```javascript
-const CONFLUENCE_WEIGHTS = {
-  orderbook_imbalance: 0.12,
-  price_momentum: 0.10,
-  volume_trend: 0.08,
-  news_sentiment: 0.15,
-  social_sentiment: 0.08,
-  smart_money: 0.12,
-  historical_pattern: 0.08,
-  time_decay: 0.05,
-  liquidity_score: 0.07,
-  model_confidence: 0.15
-};
-
-function calculateConfluence(factors) {
-  let bullish = 0;
-  let bearish = 0;
-
-  for (const [factor, weight] of Object.entries(CONFLUENCE_WEIGHTS)) {
-    const value = factors[factor].value;
-
-    if (value > 0) {
-      bullish += value * weight;
-    } else {
-      bearish += Math.abs(value) * weight;
-    }
-  }
-
-  const total = bullish + bearish;
-
-  return {
-    bullishPercent: (bullish / total) * 100,
-    bearishPercent: (bearish / total) * 100,
-    signal: bullish > bearish ? 'BUY' : 'SELL',
-    strength: Math.abs(bullish - bearish)
-  };
-}
-```
-
----
-
-## 10. Development Guide
-
-### 10.1 Environment Setup
-
-#### Prerequisites
-
-- Node.js >= 18.0.0
-- npm >= 9.0.0
-- Git
-
-#### Installation
-
-```bash
-# Clone repository
-git clone https://github.com/NicolasLeyvaPA/leet-terminal.git
-cd leet-terminal/website
-
-# Install dependencies
-npm install
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your Supabase credentials
-
-# Start development server
-npm run dev
-```
-
-### 10.2 Development Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start Vite dev server with HMR |
-| `npm run build` | Create production build |
-| `npm run preview` | Preview production build locally |
-| `npm run lint` | Run ESLint |
-| `npm run test` | Run test suite |
-
-### 10.3 Code Style Guidelines
-
-#### Component Structure
-
-```javascript
-// Recommended component template
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-
-function ComponentName({ prop1, prop2, onEvent }) {
-  // 1. State declarations
-  const [state, setState] = useState(initialValue);
-
-  // 2. Memoized values
-  const computed = useMemo(() => {
-    return expensiveCalculation(prop1);
-  }, [prop1]);
-
-  // 3. Callbacks
-  const handleClick = useCallback(() => {
-    onEvent(state);
-  }, [state, onEvent]);
-
-  // 4. Effects
-  useEffect(() => {
-    // Side effect logic
-    return () => {
-      // Cleanup
-    };
-  }, [dependencies]);
-
-  // 5. Render
-  return (
-    <div className="component-container">
-      {/* JSX */}
-    </div>
-  );
-}
-
-export default ComponentName;
-```
-
-#### Naming Conventions
-
-| Type | Convention | Example |
-|------|------------|---------|
-| Components | PascalCase | `MarketOverviewPanel` |
-| Functions | camelCase | `calculateKellySize` |
-| Constants | SCREAMING_SNAKE | `MAX_MARKETS` |
-| CSS Classes | kebab-case | `panel-header` |
-| Files | PascalCase.jsx | `QuantumLabPanel.jsx` |
-
-### 10.4 Adding New Features
-
-#### Creating a New Panel
-
-```javascript
-// 1. Create component file: src/components/panels/NewPanel.jsx
-import React from 'react';
-import PanelHeader from '../PanelHeader';
-
-function NewPanel({ market }) {
-  return (
-    <div className="panel">
-      <PanelHeader title="NEW FEATURE" />
-      <div className="panel-content">
-        {/* Panel content */}
-      </div>
-    </div>
-  );
-}
-
-export default NewPanel;
-
-// 2. Import in App.jsx
-import NewPanel from './components/panels/NewPanel';
-
-// 3. Add to workspace grid
-{workspace === 'ANALYSIS' && (
-  <div className="grid grid-cols-3 gap-2">
-    {/* Existing panels */}
-    <NewPanel market={selectedMarket} />
-  </div>
-)}
-```
-
----
-
-## 11. Deployment & Infrastructure
-
-### 11.1 Build Configuration
+### Build Configuration
 
 ```javascript
 // vite.config.js
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
 export default defineConfig({
-  plugins: [react()],
-
-  base: process.env.NODE_ENV === 'production'
-    ? '/leet-terminal/'
-    : '/',
-
-  server: {
-    host: true,
-    allowedHosts: ['localhost', '.ngrok.io', '.ngrok-free.app'],
-    proxy: {
-      '/api/polymarket': {
-        target: 'https://gamma-api.polymarket.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/polymarket/, '')
-      },
-      '/api/clob': {
-        target: 'https://clob.polymarket.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/clob/, '')
-      }
-    }
-  },
+  base: process.env.NODE_ENV === 'production' ? '/leet-terminal/' : '/',
 
   build: {
     outDir: 'dist',
@@ -1170,239 +595,113 @@ export default defineConfig({
 });
 ```
 
-### 11.2 Deployment Options
+### Deployment Options
 
 | Platform | Configuration | Best For |
 |----------|---------------|----------|
-| GitHub Pages | `base: '/leet-terminal/'` | Free hosting, GitHub integration |
-| Vercel | Zero config | Fast global CDN, preview deployments |
-| Netlify | `_redirects` for SPA | Form handling, serverless functions |
-| AWS S3 + CloudFront | Manual setup | Enterprise, custom domains |
-
-### 11.3 CI/CD Pipeline
-
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy to Production
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: website/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-        working-directory: website
-
-      - name: Build
-        run: npm run build
-        working-directory: website
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: website/dist
-```
+| ![GitHub Pages](https://img.shields.io/badge/GitHub_Pages-181717?style=flat-square&logo=github&logoColor=white) | `base: '/leet-terminal/'` | Free hosting |
+| ![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white) | Zero config | Preview deploys |
+| ![Netlify](https://img.shields.io/badge/Netlify-00C7B7?style=flat-square&logo=netlify&logoColor=white) | `_redirects` for SPA | Serverless |
+| ![AWS](https://img.shields.io/badge/AWS_S3-232F3E?style=flat-square&logo=amazonaws&logoColor=white) | CloudFront CDN | Enterprise |
 
 ---
 
-## 12. Performance Specifications
+## Performance
 
-### 12.1 Performance Targets
+### Targets
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
+| Metric | Target | Tool |
+|--------|:------:|------|
 | First Contentful Paint | < 1.5s | Lighthouse |
 | Time to Interactive | < 3.0s | Lighthouse |
 | Largest Contentful Paint | < 2.5s | Lighthouse |
-| Cumulative Layout Shift | < 0.1 | Lighthouse |
 | Bundle Size (gzipped) | < 200KB | Build output |
-| API Response Handling | < 100ms | Custom metrics |
-| Monte Carlo (5k sims) | < 500ms | Custom metrics |
+| Monte Carlo (5k sims) | < 500ms | Custom |
 
-### 12.2 Optimization Strategies
+### Optimizations
 
-#### React Optimizations
+- **React.memo** - Memoized components prevent unnecessary re-renders
+- **useMemo/useCallback** - Cached calculations and handlers
+- **Code Splitting** - Dynamic imports for workspace panels
+- **Tree Shaking** - Dead code elimination in production builds
 
-```javascript
-// Memoization for expensive calculations
-const filteredMarkets = useMemo(() => {
-  return markets
-    .filter(m => m.category === selectedCategory)
-    .sort((a, b) => b.edge - a.edge);
-}, [markets, selectedCategory]);
+---
 
-// Callback memoization for event handlers
-const handleMarketSelect = useCallback((market) => {
-  setSelectedMarket(market);
-}, []);
+## Roadmap
 
-// Ref-based drag handling (no re-renders)
-const isDragging = useRef(false);
-```
+### Phase 1: Foundation
+- [ ] WebSocket real-time connections
+- [ ] Persistent user preferences
+- [ ] TradingView chart integration
+- [ ] Mobile-responsive design
 
-#### Bundle Optimization
+### Phase 2: Analytics
+- [ ] Custom ML model training
+- [ ] Backtesting engine
+- [ ] Strategy builder
+- [ ] Price/volume alerts
 
-```javascript
-// Code splitting with dynamic imports
-const QuantumLabPanel = React.lazy(() =>
-  import('./components/panels/QuantumLabPanel')
-);
+### Phase 3: Trading
+- [ ] Direct Polymarket & Kalshi execution
+- [ ] Portfolio rebalancing
+- [ ] Multi-platform support
+- [ ] Copy trading
 
-// Tree-shaking friendly imports
-import { format } from 'date-fns/format';  // Not: import { format } from 'date-fns'
-```
+### Phase 4: Enterprise
+- [ ] Team workspaces
+- [ ] API access tiers
+- [ ] White-label options
+- [ ] Compliance logging
 
-### 12.3 Caching Strategy
+---
 
-```javascript
-// API response caching
-const CACHE_DURATION = {
-  markets: 15000,      // 15 seconds
-  priceHistory: 60000, // 1 minute
-  orderbook: 5000      // 5 seconds
-};
+## Contributing
 
-const marketCache = new Map();
+We welcome contributions! Please see our contributing guidelines for details.
 
-async function fetchWithCache(key, fetcher, duration) {
-  const cached = marketCache.get(key);
+```bash
+# Fork the repository
+# Create your feature branch
+git checkout -b feature/amazing-feature
 
-  if (cached && Date.now() - cached.timestamp < duration) {
-    return cached.data;
-  }
+# Commit your changes
+git commit -m 'Add amazing feature'
 
-  const data = await fetcher();
-  marketCache.set(key, { data, timestamp: Date.now() });
+# Push to the branch
+git push origin feature/amazing-feature
 
-  return data;
-}
+# Open a Pull Request
 ```
 
 ---
 
-## 13. Roadmap & Future Considerations
+## License
 
-### 13.1 Feature Roadmap
+<img src="https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge" alt="License">
 
-#### Phase 1: Foundation Enhancement
-- [ ] Real-time WebSocket connections for live data
-- [ ] Persistent user preferences (cloud sync)
-- [ ] Advanced charting (TradingView integration)
-- [ ] Mobile-responsive design overhaul
-
-#### Phase 2: Analytics Expansion
-- [ ] Custom ML model training interface
-- [ ] Backtesting engine with historical data
-- [ ] Strategy builder with visual editor
-- [ ] Alert system (price, volume, signal triggers)
-
-#### Phase 3: Trading Integration
-- [ ] Direct Polymarket order execution
-- [ ] Portfolio rebalancing automation
-- [ ] Multi-platform support (Kalshi, PredictIt)
-- [ ] Copy trading / signal marketplace
-
-#### Phase 4: Enterprise Features
-- [ ] Team workspaces and collaboration
-- [ ] Custom API access tiers
-- [ ] White-label deployment options
-- [ ] Compliance and audit logging
-
-### 13.2 Technical Debt Considerations
-
-| Item | Priority | Description |
-|------|----------|-------------|
-| State Management | Medium | Consider Zustand/Jotai for complex state |
-| TypeScript Migration | High | Add type safety across codebase |
-| Test Coverage | High | Add unit/integration tests (Jest, RTL) |
-| Error Boundaries | Medium | Add React error boundaries for resilience |
-| Accessibility | Medium | WCAG 2.1 AA compliance audit |
-
-### 13.3 Scalability Considerations
-
-```
-Current Architecture Limits:
-├── Client-side only: Limited by browser memory
-├── API polling: 15-second refresh interval
-├── No persistence: Data lost on refresh
-└── Single-user: No collaboration features
-
-Recommended Evolution:
-├── Add backend service (Node.js/Python)
-├── Implement WebSocket for real-time
-├── Add Redis caching layer
-├── Deploy with horizontal scaling (K8s)
-└── Add message queue for async processing
-```
+All Rights Reserved. This software is proprietary and confidential.
 
 ---
 
-## 14. Appendices
+<div align="center">
 
-### 14.1 Glossary
+### Built with precision for prediction market professionals
 
-| Term | Definition |
-|------|------------|
-| **Confluence** | Multi-factor agreement score for trading signals |
-| **CLOB** | Central Limit Order Book - Polymarket's trading engine |
-| **Edge** | Difference between model probability and market price |
-| **Greeks** | Risk metrics borrowed from options pricing theory |
-| **Kelly Criterion** | Optimal bet sizing formula maximizing log wealth |
-| **Monte Carlo** | Statistical simulation using random sampling |
-| **VaR** | Value at Risk - potential loss at confidence level |
-| **CVaR** | Conditional VaR - expected loss beyond VaR |
+<br/>
 
-### 14.2 API Error Codes
+<img src="https://img.shields.io/badge/Made_with-React-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React">
+<img src="https://img.shields.io/badge/Powered_by-Polymarket-000000?style=flat-square" alt="Polymarket">
+<img src="https://img.shields.io/badge/Powered_by-Kalshi-4F46E5?style=flat-square" alt="Kalshi">
+<img src="https://img.shields.io/badge/Secured_by-Web3-F6851B?style=flat-square" alt="Web3">
 
-| Code | Message | Resolution |
-|------|---------|------------|
-| `CORS_ERROR` | Cross-origin request blocked | Fallback to proxy |
-| `RATE_LIMITED` | Too many requests | Implement backoff |
-| `INVALID_MARKET` | Market ID not found | Refresh market list |
-| `AUTH_EXPIRED` | JWT token expired | Re-authenticate |
-| `WALLET_REJECTED` | User rejected signature | Prompt retry |
+<br/><br/>
 
-### 14.3 Environment Variables Reference
+**[github.com/NicolasLeyvaPA/leet-terminal](https://github.com/NicolasLeyvaPA/leet-terminal)**
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `VITE_SUPABASE_URL` | Yes* | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Yes* | Supabase anonymous key |
-| `VITE_API_BASE_URL` | No | Custom API endpoint |
-| `VITE_ENABLE_DEVTOOLS` | No | Enable React DevTools |
+<br/>
 
-*Required for authentication features
+```
+© 2026 Leet Quantum Terminal Pro. All rights reserved.
+```
 
-### 14.4 Contact & Support
-
-**Repository**: [github.com/NicolasLeyvaPA/leet-terminal](https://github.com/NicolasLeyvaPA/leet-terminal)
-
-**Issues**: Submit via GitHub Issues
-
-**License**: Proprietary - All Rights Reserved
-
----
-
-*This document is confidential and intended for authorized developers and stakeholders only.*
-
-**Document Version**: 1.0
-**Generated**: January 2026
-**Leet Quantum Terminal Pro - Technical Specification**
+</div>
