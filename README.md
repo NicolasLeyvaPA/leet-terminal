@@ -18,7 +18,7 @@
 
 <br/><br/>
 
-**Enterprise-grade prediction market analytics with real-time Polymarket integration,**
+**Enterprise-grade prediction market analytics with real-time Polymarket & Kalshi integration,**
 **quantitative analysis tools, and Web3-native authentication.**
 
 [Features](#-features) |
@@ -56,7 +56,7 @@
 
 ### Why Leet QTP?
 
-- **Real-Time Data** - Live Polymarket prices & volumes
+- **Real-Time Data** - Live Polymarket & Kalshi prices & volumes
 - **Quant Analytics** - Monte Carlo, Kelly Criterion, Greeks
 - **Multi-Model ML** - 4-model ensemble predictions
 - **Web3 Native** - Phantom & MetaMask integration
@@ -90,8 +90,8 @@
 <br/><br/>
 <b>Real-Time Markets</b>
 <br/>
-Live Polymarket integration with<br/>
-up to 100 markets, price history,<br/>
+Live Polymarket & Kalshi integration<br/>
+with 100+ markets, price history,<br/>
 and order book depth
 <br/><br/>
 </td>
@@ -369,7 +369,8 @@ leet-terminal/
 │   │   │       └── MarketTradesPanel.jsx
 │   │   │
 │   │   ├── services/
-│   │   │   └── polymarketAPI.js       # API integration (500+ LOC)
+│   │   │   ├── polymarketAPI.js       # Polymarket API integration
+│   │   │   └── kalshiAPI.js           # Kalshi API integration
 │   │   │
 │   │   ├── utils/
 │   │   │   ├── auth.js                # Auth orchestration (1000+ LOC)
@@ -401,7 +402,7 @@ leet-terminal/
 
 | Feature | Status | Workspace | Description |
 |---------|:------:|-----------|-------------|
-| Real-Time Market Data | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | All | Live Polymarket prices & volumes |
+| Real-Time Market Data | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | All | Live Polymarket & Kalshi prices & volumes |
 | Interactive Watchlist | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | All | Filterable market browser (up to 100) |
 | Price Charts | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | Analysis | 90-day historical visualization |
 | Order Book Display | ![Production](https://img.shields.io/badge/-Production-brightgreen?style=flat-square) | Analysis | 15-level bid/ask depth |
@@ -427,7 +428,7 @@ The terminal supports keyboard-driven navigation:
 | `NEWS` | Switch to News workspace |
 | `BETS` | Switch to Bets workspace |
 | `REFRESH` | Force data refresh |
-| `[Polymarket URL]` | Load specific market by URL |
+| `[Market URL]` | Load specific Polymarket or Kalshi market by URL |
 
 ---
 
@@ -641,7 +642,7 @@ export default defineConfig({
 - [ ] Price/volume alerts
 
 ### Phase 3: Trading
-- [ ] Direct Polymarket execution
+- [ ] Direct Polymarket & Kalshi execution
 - [ ] Portfolio rebalancing
 - [ ] Multi-platform support
 - [ ] Copy trading
@@ -690,6 +691,7 @@ All Rights Reserved. This software is proprietary and confidential.
 
 <img src="https://img.shields.io/badge/Made_with-React-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React">
 <img src="https://img.shields.io/badge/Powered_by-Polymarket-000000?style=flat-square" alt="Polymarket">
+<img src="https://img.shields.io/badge/Powered_by-Kalshi-4F46E5?style=flat-square" alt="Kalshi">
 <img src="https://img.shields.io/badge/Secured_by-Web3-F6851B?style=flat-square" alt="Web3">
 
 <br/><br/>
