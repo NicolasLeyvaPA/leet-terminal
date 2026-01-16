@@ -1,0 +1,264 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "daily-agent.config.schema.json",
+  "title": "Daily Frontend Agent Configuration",
+  "description": "Configuration schema for the daily-frontend-agent tool",
+  "type": "object",
+  "required": ["github"],
+  "properties": {
+    "timezone": {
+      "type": "string",
+      "description": "IANA timezone string for scheduling",
+      "default": "America/New_York",
+      "examples": ["America/New_York", "Europe/London", "Asia/Tokyo"]
+    },
+    "runTimeLocal": {
+      "type": "string",
+      "description": "Local time to run the agent (HH:MM format)",
+      "pattern": "^([01]?[0-9]|2[0-3]):[0-5][0-9]$",
+      "default": "08:30"
+    },
+    "repoPath": {
+      "type": "string",
+      "description": "Path to the repository. Defaults to current working directory.",
+      "default": "."
+    },
+    "defaultBranch": {
+      "type": "string",
+      "description": "Default branch name (main or master)",
+      "default": "main"
+    },
+    "packageManager": {
+      "type": "string",
+      "enum": ["auto", "npm", "pnpm", "yarn", "bun"],
+      "description": "Package manager to use. 'auto' will detect from lockfiles.",
+      "default": "auto"
+    },
+    "github": {
+      "type": "object",
+      "required": ["owner", "repo"],
+      "properties": {
+        "owner": {
+          "type": "string",
+          "description": "GitHub repository owner"
+        },
+        "repo": {
+          "type": "string",
+          "description": "GitHub repository name"
+        },
+        "labelsForAutocode": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Issue labels that allow automatic implementation",
+          "default": ["agent:auto"]
+        },
+        "labelsForPlanOnly": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Issue labels that trigger plan-only mode",
+          "default": ["agent:plan"]
+        },
+        "maxIssuesPerDay": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum number of issues to process per day",
+          "default": 3
+        },
+        "excludeLabels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Labels to exclude from processing",
+          "default": ["wontfix", "duplicate", "invalid"]
+        }
+      }
+    },
+    "riskPolicy": {
+      "type": "object",
+      "properties": {
+        "maxFilesChanged": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of files that can be changed",
+          "default": 10
+        },
+        "maxLinesChanged": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum lines of code that can be changed",
+          "default": 400
+        },
+        "disallowDependencyChanges": {
+          "type": "boolean",
+          "description": "Prevent changes to package.json dependencies",
+          "default": true
+        },
+        "allowFileGlobs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Glob patterns for files allowed to be changed",
+          "default": ["src/**/*", "components/**/*", "lib/**/*", "app/**/*", "pages/**/*"]
+        },
+        "denyFileGlobs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Glob patterns for files that must not be changed",
+          "default": [".env*", "*.secret*", "**/secrets/**", "**/credentials/**", "**/.aws/**", "**/infra/**", "**/terraform/**"]
+        },
+        "highRiskPatterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Path patterns that indicate high-risk changes",
+          "default": ["**/auth/**", "**/payment/**", "**/billing/**", "**/admin/**", "**/security/**"]
+        }
+      }
+    },
+    "executionPolicy": {
+      "type": "object",
+      "properties": {
+        "modeDefault": {
+          "type": "string",
+          "enum": ["plan-only", "execute", "dry-run"],
+          "description": "Default execution mode",
+          "default": "plan-only"
+        },
+        "createDraftPR": {
+          "type": "boolean",
+          "description": "Create PRs as drafts by default",
+          "default": true
+        },
+        "requireCleanWorkingTree": {
+          "type": "boolean",
+          "description": "Require clean git working tree before running",
+          "default": true
+        },
+        "maxPatchIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum attempts to fix failing patches",
+          "default": 3
+        },
+        "autoCommit": {
+          "type": "boolean",
+          "description": "Automatically commit changes",
+          "default": true
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "description": "Override auto-detected commands",
+      "properties": {
+        "install": {
+          "type": "string",
+          "description": "Command to install dependencies"
+        },
+        "lint": {
+          "type": "string",
+          "description": "Command to run linter"
+        },
+        "typecheck": {
+          "type": "string",
+          "description": "Command to run type checker"
+        },
+        "test": {
+          "type": "string",
+          "description": "Command to run tests"
+        },
+        "build": {
+          "type": "string",
+          "description": "Command to run build"
+        }
+      }
+    },
+    "reporting": {
+      "type": "object",
+      "properties": {
+        "reportOutputDir": {
+          "type": "string",
+          "description": "Directory for report output",
+          "default": "daily-reports"
+        },
+        "stateDir": {
+          "type": "string",
+          "description": "Directory for state files",
+          "default": "daily-reports/state"
+        },
+        "saveDiffPatch": {
+          "type": "boolean",
+          "description": "Save diff patches to files",
+          "default": true
+        },
+        "saveCommandLogs": {
+          "type": "boolean",
+          "description": "Save command output logs",
+          "default": true
+        }
+      }
+    },
+    "llm": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["anthropic"],
+          "description": "LLM provider to use",
+          "default": "anthropic"
+        },
+        "model": {
+          "type": "string",
+          "description": "Model identifier",
+          "default": "claude-sonnet-4-20250514"
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 100000,
+          "description": "Maximum tokens for LLM responses",
+          "default": 8192
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Temperature for LLM responses (lower = more deterministic)",
+          "default": 0.1
+        },
+        "promptLogging": {
+          "type": "boolean",
+          "description": "Log prompts for reproducibility",
+          "default": true
+        }
+      }
+    },
+    "integrations": {
+      "type": "object",
+      "properties": {
+        "githubCli": {
+          "type": "boolean",
+          "description": "Use GitHub CLI for PR creation",
+          "default": true
+        },
+        "linear": {
+          "type": "object",
+          "description": "Linear integration (placeholder)",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "apiKey": { "type": "string" },
+            "teamId": { "type": "string" }
+          }
+        },
+        "jira": {
+          "type": "object",
+          "description": "Jira integration (placeholder)",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "baseUrl": { "type": "string" },
+            "projectKey": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

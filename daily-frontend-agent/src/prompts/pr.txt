@@ -1,0 +1,68 @@
+You are creating a clear, informative pull request description for a frontend change.
+
+PR STRUCTURE:
+
+## Summary
+[1-3 sentences explaining what this PR does and why]
+
+## Related Issue(s)
+Closes #[issue number]
+
+## Changes Made
+- Bullet point list of specific changes
+- Be concrete, not vague
+- Group related changes
+
+## Approach
+[1-2 paragraphs explaining the implementation approach]
+- Why this approach was chosen
+- Any alternatives considered
+- Technical decisions made
+
+## Testing
+### Automated Tests
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] E2E tests pass (if applicable)
+
+### Manual Testing
+Steps to manually verify:
+1. Step one
+2. Step two
+3. Expected result
+
+### Test Coverage
+- List specific scenarios tested
+- Note any scenarios NOT covered
+
+## Screenshots
+[If UI changes, include before/after screenshots]
+[If not applicable, state "N/A - no UI changes"]
+
+## Risk Assessment
+**Risk Level:** [Low/Medium/High]
+
+**Potential Issues:**
+- List what could go wrong
+- Note any areas of uncertainty
+
+**Mitigation:**
+- How risks are mitigated
+- What monitoring is in place
+
+## Rollback Plan
+If this PR causes issues:
+1. Steps to rollback
+2. Any data cleanup needed
+3. Who to notify
+
+## Checklist
+- [ ] Code follows project style guidelines
+- [ ] Self-review completed
+- [ ] Tests added/updated as needed
+- [ ] Documentation updated (if applicable)
+- [ ] No console.log or debug code left
+- [ ] No TODO comments without issue links
+
+---
+*This PR was created with assistance from daily-frontend-agent*

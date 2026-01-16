@@ -1,0 +1,81 @@
+{
+  "timezone": "America/New_York",
+  "runTimeLocal": "08:30",
+  "repoPath": ".",
+  "defaultBranch": "main",
+  "packageManager": "auto",
+  "github": {
+    "owner": "your-org",
+    "repo": "your-repo",
+    "labelsForAutocode": ["agent:auto", "good-first-issue"],
+    "labelsForPlanOnly": ["agent:plan", "needs-design"],
+    "maxIssuesPerDay": 3,
+    "excludeLabels": ["wontfix", "duplicate", "invalid", "blocked"]
+  },
+  "riskPolicy": {
+    "maxFilesChanged": 10,
+    "maxLinesChanged": 400,
+    "disallowDependencyChanges": true,
+    "allowFileGlobs": [
+      "src/**/*",
+      "components/**/*",
+      "lib/**/*",
+      "app/**/*",
+      "pages/**/*",
+      "styles/**/*"
+    ],
+    "denyFileGlobs": [
+      ".env*",
+      "*.secret*",
+      "**/secrets/**",
+      "**/credentials/**",
+      "**/.aws/**",
+      "**/infra/**",
+      "**/terraform/**",
+      "**/k8s/**"
+    ],
+    "highRiskPatterns": [
+      "**/auth/**",
+      "**/payment/**",
+      "**/billing/**",
+      "**/admin/**",
+      "**/security/**"
+    ]
+  },
+  "executionPolicy": {
+    "modeDefault": "plan-only",
+    "createDraftPR": true,
+    "requireCleanWorkingTree": true,
+    "maxPatchIterations": 3,
+    "autoCommit": true
+  },
+  "commands": {
+    "install": null,
+    "lint": null,
+    "typecheck": null,
+    "test": null,
+    "build": null
+  },
+  "reporting": {
+    "reportOutputDir": "daily-reports",
+    "stateDir": "daily-reports/state",
+    "saveDiffPatch": true,
+    "saveCommandLogs": true
+  },
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-20250514",
+    "maxTokens": 8192,
+    "temperature": 0.1,
+    "promptLogging": true
+  },
+  "integrations": {
+    "githubCli": true,
+    "linear": {
+      "enabled": false
+    },
+    "jira": {
+      "enabled": false
+    }
+  }
+}

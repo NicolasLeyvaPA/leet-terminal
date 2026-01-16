@@ -1,0 +1,121 @@
+name: Daily Frontend Agent
+
+on:
+  schedule:
+    # Run at 8:30 AM UTC every weekday
+    - cron: '30 8 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Execution mode'
+        required: true
+        default: 'plan-only'
+        type: choice
+        options:
+          - dry-run
+          - plan-only
+          - execute
+      verbose:
+        description: 'Enable verbose logging'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: daily-frontend-agent/package-lock.json
+
+      - name: Install dependencies
+        working-directory: daily-frontend-agent
+        run: npm ci
+
+      - name: Build agent
+        working-directory: daily-frontend-agent
+        run: npm run build
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "Daily Frontend Agent"
+          git config --global user.email "agent@example.com"
+
+      - name: Run agent (scheduled)
+        if: github.event_name == 'schedule'
+        working-directory: daily-frontend-agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          npm run daily-agent -- run --execute --verbose
+
+      - name: Run agent (manual)
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: daily-frontend-agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          MODE=${{ github.event.inputs.mode }}
+          VERBOSE=${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }}
+          npm run daily-agent -- run --${MODE} ${VERBOSE}
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-reports-${{ github.run_id }}
+          path: |
+            daily-frontend-agent/daily-reports/*.md
+            daily-frontend-agent/daily-reports/*.json
+            daily-frontend-agent/daily-reports/logs/
+          retention-days: 30
+
+      - name: Commit reports to repository
+        if: always()
+        run: |
+          cd daily-frontend-agent
+          if [ -n "$(git status --porcelain daily-reports/)" ]; then
+            git add daily-reports/
+            git commit -m "chore: add daily agent report for $(date +%Y-%m-%d)"
+            git push origin HEAD
+          else
+            echo "No new reports to commit"
+          fi
+
+      - name: Post summary
+        if: always()
+        run: |
+          REPORT_DATE=$(date +%Y-%m-%d)
+          REPORT_FILE="daily-frontend-agent/daily-reports/${REPORT_DATE}.md"
+
+          if [ -f "$REPORT_FILE" ]; then
+            echo "## Daily Agent Report - ${REPORT_DATE}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            head -100 "$REPORT_FILE" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "See full report in artifacts." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Daily Agent Report - ${REPORT_DATE}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No report generated. Check logs for errors." >> $GITHUB_STEP_SUMMARY
+          fi

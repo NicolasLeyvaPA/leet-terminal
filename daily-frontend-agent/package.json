@@ -1,0 +1,57 @@
+{
+  "name": "daily-frontend-agent",
+  "version": "1.0.0",
+  "description": "Autonomous daily frontend engineering agent that inspects repos, plans work, implements safe changes, and reports progress",
+  "type": "module",
+  "bin": {
+    "daily-agent": "./dist/cli/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli/index.js",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "daily-agent": "node dist/cli/index.js"
+  },
+  "keywords": [
+    "automation",
+    "frontend",
+    "agent",
+    "cli",
+    "github",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "ajv": "^8.17.1",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "date-fns": "^3.6.0",
+    "date-fns-tz": "^3.1.3",
+    "diff": "^5.2.0",
+    "glob": "^10.4.5",
+    "octokit": "^4.0.2",
+    "simple-git": "^3.27.0",
+    "yaml": "^2.5.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/diff": "^5.2.2",
+    "@types/node": "^22.7.5",
+    "@typescript-eslint/eslint-plugin": "^8.8.0",
+    "@typescript-eslint/parser": "^8.8.0",
+    "eslint": "^9.11.1",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
+  }
+}

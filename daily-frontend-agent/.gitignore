@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Daily reports (optional - can be tracked if desired)
+daily-reports/*.md
+daily-reports/*.json
+daily-reports/logs/
+daily-reports/state/
+daily-reports/patches/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+.agent-patch.tmp
+
+# Config (user creates their own)
+daily-agent.config.json
