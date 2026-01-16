@@ -1,6 +1,6 @@
 <div align="center">
 
-# LEET QUANTUM TERMINAL PRO
+# LEET QUANTUM TERMINAL
 
 ### The Bloomberg Terminal for Prediction Markets
 
