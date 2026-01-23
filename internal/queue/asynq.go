@@ -12,9 +12,10 @@ import (
 
 // Task types
 const (
-	TypeScrapeJob     = "scrape:job"
-	TypeAnalysisJob   = "analysis:job"
-	TypePredictionJob = "prediction:job"
+	TypeScrapeJob         = "scrape:job"
+	TypeAnalysisJob       = "analysis:job"
+	TypePredictionJob     = "prediction:job"
+	TypeNewsSourceScrape  = "news:source:scrape"
 )
 
 // AsynqClient wraps the Asynq client for enqueuing tasks
@@ -85,6 +86,25 @@ func (c *AsynqClient) EnqueuePredictionJob(jobID, datasetID, modelType string) e
 	}
 
 	task := asynq.NewTask(TypePredictionJob, data)
+	_, err = c.client.Enqueue(task)
+	return err
+}
+
+// EnqueueNewsSourceScrape enqueues a news source scraping job
+func (c *AsynqClient) EnqueueNewsSourceScrape(sourceID, url, sourceType string, config map[string]interface{}) error {
+	payload := map[string]interface{}{
+		"source_id":   sourceID,
+		"url":         url,
+		"source_type": sourceType,
+		"config":      config,
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	task := asynq.NewTask(TypeNewsSourceScrape, data)
 	_, err = c.client.Enqueue(task)
 	return err
 }

@@ -68,9 +68,12 @@ type Config struct {
 	ScraperCacheTTL      int
 
 	// External APIs
-	PolymarketAPIKey string
-	KalshiAPIKey     string
-	ParallelAIAPIKey string
+	PolymarketAPIKey    string
+	PolymarketAPIURL    string
+	KalshiAPIKey        string
+	ParallelAIAPIKey    string
+	NewsAPIKey          string
+	NewsAPIURL          string
 
 	// Monitoring & Logging
 	LogLevel      string
@@ -146,8 +149,11 @@ func Load() (*Config, error) {
 
 		// External APIs
 		PolymarketAPIKey: getEnv("POLYMARKET_API_KEY", ""),
+		PolymarketAPIURL: getEnv("POLYMARKET_API_URL", "https://gamma-api.polymarket.com"),
 		KalshiAPIKey:     getEnv("KALSHI_API_KEY", ""),
 		ParallelAIAPIKey: getEnv("PARALLEL_AI_API_KEY", ""),
+		NewsAPIKey:       getEnv("NEWS_API_KEY", ""),
+		NewsAPIURL:       getEnv("NEWS_API_URL", "https://newsapi.org/v2"),
 
 		// Monitoring
 		LogLevel:      getEnv("LOG_LEVEL", "info"),

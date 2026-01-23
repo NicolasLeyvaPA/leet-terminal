@@ -125,6 +125,30 @@ func main() {
 				predictions.GET("/jobs/:id", apiHandler.GetPredictionJob)
 			}
 
+			// News routes
+			news := protected.Group("/news")
+			{
+				// News sources management
+				news.POST("/sources", apiHandler.CreateNewsSource)
+				news.GET("/sources", apiHandler.ListNewsSources)
+				news.GET("/sources/:id", apiHandler.GetNewsSource)
+				news.PUT("/sources/:id", apiHandler.UpdateNewsSource)
+				news.DELETE("/sources/:id", apiHandler.DeleteNewsSource)
+				news.POST("/sources/:id/scrape", apiHandler.TriggerNewsSourceScrape)
+				
+				// Articles
+				news.GET("/articles", apiHandler.ListArticles)
+				news.GET("/articles/:id", apiHandler.GetArticle)
+				news.GET("/articles/search", apiHandler.SearchArticles)
+			}
+
+			// Polymarket proxy routes (avoid CORS issues)
+			polymarket := protected.Group("/polymarket")
+			{
+				polymarket.GET("/events", apiHandler.PolymarketProxyHandler)
+				polymarket.GET("/events/:id", apiHandler.PolymarketEventHandler)
+			}
+
 			// WebSocket endpoint
 			protected.GET("/ws", apiHandler.HandleWebSocket)
 		}

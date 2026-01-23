@@ -3,34 +3,91 @@ import { PanelHeader } from '../PanelHeader';
 import { DataRow } from '../DataRow';
 import { Tag } from '../Tag';
 import { useWatchlist } from '../../hooks/useWatchlist';
+import { getAuthToken } from '../../utils/auth';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export const BetsMarketPanel = () => {
   const { addToWatchlist, isInWatchlist } = useWatchlist();
   const [events, setEvents] = useState([]);
+  const [filteredEvents, setFilteredEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState('fuzzy'); // 'fuzzy' or 'regex'
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Fuzzy search function
+  const fuzzyMatch = (text, query) => {
+    if (!query) return true;
+    
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    
+    // Simple fuzzy matching: check if all characters in query appear in order
+    let queryIndex = 0;
+    for (let i = 0; i < lowerText.length && queryIndex < lowerQuery.length; i++) {
+      if (lowerText[i] === lowerQuery[queryIndex]) {
+        queryIndex++;
+      }
+    }
+    return queryIndex === lowerQuery.length;
+  };
+
+  // Regex search function
+  const regexMatch = (text, pattern) => {
+    if (!pattern) return true;
+    
+    try {
+      const regex = new RegExp(pattern, 'i');
+      return regex.test(text);
+    } catch (e) {
+      // Invalid regex, fall back to includes
+      return text.toLowerCase().includes(pattern.toLowerCase());
+    }
+  };
+
+  // Filter events based on search
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredEvents(events);
+      return;
+    }
+
+    const filtered = events.filter(event => {
+      const searchText = `${event.title} ${event.ticker} ${event.description || ''}`;
+      
+      if (searchMode === 'regex') {
+        return regexMatch(searchText, searchQuery);
+      } else {
+        return fuzzyMatch(searchText, searchQuery);
+      }
+    });
+
+    setFilteredEvents(filtered);
+  }, [searchQuery, searchMode, events]);
 
   useEffect(() => {
     const fetchMarkets = async () => {
       try {
-        setLoading(true);
+        // Don't show loading on refresh if we already have data
+        if (events.length === 0) {
+          setLoading(true);
+        } else {
+          setIsRefreshing(true);
+        }
         setError(null);
         
-        // Use proxy in development, direct API with CORS proxy fallback in production
-        const apiUrl = import.meta.env.DEV
-          ? '/api/polymarket/events?order=id&ascending=false&closed=false&limit=100'
-          : 'https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=100';
+        // Always use backend proxy to avoid CORS issues
+        const token = getAuthToken();
+        const apiUrl = `${API_BASE_URL}/api/v1/polymarket/events?order=id&ascending=false&closed=false&limit=100`;
         
-        let response;
-        try {
-          response = await fetch(apiUrl);
-        } catch (corsError) {
-          // Fallback to CORS proxy if direct fetch fails
-          console.warn('Direct fetch failed, trying CORS proxy:', corsError);
-          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=100')}`;
-          response = await fetch(proxyUrl);
-        }
+        const response = await fetch(apiUrl, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -41,22 +98,36 @@ export const BetsMarketPanel = () => {
         if (!Array.isArray(data)) {
           throw new Error('Invalid response format');
         }
-        setEvents(data);
+        
+        // Update events without disrupting UI
+        setEvents(prevEvents => {
+          // If we have a selected event, try to maintain selection
+          if (selectedEvent) {
+            const updatedEvent = data.find(e => e.id === selectedEvent.id);
+            if (updatedEvent) {
+              setSelectedEvent(updatedEvent);
+            }
+          }
+          return data;
+        });
       } catch (err) {
         console.error('Failed to fetch markets:', err);
-        const errorMessage = err.message.includes('CORS') || err.message.includes('Failed to fetch')
-          ? 'CORS error: Unable to fetch from Polymarket API. The proxy should handle this in development.'
-          : err.message;
-        setError(errorMessage);
+        // Only set error if we don't have existing data
+        if (events.length === 0) {
+          setError(`Error loading markets: ${err.message}`);
+        } else {
+          console.warn('Failed to refresh markets, using cached data');
+        }
       } finally {
         setLoading(false);
+        setIsRefreshing(false);
       }
     };
 
     fetchMarkets();
     const interval = setInterval(fetchMarkets, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedEvent?.id]); // Only depend on selectedEvent.id to avoid infinite loops
 
   if (loading) {
     return (
@@ -80,15 +151,48 @@ export const BetsMarketPanel = () => {
   return (
     <div className="h-full flex gap-1.5">
       {/* Left: Market List */}
-      <div className="w-80 terminal-panel h-full">
-        <PanelHeader title="MARKETS" subtitle={`${events.length} events`} />
-        <div className="panel-content">
-          {events.length === 0 ? (
+      <div className="w-80 terminal-panel h-full flex flex-col">
+        <PanelHeader 
+          title="MARKETS" 
+          subtitle={`${filteredEvents.length} of ${events.length} events${isRefreshing ? ' • ↻ Refreshing...' : ''}`} 
+        />
+        
+        {/* Search Bar */}
+        <div className="px-2 py-2 border-b border-gray-800">
+          <div className="flex gap-1 mb-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={searchMode === 'regex' ? 'Search with regex...' : 'Search markets...'}
+              className="flex-1 px-2 py-1 bg-black/40 border border-cyan-500/30 text-cyan-400 text-xs font-mono rounded focus:outline-none focus:border-cyan-500"
+            />
+            <button
+              onClick={() => setSearchMode(searchMode === 'fuzzy' ? 'regex' : 'fuzzy')}
+              className={`px-2 py-1 text-xs font-mono rounded border transition-colors ${
+                searchMode === 'regex'
+                  ? 'bg-orange-500/20 border-orange-500/50 text-orange-400'
+                  : 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+              }`}
+              title={`Current: ${searchMode === 'regex' ? 'Regex' : 'Fuzzy'} search. Click to switch.`}
+            >
+              {searchMode === 'regex' ? '.*' : 'Az'}
+            </button>
+          </div>
+          {searchQuery && (
+            <div className="text-xs text-gray-500">
+              {searchMode === 'regex' ? 'Regex mode' : 'Fuzzy search'} • {filteredEvents.length} match{filteredEvents.length !== 1 ? 'es' : ''}
+            </div>
+          )}
+        </div>
+
+        <div className="panel-content flex-1 overflow-y-auto">
+          {filteredEvents.length === 0 ? (
             <div className="px-2 py-4 text-center text-gray-600 text-xs">
-              No markets found
+              {searchQuery ? 'No markets match your search' : 'No markets found'}
             </div>
           ) : (
-            events.map((event) => {
+            filteredEvents.map((event) => {
               const market = event.markets?.[0];
               const bestBid = market?.bestBid ? (market.bestBid * 100).toFixed(1) : 'N/A';
               const bestAsk = market?.bestAsk ? (market.bestAsk * 100).toFixed(1) : 'N/A';

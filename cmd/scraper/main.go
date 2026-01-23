@@ -65,6 +65,7 @@ func main() {
 	// Register task handlers
 	mux := srv.Mux()
 	mux.HandleFunc(queue.TypeScrapeJob, engine.HandleScrapeJob)
+	mux.HandleFunc(queue.TypeNewsSourceScrape, engine.HandleNewsSourceScrape)
 
 	// Start server in a goroutine
 	go func() {

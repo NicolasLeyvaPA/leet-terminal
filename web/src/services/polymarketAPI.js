@@ -1,83 +1,31 @@
-// Polymarket API Service - Real market data integration
-const GAMMA_API = 'https://gamma-api.polymarket.com';
-const CLOB_API = 'https://clob.polymarket.com';
+// Polymarket API Service - Uses backend proxy to avoid CORS issues
+import { getAuthToken } from '../utils/auth';
 
-// CORS proxy options (fallbacks if direct/vite proxy fails)
-const CORS_PROXIES = [
-  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://cors-anywhere.herokuapp.com/${url}`,
-];
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
-// Helper to handle API calls with CORS fallback
-async function fetchWithFallback(url, options = {}) {
-  // First try: Vite proxy in development
-  if (import.meta.env.DEV) {
-    const proxyUrl = url
-      .replace(GAMMA_API, '/api/polymarket')
-      .replace(CLOB_API, '/api/clob');
-
-    try {
-      const response = await fetch(proxyUrl, {
-        ...options,
-        headers: {
-          'Accept': 'application/json',
-          ...options.headers,
-        },
-      });
-      if (response.ok) {
-        return await response.json();
-      }
-      console.warn(`Vite proxy returned ${response.status}, trying fallbacks...`);
-    } catch (error) {
-      console.warn('Vite proxy failed:', error.message);
-    }
-  }
-
-  // Second try: Direct fetch (may work in some environments)
+// Helper to call backend proxy
+async function fetchFromBackend(endpoint, options = {}) {
+  const token = getAuthToken();
+  
   try {
-    const response = await fetch(url, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/polymarket${endpoint}`, {
       ...options,
       headers: {
+        'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
         ...options.headers,
       },
     });
-    if (response.ok) {
-      return await response.json();
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    
+    return await response.json();
   } catch (error) {
-    console.warn('Direct fetch failed:', error.message);
+    console.error('Backend API call failed:', error);
+    throw error;
   }
-
-  // Third try: CORS proxies as fallback
-  for (const makeProxyUrl of CORS_PROXIES) {
-    try {
-      const proxyUrl = makeProxyUrl(url);
-      const response = await fetch(proxyUrl, {
-        ...options,
-        headers: {
-          'Accept': 'application/json',
-          ...options.headers,
-        },
-      });
-      if (response.ok) {
-        const text = await response.text();
-        try {
-          return JSON.parse(text);
-        } catch {
-          console.warn('Proxy returned non-JSON response');
-          continue;
-        }
-      }
-    } catch (error) {
-      console.warn('CORS proxy failed:', error.message);
-      continue;
-    }
-  }
-
-  // All methods failed
-  throw new Error(`Failed to fetch from ${url}. All proxy methods exhausted.`);
 }
 
 // Extract event slug from Polymarket URL
@@ -98,13 +46,12 @@ export function extractEventSlug(url) {
 // Fetch event by slug
 export async function fetchEventBySlug(slug) {
   const cleanSlug = extractEventSlug(slug);
-  const url = `${GAMMA_API}/events?slug=${cleanSlug}`;
 
   try {
-    const data = await fetchWithFallback(url);
+    const data = await fetchFromBackend(`/events/${cleanSlug}`);
 
-    if (Array.isArray(data) && data.length > 0) {
-      return transformEventToMarket(data[0]);
+    if (data) {
+      return transformEventToMarket(data);
     }
     throw new Error('Event not found');
   } catch (error) {
@@ -115,10 +62,8 @@ export async function fetchEventBySlug(slug) {
 
 // Fetch all open events
 export async function fetchOpenEvents(limit = 50) {
-  const url = `${GAMMA_API}/events?closed=false&order=volume&ascending=false&limit=${limit}`;
-
   try {
-    const data = await fetchWithFallback(url);
+    const data = await fetchFromBackend(`/events?closed=false&order=volume&ascending=false&limit=${limit}`);
 
     if (!Array.isArray(data)) {
       console.warn('Unexpected response format, returning empty array');
@@ -132,45 +77,18 @@ export async function fetchOpenEvents(limit = 50) {
   }
 }
 
-// Fetch market price history
+// Fetch market price history - Uses fallback data (CLOB API proxy not implemented yet)
 export async function fetchPriceHistory(marketId, days = 90) {
-  try {
-    const endTs = Math.floor(Date.now() / 1000);
-    const startTs = endTs - (days * 24 * 60 * 60);
-    const url = `${CLOB_API}/prices-history?market=${marketId}&startTs=${startTs}&endTs=${endTs}&fidelity=60`;
-    const data = await fetchWithFallback(url);
-
-    if (data && data.history) {
-      return data.history.map(point => ({
-        date: new Date(point.t * 1000).toISOString().split('T')[0],
-        time: point.t * 1000,
-        price: parseFloat(point.p),
-        volume: 0,
-        high: parseFloat(point.p),
-        low: parseFloat(point.p),
-      }));
-    }
-    return generateFallbackPriceHistory(0.5, days);
-  } catch (error) {
-    console.warn('Failed to fetch price history:', error);
-    return generateFallbackPriceHistory(0.5, days);
-  }
+  // TODO: Implement CLOB API proxy in backend for price history
+  console.info('Using fallback price history data');
+  return generateFallbackPriceHistory(0.5, days);
 }
 
-// Fetch orderbook
+// Fetch orderbook - Uses fallback data (CLOB API proxy not implemented yet)
 export async function fetchOrderbook(tokenId) {
-  try {
-    const url = `${CLOB_API}/book?token_id=${tokenId}`;
-    const data = await fetchWithFallback(url);
-
-    if (data && data.bids && data.asks) {
-      return transformOrderbook(data);
-    }
-    return generateFallbackOrderbook(0.5);
-  } catch (error) {
-    console.warn('Failed to fetch orderbook:', error);
-    return generateFallbackOrderbook(0.5);
-  }
+  // TODO: Implement CLOB API proxy in backend for orderbook data
+  console.info('Using fallback orderbook data');
+  return generateFallbackOrderbook(0.5);
 }
 
 // Transform Polymarket event to our market format
