@@ -1,0 +1,215 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: leet-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: leet_user
+      POSTGRES_PASSWORD: leet_password
+      POSTGRES_DB: leet_terminal
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ../migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - leet-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leet_user -d leet_terminal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: leet-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - leet-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Service
+  api:
+    build:
+      context: ..
+      dockerfile: deployments/docker/Dockerfile.api
+    container_name: leet-api-dev
+    restart: unless-stopped
+    environment:
+      APP_ENV: development
+      APP_PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: leet_user
+      DB_PASSWORD: leet_password
+      DB_NAME: leet_terminal
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      ASYNQ_REDIS_ADDR: redis:6379
+      JWT_SECRET: dev_jwt_secret_key_for_testing_only
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://localhost:80,http://localhost
+      LOG_LEVEL: debug
+      STORAGE_PATH: /var/lib/leet-terminal/data
+    volumes:
+      - api_dev_data:/var/lib/leet-terminal/data
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - leet-dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Scraper Service
+  scraper:
+    build:
+      context: ..
+      dockerfile: deployments/docker/Dockerfile.scraper
+    container_name: leet-scraper-dev
+    restart: unless-stopped
+    environment:
+      APP_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: leet_user
+      DB_PASSWORD: leet_password
+      DB_NAME: leet_terminal
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      ASYNQ_REDIS_ADDR: redis:6379
+      ASYNQ_CONCURRENCY: 5
+      SCRAPER_MAX_CONCURRENT: 5
+      LOG_LEVEL: debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - leet-dev-network
+
+  # Analyzer Service
+  analyzer:
+    build:
+      context: ..
+      dockerfile: deployments/docker/Dockerfile.analyzer
+    container_name: leet-analyzer-dev
+    restart: unless-stopped
+    environment:
+      APP_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: leet_user
+      DB_PASSWORD: leet_password
+      DB_NAME: leet_terminal
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      ASYNQ_REDIS_ADDR: redis:6379
+      ASYNQ_CONCURRENCY: 5
+      LOG_LEVEL: debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - leet-dev-network
+
+  # Modeler Service
+  modeler:
+    build:
+      context: ..
+      dockerfile: deployments/docker/Dockerfile.modeler
+    container_name: leet-modeler-dev
+    restart: unless-stopped
+    environment:
+      APP_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: leet_user
+      DB_PASSWORD: leet_password
+      DB_NAME: leet_terminal
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      ASYNQ_REDIS_ADDR: redis:6379
+      ASYNQ_CONCURRENCY: 5
+      LOG_LEVEL: debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - leet-dev-network
+
+  # Web Frontend
+  web:
+    build:
+      context: ..
+      dockerfile: deployments/docker/Dockerfile.web
+    container_name: leet-web-dev
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - leet-dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Asynq Monitor (Queue Monitoring UI)
+  asynqmon:
+    image: hibiken/asynqmon:latest
+    container_name: leet-asynqmon-dev
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ""
+    ports:
+      - "8081:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - leet-dev-network
+
+networks:
+  leet-dev-network:
+    driver: bridge
+    name: leet-dev-network
+
+volumes:
+  postgres_dev_data:
+    name: leet-postgres-dev-data
+  redis_dev_data:
+    name: leet-redis-dev-data
+  api_dev_data:
+    name: leet-api-dev-data

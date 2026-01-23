@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { PanelHeader } from '../PanelHeader';
 import { DataRow } from '../DataRow';
 import { Tag } from '../Tag';
-import { useWatchlist } from '../../utils/useWatchlist';
+import { useWatchlist } from '../../hooks/useWatchlist';
 
 export const BetsMarketPanel = () => {
   const { addToWatchlist, isInWatchlist } = useWatchlist();

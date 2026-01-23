@@ -1,6 +1,6 @@
 import { PanelHeader } from '../PanelHeader';
 import { Tag } from '../Tag';
-import { useWatchlist } from '../../utils/useWatchlist';
+import { useWatchlist } from '../../hooks/useWatchlist';
 
 // Category colors for visual distinction
 const CATEGORY_COLORS = {

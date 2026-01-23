@@ -1,0 +1,39 @@
+# Ignore everything except source code
+*
+!*/
+
+# Include Go source files
+!*.go
+!go.mod
+!go.sum
+
+# Include configs
+!*.yaml
+!*.yml
+!*.json
+!*.toml
+
+# Include migrations
+!*.sql
+
+# Include Docker files
+!Dockerfile*
+!.dockerignore
+
+# Include docs
+!*.md
+
+# Exclude
+.git
+.gitignore
+.env
+.env.*
+bin/
+dist/
+node_modules/
+web/node_modules/
+web/dist/
+*.log
+tmp/
+temp/
+vendor/

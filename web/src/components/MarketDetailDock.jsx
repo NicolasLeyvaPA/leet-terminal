@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PriceChart } from './PriceChart';
+import { PriceChart } from './Visualization/DataChart';
 import { MarketTradesPanel } from './panels/MarketTradesPanel';
 import { BuySellPanel } from './panels/BuySellPanel';
 

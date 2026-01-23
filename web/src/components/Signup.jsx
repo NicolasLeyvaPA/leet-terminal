@@ -3,7 +3,7 @@ import { createUser, usernameExists, signUpWithEmail, signInWithOAuth, authentic
 import { isSupabaseConfigured } from '../utils/supabase';
 import { isPhantomInstalled } from '../utils/phantom';
 import { isMetaMaskInstalled } from '../utils/metamask';
-import MetamaskIcon from '../assets/Metamask_icon.svg';
+const MetamaskIcon = '/assets/Metamask_icon.svg';
 
 const Signup = ({ onSignup, onSwitchToLogin }) => {
   const [username, setUsername] = useState('');
@@ -59,7 +59,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         return;
       }
 
-      // Try Supabase signup if configured, otherwise use local storage
+      // Try Supabase signup if configured, otherwise use backend API
       if (isSupabaseConfigured()) {
         const result = await signUpWithEmail(email, password);
         if (result.success) {
@@ -68,15 +68,8 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
           setError(result.error || 'Failed to create account');
         }
       } else {
-        // For local storage, use email as username
-        if (usernameExists(email)) {
-          setError('An account with this email already exists');
-          setLoading(false);
-          return;
-        }
-
-        // Create user locally using email
-        const result = createUser(email, password);
+        // Use backend API for registration
+        const result = await createUser(email, password, email);
         if (result.success) {
           onSignup();
         } else {

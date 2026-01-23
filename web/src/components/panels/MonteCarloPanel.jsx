@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { PanelHeader } from '../PanelHeader';
 import { DataRow } from '../DataRow';
-import { MonteCarloChart } from '../MonteCarloChart';
+import { MonteCarloChart } from '../Visualization/MonteCarloChart';
 import { QuantEngine } from '../../utils/quantEngine';
 
 // Validate probability is a valid number between 0 and 1

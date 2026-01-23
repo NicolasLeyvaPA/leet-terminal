@@ -2,8 +2,32 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { connectPhantom, signMessage as signPhantomMessage, disconnectPhantom } from './phantom';
 import { connectMetaMask, signMessage as signMetaMaskMessage, disconnectMetaMask } from './metamask';
 
+// Backend API URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+
 // Simple user management using localStorage
 const USERS_KEY = 'leet_terminal_users';
+const TOKEN_KEY = 'leet_terminal_token';
+const REFRESH_TOKEN_KEY = 'leet_terminal_refresh_token';
+
+// Store auth tokens
+export const setAuthTokens = (token, refreshToken) => {
+  localStorage.setItem(TOKEN_KEY, token);
+  if (refreshToken) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  }
+};
+
+// Get auth token
+export const getAuthToken = () => {
+  return localStorage.getItem(TOKEN_KEY);
+};
+
+// Clear auth tokens
+export const clearAuthTokens = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+};
 
 // Initialize users (no default user)
 export const initializeUsers = () => {
@@ -35,59 +59,77 @@ export const usernameExists = (username) => {
   return users.some((user) => user.username.toLowerCase() === username.toLowerCase());
 };
 
-// Create a new user
-export const createUser = (username, password) => {
-  if (usernameExists(username)) {
-    return { success: false, error: 'Username already exists' };
-  }
-
+// Create a new user via backend API
+export const createUser = async (username, password, email) => {
   if (username.trim().length < 3) {
     return { success: false, error: 'Username must be at least 3 characters' };
   }
 
-  if (password.length < 6) {
-    return { success: false, error: 'Password must be at least 6 characters' };
+  if (password.length < 8) {
+    return { success: false, error: 'Password must be at least 8 characters' };
   }
 
-  const users = getUsers();
-  users.push({ username: username.trim(), password });
-  saveUsers(users);
-  return { success: true };
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: email || `${username}@local.dev`,
+        username: username.trim(),
+        password: password,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Registration failed' };
+    }
+
+    // Store tokens
+    if (data.token) {
+      setAuthTokens(data.token, data.refresh_token);
+    }
+
+    return { success: true, user: data };
+  } catch (error) {
+    console.error('Registration error:', error);
+    return { success: false, error: 'Network error. Please try again.' };
+  }
 };
 
-// Authenticate user
-export const authenticateUser = async (username, password) => {
-  // Try Supabase auth first if configured
-  if (isSupabaseConfigured()) {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: username,
+// Authenticate user via backend API
+export const authenticateUser = async (usernameOrEmail, password) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: usernameOrEmail,
         password: password,
-      });
-      
-      if (error) {
-        // Fallback to local auth if Supabase fails
-        const users = getUsers();
-        const user = users.find(
-          (u) => u.username.toLowerCase() === username.toLowerCase() && u.password === password
-        );
-        return user ? { success: true, user } : { success: false, error: 'Invalid credentials' };
-      }
-      
-      if (data?.user) {
-        return { success: true, user: data.user, isOAuth: false };
-      }
-    } catch (err) {
-      // Fallback to local auth on error
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Invalid credentials' };
     }
+
+    // Store tokens
+    if (data.token) {
+      setAuthTokens(data.token, data.refresh_token);
+    }
+
+    return { success: true, user: data };
+  } catch (error) {
+    console.error('Login error:', error);
+    return { success: false, error: 'Network error. Please try again.' };
   }
-  
-  // Fallback to local authentication
-  const users = getUsers();
-  const user = users.find(
-    (u) => u.username.toLowerCase() === username.toLowerCase() && u.password === password
-  );
-  return user ? { success: true, user } : { success: false, error: 'Invalid credentials' };
 };
 
 // OAuth authentication
@@ -158,7 +200,15 @@ export const getSession = async () => {
 
 // Verify authentication is valid
 export const verifyAuthentication = async () => {
-  // Check wallet auth first
+  // Check for backend JWT token first
+  const token = getAuthToken();
+  if (token) {
+    // TODO: Verify token with backend /api/v1/auth/verify endpoint
+    // For now, just check if it exists
+    return { isValid: true, authType: 'backend', token };
+  }
+
+  // Check wallet auth
   const phantomAuth = await getPhantomAuth();
   if (phantomAuth) {
     // If Supabase is configured, verify JWT is valid

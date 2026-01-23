@@ -1,5 +1,5 @@
 import { PanelHeader } from '../PanelHeader';
-import { PriceChart } from '../PriceChart';
+import { PriceChart } from '../Visualization/DataChart';
 
 export const PriceChartPanel = ({ market }) => {
   if (!market)

@@ -3,7 +3,7 @@ import { authenticateUser, signInWithOAuth, authenticateWithPhantom, authenticat
 import { isSupabaseConfigured } from '../utils/supabase';
 import { isPhantomInstalled } from '../utils/phantom';
 import { isMetaMaskInstalled } from '../utils/metamask';
-import MetamaskIcon from '../assets/Metamask_icon.svg';
+const MetamaskIcon = '/assets/Metamask_icon.svg';
 
 const Login = ({ onLogin, onSwitchToSignup }) => {
   const [username, setUsername] = useState('');
