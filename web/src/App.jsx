@@ -15,7 +15,7 @@ import { QuantumLabPanel } from './components/panels/QuantumLabPanel';
 import { NewsFeedPanel } from './components/panels/NewsFeedPanel';
 import { BetsMarketPanel } from './components/panels/BetsMarketPanel';
 import { MarketDetailDock } from './components/MarketDetailDock';
-import { useWatchlist } from './utils/useWatchlist';
+import { useWatchlist } from './hooks/useWatchlist';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import { getSession, signOut, getPhantomAuth, getMetaMaskAuth, verifyAuthentication } from './utils/auth';

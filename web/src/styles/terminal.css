@@ -1,0 +1,215 @@
+/* Terminal Styles */
+
+.terminal-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #0a0e14;
+  color: #b3b1ad;
+  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+.terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: #0f1419;
+  border-bottom: 1px solid #1f2430;
+}
+
+.terminal-title {
+  font-weight: 600;
+  color: #39bae6;
+}
+
+.terminal-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.terminal-btn {
+  padding: 4px 12px;
+  background-color: #1f2430;
+  color: #b3b1ad;
+  border: 1px solid #2d3640;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.terminal-btn:hover {
+  background-color: #2d3640;
+  border-color: #39bae6;
+}
+
+.terminal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  line-height: 1.6;
+}
+
+.terminal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal-body::-webkit-scrollbar-track {
+  background-color: #0a0e14;
+}
+
+.terminal-body::-webkit-scrollbar-thumb {
+  background-color: #2d3640;
+  border-radius: 4px;
+}
+
+.terminal-body::-webkit-scrollbar-thumb:hover {
+  background-color: #39bae6;
+}
+
+/* History */
+.terminal-history {
+  margin-bottom: 16px;
+}
+
+.history-entry {
+  margin-bottom: 12px;
+}
+
+.history-command {
+  color: #b3b1ad;
+  margin-bottom: 4px;
+}
+
+.history-command .prompt-symbol {
+  color: #59c2ff;
+  margin-right: 8px;
+}
+
+.history-command .command-text {
+  color: #ffb454;
+}
+
+.history-output {
+  margin-left: 20px;
+  color: #95e6cb;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.history-output.error {
+  color: #ff3333;
+}
+
+/* Output */
+.terminal-output {
+  margin-bottom: 16px;
+}
+
+.output-line {
+  margin-bottom: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.output-timestamp {
+  color: #626a73;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.output-content {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  flex: 1;
+}
+
+.output-info {
+  color: #95e6cb;
+}
+
+.output-success {
+  color: #c2d94c;
+}
+
+.output-warning {
+  color: #ffb454;
+}
+
+.output-error {
+  color: #ff3333;
+}
+
+/* Command Input */
+.terminal-input-container {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #0f1419;
+  border-top: 1px solid #1f2430;
+}
+
+.terminal-prompt {
+  display: flex;
+  gap: 4px;
+  margin-right: 8px;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.prompt-user {
+  color: #c2d94c;
+}
+
+.prompt-separator {
+  color: #626a73;
+}
+
+.prompt-host {
+  color: #39bae6;
+}
+
+.prompt-dir {
+  color: #ffb454;
+}
+
+.prompt-symbol {
+  color: #59c2ff;
+}
+
+.terminal-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #b3b1ad;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+  caret-color: #59c2ff;
+}
+
+.terminal-input::selection {
+  background-color: #39bae6;
+  color: #0a0e14;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .terminal-container {
+    font-size: 12px;
+  }
+
+  .terminal-body {
+    padding: 12px;
+  }
+
+  .terminal-input-container {
+    padding: 8px 12px;
+  }
+}
