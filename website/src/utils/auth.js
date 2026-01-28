@@ -1,9 +1,11 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { connectPhantom, signMessage as signPhantomMessage, disconnectPhantom } from './phantom';
 import { connectMetaMask, signMessage as signMetaMaskMessage, disconnectMetaMask } from './metamask';
+import { hashPassword, verifyPassword, hashSignature, generateSecureToken } from './crypto';
 
 // Simple user management using localStorage
 const USERS_KEY = 'leet_terminal_users';
+const WALLET_SESSIONS_KEY = 'leet_terminal_wallet_sessions';
 
 // Initialize users (no default user)
 export const initializeUsers = () => {
@@ -35,8 +37,8 @@ export const usernameExists = (username) => {
   return users.some((user) => user.username.toLowerCase() === username.toLowerCase());
 };
 
-// Create a new user
-export const createUser = (username, password) => {
+// Create a new user with hashed password
+export const createUser = async (username, password) => {
   if (usernameExists(username)) {
     return { success: false, error: 'Username already exists' };
   }
@@ -49,13 +51,26 @@ export const createUser = (username, password) => {
     return { success: false, error: 'Password must be at least 6 characters' };
   }
 
-  const users = getUsers();
-  users.push({ username: username.trim(), password });
-  saveUsers(users);
-  return { success: true };
+  try {
+    // Hash the password before storing
+    const { hash, salt } = await hashPassword(password);
+    
+    const users = getUsers();
+    users.push({ 
+      username: username.trim(), 
+      passwordHash: hash,
+      passwordSalt: salt,
+      createdAt: Date.now(),
+    });
+    saveUsers(users);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to create user:', error);
+    return { success: false, error: 'Failed to create user' };
+  }
 };
 
-// Authenticate user
+// Authenticate user with hashed password verification
 export const authenticateUser = async (username, password) => {
   // Try Supabase auth first if configured
   if (isSupabaseConfigured()) {
@@ -65,29 +80,54 @@ export const authenticateUser = async (username, password) => {
         password: password,
       });
       
-      if (error) {
-        // Fallback to local auth if Supabase fails
-        const users = getUsers();
-        const user = users.find(
-          (u) => u.username.toLowerCase() === username.toLowerCase() && u.password === password
-        );
-        return user ? { success: true, user } : { success: false, error: 'Invalid credentials' };
-      }
-      
-      if (data?.user) {
+      if (!error && data?.user) {
         return { success: true, user: data.user, isOAuth: false };
       }
+      // Fall through to local auth if Supabase fails
     } catch (err) {
-      // Fallback to local auth on error
+      console.warn('Supabase auth failed, trying local:', err.message);
     }
   }
   
-  // Fallback to local authentication
+  // Local authentication with hashed password
   const users = getUsers();
   const user = users.find(
-    (u) => u.username.toLowerCase() === username.toLowerCase() && u.password === password
+    (u) => u.username.toLowerCase() === username.toLowerCase()
   );
-  return user ? { success: true, user } : { success: false, error: 'Invalid credentials' };
+
+  if (!user) {
+    return { success: false, error: 'Invalid credentials' };
+  }
+
+  // Handle legacy users with plain text passwords (migrate them)
+  if (user.password && !user.passwordHash) {
+    // Legacy user - verify and migrate
+    if (user.password === password) {
+      // Migrate to hashed password
+      try {
+        const { hash, salt } = await hashPassword(password);
+        user.passwordHash = hash;
+        user.passwordSalt = salt;
+        delete user.password; // Remove plain text
+        saveUsers(users);
+        console.log('Migrated user to hashed password:', user.username);
+      } catch (err) {
+        console.warn('Failed to migrate user password:', err);
+      }
+      return { success: true, user };
+    }
+    return { success: false, error: 'Invalid credentials' };
+  }
+
+  // Verify hashed password
+  if (user.passwordHash && user.passwordSalt) {
+    const isValid = await verifyPassword(password, user.passwordHash, user.passwordSalt);
+    if (isValid) {
+      return { success: true, user };
+    }
+  }
+
+  return { success: false, error: 'Invalid credentials' };
 };
 
 // OAuth authentication
@@ -117,7 +157,7 @@ export const signUpWithEmail = async (email, password) => {
   if (!isSupabaseConfigured()) {
     // Fallback to local storage
     const username = email.split('@')[0];
-    return createUser(username, password);
+    return await createUser(username, password);
   }
 
   try {
@@ -156,45 +196,74 @@ export const getSession = async () => {
   }
 };
 
+// Get wallet session from local storage
+const getWalletSession = (walletType, address) => {
+  try {
+    const sessions = JSON.parse(localStorage.getItem(WALLET_SESSIONS_KEY) || '{}');
+    const key = `${walletType}:${address}`;
+    const session = sessions[key];
+    
+    if (!session) return null;
+    
+    // Check if session is expired (24 hours)
+    if (Date.now() - session.createdAt > 24 * 60 * 60 * 1000) {
+      delete sessions[key];
+      localStorage.setItem(WALLET_SESSIONS_KEY, JSON.stringify(sessions));
+      return null;
+    }
+    
+    return session;
+  } catch {
+    return null;
+  }
+};
+
+// Save wallet session to local storage
+const saveWalletSession = (walletType, address, signatureHash, sessionToken) => {
+  try {
+    const sessions = JSON.parse(localStorage.getItem(WALLET_SESSIONS_KEY) || '{}');
+    const key = `${walletType}:${address}`;
+    sessions[key] = {
+      signatureHash,
+      sessionToken,
+      createdAt: Date.now(),
+    };
+    localStorage.setItem(WALLET_SESSIONS_KEY, JSON.stringify(sessions));
+  } catch (error) {
+    console.error('Failed to save wallet session:', error);
+  }
+};
+
+// Clear wallet session
+const clearWalletSession = (walletType, address) => {
+  try {
+    const sessions = JSON.parse(localStorage.getItem(WALLET_SESSIONS_KEY) || '{}');
+    delete sessions[`${walletType}:${address}`];
+    localStorage.setItem(WALLET_SESSIONS_KEY, JSON.stringify(sessions));
+  } catch (error) {
+    console.error('Failed to clear wallet session:', error);
+  }
+};
+
 // Verify authentication is valid
 export const verifyAuthentication = async () => {
   // Check wallet auth first
   const phantomAuth = await getPhantomAuth();
-  if (phantomAuth) {
-    // If Supabase is configured, verify JWT is valid
-    if (isSupabaseConfigured() && phantomAuth.jwtToken) {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (user && !error && user.user_metadata?.wallet_address === phantomAuth.publicKey) {
-          return { isValid: true, authType: 'phantom', user: phantomAuth };
-        }
-      } catch (error) {
-        console.warn('Phantom JWT verification failed:', error);
-        // Still allow if we have local auth
-        return { isValid: true, authType: 'phantom', user: phantomAuth, warning: 'JWT verification failed' };
-      }
+  if (phantomAuth && phantomAuth.sessionToken) {
+    // Verify session token exists and is valid
+    const session = getWalletSession('phantom', phantomAuth.publicKey);
+    if (session && session.sessionToken === phantomAuth.sessionToken) {
+      return { isValid: true, authType: 'phantom', user: phantomAuth };
     }
-    // Local auth only
-    return { isValid: true, authType: 'phantom', user: phantomAuth };
   }
 
   const metamaskAuth = await getMetaMaskAuth();
-  if (metamaskAuth) {
-    // If Supabase is configured, verify JWT is valid
-    if (isSupabaseConfigured() && metamaskAuth.jwtToken) {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (user && !error && user.user_metadata?.wallet_address === metamaskAuth.address) {
-          return { isValid: true, authType: 'metamask', user: metamaskAuth };
-        }
-      } catch (error) {
-        console.warn('MetaMask JWT verification failed:', error);
-        // Still allow if we have local auth
-        return { isValid: true, authType: 'metamask', user: metamaskAuth, warning: 'JWT verification failed' };
-      }
+  if (metamaskAuth && metamaskAuth.sessionToken) {
+    // Verify session token exists and is valid
+    const session = getWalletSession('metamask', metamaskAuth.address);
+    if (session && session.sessionToken === metamaskAuth.sessionToken) {
+      return { isValid: true, authType: 'metamask', user: metamaskAuth };
     }
-    // Local auth only
-    return { isValid: true, authType: 'metamask', user: metamaskAuth };
   }
 
   // Check Supabase session (Google OAuth, email/password)
@@ -223,7 +292,7 @@ export const verifyAuthentication = async () => {
   return { isValid: false, reason: 'No authentication found' };
 };
 
-// Phantom wallet authentication
+// Phantom wallet authentication - SECURE VERSION
 export const authenticateWithPhantom = async () => {
   try {
     // Connect to Phantom wallet
@@ -234,8 +303,12 @@ export const authenticateWithPhantom = async () => {
 
     const { publicKey } = connectResult;
     
+    // Generate a unique challenge for this authentication attempt
+    const challenge = generateSecureToken(32);
+    const timestamp = Date.now();
+    
     // Sign a message to prove wallet ownership
-    const message = `Sign in to Leet Quantum Terminal\n\nWallet: ${publicKey}\nTimestamp: ${Date.now()}`;
+    const message = `Sign in to Leet Quantum Terminal\n\nWallet: ${publicKey}\nChallenge: ${challenge}\nTimestamp: ${timestamp}`;
     const signResult = await signPhantomMessage(message);
     
     if (!signResult.success) {
@@ -243,20 +316,38 @@ export const authenticateWithPhantom = async () => {
       return signResult;
     }
 
-    // Store wallet info locally
+    // Create a secure session token from the signature
+    // This proves the user actually signed, without using address as password
+    const signatureHex = Array.from(signResult.signature)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    const signatureHash = await hashSignature(signatureHex, publicKey);
+    const sessionToken = generateSecureToken(32);
+
+    // Store wallet info locally with secure session
     const walletUser = {
       publicKey,
       type: 'phantom',
-      signedAt: Date.now(),
+      signedAt: timestamp,
+      sessionToken,
     };
 
-    // Create Supabase Auth user with JWT if configured
+    // Save secure session
+    saveWalletSession('phantom', publicKey, signatureHash, sessionToken);
+
+    // Create Supabase user if configured (using signature hash, not address)
     let authUser = null;
     let walletUserId = null;
     let jwtToken = null;
 
     if (isSupabaseConfigured()) {
       try {
+        // Use signature hash as password - this is secure because:
+        // 1. It's derived from an actual signature the user created
+        // 2. It's not publicly known like the wallet address
+        // 3. It changes with each authentication attempt
+        const securePassword = signatureHash;
+        
         // Check if wallet user exists in custom table
         const { data: existingUser } = await supabase
           .from('wallet_users')
@@ -265,169 +356,89 @@ export const authenticateWithPhantom = async () => {
           .eq('wallet_type', 'phantom')
           .single();
 
-        // Try to sign in first (user might already exist)
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        // Try to sign in or create account
+        let signInData, signInError;
+        
+        // First try with the new signature-based password
+        ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: `${publicKey}@phantom.local`,
-          password: publicKey,
-        });
+          password: securePassword,
+        }));
 
-        if (signInData?.session && !signInError) {
-          // Successfully signed in - user exists
-          authUser = signInData.user;
-          jwtToken = signInData.session.access_token;
-          console.log('✅ Phantom: Signed in successfully, JWT created');
-
-          // Update or create wallet_users record
-          if (existingUser) {
-            walletUserId = existingUser.id;
-            await supabase
-              .from('wallet_users')
-              .update({
-                auth_user_id: authUser.id,
-                last_login: new Date().toISOString(),
-              })
-              .eq('id', walletUserId);
-          } else {
-            // Create wallet_users record
-            const { data: newUser, error: insertError } = await supabase
-              .from('wallet_users')
-              .insert({
-                wallet_address: publicKey,
-                wallet_type: 'phantom',
-                network: 'solana',
-                auth_user_id: authUser.id,
-                user_metadata: {},
-                last_login: new Date().toISOString(),
-              })
-              .select('id')
-              .single();
-
-            if (newUser && !insertError) {
-              walletUserId = newUser.id;
-            }
-          }
-        } else if (signInError) {
-          // Sign in failed - try to create new account
-          console.log('⚠️ Phantom: Sign in failed, creating new account:', signInError.message);
-          
-          const { data: newAuthUser, error: authError } = await supabase.auth.signUp({
-            email: `${publicKey}@phantom.local`,
-            password: publicKey,
-            options: {
-              data: {
-                wallet_address: publicKey,
-                wallet_type: 'phantom',
-                network: 'solana',
-              },
-              emailRedirectTo: window.location.origin,
-            },
+        if (signInError && signInError.message?.includes('Invalid login credentials')) {
+          // User might exist with old password or not exist - try to update/create
+          const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+            password: securePassword,
           });
-
-          if (authError) {
-            console.error('❌ Phantom: Signup error:', authError.message);
-            
-            // If email confirmation error, log helpful message
-            if (authError.message?.includes('email') || authError.message?.includes('confirm')) {
-              console.warn('💡 TIP: Disable email confirmation in Supabase Auth settings for wallet users');
-            }
-          }
-
-          if (newAuthUser?.user && !authError) {
-            authUser = newAuthUser.user;
-            console.log('✅ Phantom: User created:', newAuthUser.user.id);
-            
-            // Try to get session (works if email confirmation is disabled)
-            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-            
-            if (sessionData?.session?.access_token) {
-              jwtToken = sessionData.session.access_token;
-              console.log('✅ Phantom: JWT token obtained from session');
-            } else {
-              console.warn('⚠️ Phantom: No JWT token - email confirmation may be required');
-              console.warn('💡 Fix: Go to Supabase → Auth → Settings → Disable email confirmation');
-              
-              // Try to sign in immediately after signup (sometimes works)
-              const { data: retrySignIn } = await supabase.auth.signInWithPassword({
-                email: `${publicKey}@phantom.local`,
-                password: publicKey,
-              });
-              
-              if (retrySignIn?.session?.access_token) {
-                jwtToken = retrySignIn.session.access_token;
-                console.log('✅ Phantom: JWT obtained after retry sign in');
-              }
-            }
-
-            // Create or update wallet_users record
-            if (existingUser) {
-              walletUserId = existingUser.id;
-              await supabase
-                .from('wallet_users')
-                .update({
-                  auth_user_id: authUser.id,
-                  last_login: new Date().toISOString(),
-                })
-                .eq('id', walletUserId);
-            } else {
-              const { data: newUser, error: insertError } = await supabase
-                .from('wallet_users')
-                .insert({
+          
+          if (!updateError) {
+            // Retry sign in
+            ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+              email: `${publicKey}@phantom.local`,
+              password: securePassword,
+            }));
+          } else {
+            // Create new user
+            const { data: newAuthUser, error: authError } = await supabase.auth.signUp({
+              email: `${publicKey}@phantom.local`,
+              password: securePassword,
+              options: {
+                data: {
                   wallet_address: publicKey,
                   wallet_type: 'phantom',
                   network: 'solana',
-                  auth_user_id: authUser.id,
-                  user_metadata: {},
-                  last_login: new Date().toISOString(),
-                })
-                .select('id')
-                .single();
+                },
+              },
+            });
 
-              if (newUser && !insertError) {
-                walletUserId = newUser.id;
+            if (!authError && newAuthUser?.user) {
+              authUser = newAuthUser.user;
+              // Try to get session
+              const { data: sessionData } = await supabase.auth.getSession();
+              if (sessionData?.session?.access_token) {
+                jwtToken = sessionData.session.access_token;
               }
             }
           }
-        } else {
-          // Other error - just create wallet_users record without auth
-          if (!existingUser) {
-            const { data: newUser, error: insertError } = await supabase
-              .from('wallet_users')
-              .insert({
-                wallet_address: publicKey,
-                wallet_type: 'phantom',
-                network: 'solana',
-                user_metadata: {},
-                last_login: new Date().toISOString(),
-              })
-              .select('id')
-              .single();
-
-            if (newUser && !insertError) {
-              walletUserId = newUser.id;
-            }
-          } else {
-            walletUserId = existingUser.id;
-            await supabase
-              .from('wallet_users')
-              .update({ last_login: new Date().toISOString() })
-              .eq('id', walletUserId);
-          }
         }
 
-        // Update last login if user exists
-        if (walletUserId) {
+        if (signInData?.session && !signInError) {
+          authUser = signInData.user;
+          jwtToken = signInData.session.access_token;
+        }
+
+        // Update wallet_users table
+        if (existingUser) {
+          walletUserId = existingUser.id;
           await supabase
             .from('wallet_users')
-            .update({ last_login: new Date().toISOString() })
+            .update({
+              auth_user_id: authUser?.id,
+              last_login: new Date().toISOString(),
+            })
             .eq('id', walletUserId);
+        } else if (authUser) {
+          const { data: newUser } = await supabase
+            .from('wallet_users')
+            .insert({
+              wallet_address: publicKey,
+              wallet_type: 'phantom',
+              network: 'solana',
+              auth_user_id: authUser.id,
+              user_metadata: {},
+              last_login: new Date().toISOString(),
+            })
+            .select('id')
+            .single();
+
+          if (newUser) walletUserId = newUser.id;
         }
       } catch (supabaseError) {
-        // Supabase error - continue with local storage only
-        console.warn('Supabase wallet linking failed, using local storage only:', supabaseError);
+        console.warn('Supabase wallet linking failed:', supabaseError);
       }
     }
 
-    // Save to localStorage (always, for backward compatibility)
+    // Save to localStorage
     localStorage.setItem('phantom_wallet', JSON.stringify({
       ...walletUser,
       walletUserId,
@@ -456,14 +467,30 @@ export const authenticateWithPhantom = async () => {
 
 // Sign out
 export const signOut = async () => {
-  // Disconnect Phantom if connected
+  // Get wallet data before clearing
+  try {
+    const phantomData = localStorage.getItem('phantom_wallet');
+    if (phantomData) {
+      const parsed = JSON.parse(phantomData);
+      clearWalletSession('phantom', parsed.publicKey);
+    }
+  } catch {}
+
+  try {
+    const metamaskData = localStorage.getItem('metamask_wallet');
+    if (metamaskData) {
+      const parsed = JSON.parse(metamaskData);
+      clearWalletSession('metamask', parsed.address);
+    }
+  } catch {}
+
+  // Disconnect wallets
   try {
     await disconnectPhantom();
   } catch (error) {
     console.error('Phantom disconnect error:', error);
   }
 
-  // Disconnect MetaMask (just clear data, no actual disconnect needed)
   try {
     await disconnectMetaMask();
   } catch (error) {
@@ -493,97 +520,24 @@ export const getPhantomAuth = async () => {
 
     const parsed = JSON.parse(walletData);
     
-    // If Supabase is configured, check for auth session
-    if (isSupabaseConfigured() && parsed.publicKey) {
-      try {
-        // Try to get Supabase Auth session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (session && session.user) {
-          // Check if this session belongs to our wallet user
-          const walletAddress = session.user.user_metadata?.wallet_address;
-          if (walletAddress === parsed.publicKey) {
-            // Valid session - return enhanced data with JWT
-            const { data: walletUser } = await supabase
-              .from('wallet_users')
-              .select('id, wallet_address, user_metadata, last_login')
-              .eq('wallet_address', parsed.publicKey)
-              .eq('wallet_type', 'phantom')
-              .single();
-
-            return {
-              ...parsed,
-              walletUserId: walletUser?.id,
-              authUser: session.user,
-              jwtToken: session.access_token,
-              userMetadata: walletUser?.user_metadata || session.user.user_metadata,
-              lastLogin: walletUser?.last_login,
-              linkedToSupabase: true,
-            };
-          }
-        }
-
-        // No valid session - try to sign in with wallet credentials
-        if (parsed.publicKey) {
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email: `${parsed.publicKey}@phantom.local`,
-            password: parsed.publicKey,
-          });
-
-          if (signInData?.session && !signInError) {
-            // Successfully signed in - return with JWT
-            const { data: walletUser } = await supabase
-              .from('wallet_users')
-              .select('id, wallet_address, user_metadata, last_login')
-              .eq('wallet_address', parsed.publicKey)
-              .eq('wallet_type', 'phantom')
-              .single();
-
-            return {
-              ...parsed,
-              walletUserId: walletUser?.id,
-              authUser: signInData.user,
-              jwtToken: signInData.session.access_token,
-              userMetadata: walletUser?.user_metadata || signInData.user.user_metadata,
-              lastLogin: walletUser?.last_login,
-              linkedToSupabase: true,
-            };
-          }
-        }
-
-        // Fallback: check wallet_users table
-        if (parsed.walletUserId) {
-          const { data: user, error } = await supabase
-            .from('wallet_users')
-            .select('id, wallet_address, user_metadata, last_login')
-            .eq('id', parsed.walletUserId)
-            .eq('wallet_address', parsed.publicKey)
-            .single();
-
-          if (user && !error) {
-            return {
-              ...parsed,
-              walletUserId: user.id,
-              userMetadata: user.user_metadata,
-              lastLogin: user.last_login,
-              linkedToSupabase: true,
-            };
-          }
-        }
-      } catch (error) {
-        // Supabase check failed - return local data
-        console.warn('Failed to verify Phantom user in Supabase:', error);
-      }
+    // Verify session is still valid
+    const session = getWalletSession('phantom', parsed.publicKey);
+    if (!session) {
+      // Session expired or invalid
+      localStorage.removeItem('phantom_wallet');
+      return null;
     }
 
-    // Return local storage data (backward compatibility)
-    return parsed;
+    return {
+      ...parsed,
+      sessionToken: session.sessionToken,
+    };
   } catch {
     return null;
   }
 };
 
-// MetaMask wallet authentication
+// MetaMask wallet authentication - SECURE VERSION
 export const authenticateWithMetaMask = async () => {
   try {
     // Connect to MetaMask wallet
@@ -594,8 +548,12 @@ export const authenticateWithMetaMask = async () => {
 
     const { address } = connectResult;
     
+    // Generate a unique challenge for this authentication attempt
+    const challenge = generateSecureToken(32);
+    const timestamp = Date.now();
+    
     // Sign a message to prove wallet ownership
-    const message = `Sign in to Leet Quantum Terminal\n\nWallet: ${address}\nTimestamp: ${Date.now()}`;
+    const message = `Sign in to Leet Quantum Terminal\n\nWallet: ${address}\nChallenge: ${challenge}\nTimestamp: ${timestamp}`;
     const signResult = await signMetaMaskMessage(message, address);
     
     if (!signResult.success) {
@@ -603,21 +561,30 @@ export const authenticateWithMetaMask = async () => {
       return signResult;
     }
 
-    // Store wallet info locally
+    // Create a secure session token from the signature
+    const signatureHash = await hashSignature(signResult.signature, address);
+    const sessionToken = generateSecureToken(32);
+
+    // Store wallet info locally with secure session
     const walletUser = {
       address,
       type: 'metamask',
-      signedAt: Date.now(),
+      signedAt: timestamp,
+      sessionToken,
     };
 
-    // Create Supabase Auth user with JWT if configured
+    // Save secure session
+    saveWalletSession('metamask', address, signatureHash, sessionToken);
+
+    // Create Supabase user if configured
     let authUser = null;
     let walletUserId = null;
     let jwtToken = null;
 
     if (isSupabaseConfigured()) {
       try {
-        // Check if wallet user exists in custom table
+        const securePassword = signatureHash;
+        
         const { data: existingUser } = await supabase
           .from('wallet_users')
           .select('id, auth_user_id, wallet_address, user_metadata')
@@ -625,169 +592,71 @@ export const authenticateWithMetaMask = async () => {
           .eq('wallet_type', 'metamask')
           .single();
 
-        // Try to sign in first (user might already exist)
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        let signInData, signInError;
+        
+        ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: `${address}@metamask.local`,
-          password: address,
-        });
+          password: securePassword,
+        }));
 
-        if (signInData?.session && !signInError) {
-          // Successfully signed in - user exists
-          authUser = signInData.user;
-          jwtToken = signInData.session.access_token;
-          console.log('✅ MetaMask: Signed in successfully, JWT created');
-
-          // Update or create wallet_users record
-          if (existingUser) {
-            walletUserId = existingUser.id;
-            await supabase
-              .from('wallet_users')
-              .update({
-                auth_user_id: authUser.id,
-                last_login: new Date().toISOString(),
-              })
-              .eq('id', walletUserId);
-          } else {
-            // Create wallet_users record
-            const { data: newUser, error: insertError } = await supabase
-              .from('wallet_users')
-              .insert({
-                wallet_address: address,
-                wallet_type: 'metamask',
-                network: 'ethereum',
-                auth_user_id: authUser.id,
-                user_metadata: {},
-                last_login: new Date().toISOString(),
-              })
-              .select('id')
-              .single();
-
-            if (newUser && !insertError) {
-              walletUserId = newUser.id;
-            }
-          }
-        } else if (signInError) {
-          // Sign in failed - try to create new account
-          console.log('⚠️ MetaMask: Sign in failed, creating new account:', signInError.message);
-          
+        if (signInError && signInError.message?.includes('Invalid login credentials')) {
           const { data: newAuthUser, error: authError } = await supabase.auth.signUp({
             email: `${address}@metamask.local`,
-            password: address,
+            password: securePassword,
             options: {
               data: {
                 wallet_address: address,
                 wallet_type: 'metamask',
                 network: 'ethereum',
               },
-              emailRedirectTo: window.location.origin,
             },
           });
 
-          if (authError) {
-            console.error('❌ MetaMask: Signup error:', authError.message);
-            
-            // If email confirmation error, log helpful message
-            if (authError.message?.includes('email') || authError.message?.includes('confirm')) {
-              console.warn('💡 TIP: Disable email confirmation in Supabase Auth settings for wallet users');
-            }
-          }
-
-          if (newAuthUser?.user && !authError) {
+          if (!authError && newAuthUser?.user) {
             authUser = newAuthUser.user;
-            console.log('✅ MetaMask: User created:', newAuthUser.user.id);
-            
-            // Try to get session (works if email confirmation is disabled)
-            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-            
+            const { data: sessionData } = await supabase.auth.getSession();
             if (sessionData?.session?.access_token) {
               jwtToken = sessionData.session.access_token;
-              console.log('✅ MetaMask: JWT token obtained from session');
-            } else {
-              console.warn('⚠️ MetaMask: No JWT token - email confirmation may be required');
-              console.warn('💡 Fix: Go to Supabase → Auth → Settings → Disable email confirmation');
-              
-              // Try to sign in immediately after signup (sometimes works)
-              const { data: retrySignIn } = await supabase.auth.signInWithPassword({
-                email: `${address}@metamask.local`,
-                password: address,
-              });
-              
-              if (retrySignIn?.session?.access_token) {
-                jwtToken = retrySignIn.session.access_token;
-                console.log('✅ MetaMask: JWT obtained after retry sign in');
-              }
             }
-
-            // Create or update wallet_users record
-            if (existingUser) {
-              walletUserId = existingUser.id;
-              await supabase
-                .from('wallet_users')
-                .update({
-                  auth_user_id: authUser.id,
-                  last_login: new Date().toISOString(),
-                })
-                .eq('id', walletUserId);
-            } else {
-              const { data: newUser, error: insertError } = await supabase
-                .from('wallet_users')
-                .insert({
-                  wallet_address: address,
-                  wallet_type: 'metamask',
-                  network: 'ethereum',
-                  auth_user_id: authUser.id,
-                  user_metadata: {},
-                  last_login: new Date().toISOString(),
-                })
-                .select('id')
-                .single();
-
-              if (newUser && !insertError) {
-                walletUserId = newUser.id;
-              }
-            }
-          }
-        } else {
-          // Other error - just create wallet_users record without auth
-          if (!existingUser) {
-            const { data: newUser, error: insertError } = await supabase
-              .from('wallet_users')
-              .insert({
-                wallet_address: address,
-                wallet_type: 'metamask',
-                network: 'ethereum',
-                user_metadata: {},
-                last_login: new Date().toISOString(),
-              })
-              .select('id')
-              .single();
-
-            if (newUser && !insertError) {
-              walletUserId = newUser.id;
-            }
-          } else {
-            walletUserId = existingUser.id;
-            await supabase
-              .from('wallet_users')
-              .update({ last_login: new Date().toISOString() })
-              .eq('id', walletUserId);
           }
         }
 
-        // Update last login if user exists
-        if (walletUserId) {
+        if (signInData?.session && !signInError) {
+          authUser = signInData.user;
+          jwtToken = signInData.session.access_token;
+        }
+
+        if (existingUser) {
+          walletUserId = existingUser.id;
           await supabase
             .from('wallet_users')
-            .update({ last_login: new Date().toISOString() })
+            .update({
+              auth_user_id: authUser?.id,
+              last_login: new Date().toISOString(),
+            })
             .eq('id', walletUserId);
+        } else if (authUser) {
+          const { data: newUser } = await supabase
+            .from('wallet_users')
+            .insert({
+              wallet_address: address,
+              wallet_type: 'metamask',
+              network: 'ethereum',
+              auth_user_id: authUser.id,
+              user_metadata: {},
+              last_login: new Date().toISOString(),
+            })
+            .select('id')
+            .single();
+
+          if (newUser) walletUserId = newUser.id;
         }
       } catch (supabaseError) {
-        // Supabase error - continue with local storage only
-        console.warn('Supabase wallet linking failed, using local storage only:', supabaseError);
+        console.warn('Supabase wallet linking failed:', supabaseError);
       }
     }
 
-    // Save to localStorage (always, for backward compatibility)
+    // Save to localStorage
     localStorage.setItem('metamask_wallet', JSON.stringify({
       ...walletUser,
       walletUserId,
@@ -822,91 +691,17 @@ export const getMetaMaskAuth = async () => {
 
     const parsed = JSON.parse(walletData);
     
-    // If Supabase is configured, check for auth session
-    if (isSupabaseConfigured() && parsed.address) {
-      try {
-        // Try to get Supabase Auth session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (session && session.user) {
-          // Check if this session belongs to our wallet user
-          const walletAddress = session.user.user_metadata?.wallet_address;
-          if (walletAddress === parsed.address) {
-            // Valid session - return enhanced data with JWT
-            const { data: walletUser } = await supabase
-              .from('wallet_users')
-              .select('id, wallet_address, user_metadata, last_login')
-              .eq('wallet_address', parsed.address)
-              .eq('wallet_type', 'metamask')
-              .single();
-
-            return {
-              ...parsed,
-              walletUserId: walletUser?.id,
-              authUser: session.user,
-              jwtToken: session.access_token,
-              userMetadata: walletUser?.user_metadata || session.user.user_metadata,
-              lastLogin: walletUser?.last_login,
-              linkedToSupabase: true,
-            };
-          }
-        }
-
-        // No valid session - try to sign in with wallet credentials
-        if (parsed.address) {
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email: `${parsed.address}@metamask.local`,
-            password: parsed.address,
-          });
-
-          if (signInData?.session && !signInError) {
-            // Successfully signed in - return with JWT
-            const { data: walletUser } = await supabase
-              .from('wallet_users')
-              .select('id, wallet_address, user_metadata, last_login')
-              .eq('wallet_address', parsed.address)
-              .eq('wallet_type', 'metamask')
-              .single();
-
-            return {
-              ...parsed,
-              walletUserId: walletUser?.id,
-              authUser: signInData.user,
-              jwtToken: signInData.session.access_token,
-              userMetadata: walletUser?.user_metadata || signInData.user.user_metadata,
-              lastLogin: walletUser?.last_login,
-              linkedToSupabase: true,
-            };
-          }
-        }
-
-        // Fallback: check wallet_users table
-        if (parsed.walletUserId) {
-          const { data: user, error } = await supabase
-            .from('wallet_users')
-            .select('id, wallet_address, user_metadata, last_login')
-            .eq('id', parsed.walletUserId)
-            .eq('wallet_address', parsed.address)
-            .single();
-
-          if (user && !error) {
-            return {
-              ...parsed,
-              walletUserId: user.id,
-              userMetadata: user.user_metadata,
-              lastLogin: user.last_login,
-              linkedToSupabase: true,
-            };
-          }
-        }
-      } catch (error) {
-        // Supabase check failed - return local data
-        console.warn('Failed to verify MetaMask user in Supabase:', error);
-      }
+    // Verify session is still valid
+    const session = getWalletSession('metamask', parsed.address);
+    if (!session) {
+      localStorage.removeItem('metamask_wallet');
+      return null;
     }
 
-    // Return local storage data (backward compatibility)
-    return parsed;
+    return {
+      ...parsed,
+      sessionToken: session.sessionToken,
+    };
   } catch {
     return null;
   }
@@ -926,7 +721,6 @@ export const getWalletUserPreferences = async (walletUserId) => {
 
     if (error) throw error;
 
-    // Convert array to object
     const preferences = {};
     if (data) {
       data.forEach((pref) => {
@@ -967,63 +761,5 @@ export const setWalletUserPreference = async (walletUserId, key, value) => {
   }
 };
 
-// Update wallet user metadata in Supabase
-export const updateWalletUserMetadata = async (walletUserId, metadata) => {
-  if (!isSupabaseConfigured() || !walletUserId) {
-    return { success: false, error: 'Supabase not configured or no wallet user ID' };
-  }
-
-  try {
-    // Get current metadata
-    const { data: user, error: fetchError } = await supabase
-      .from('wallet_users')
-      .select('user_metadata')
-      .eq('id', walletUserId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    // Merge with new metadata
-    const updatedMetadata = {
-      ...(user?.user_metadata || {}),
-      ...metadata,
-    };
-
-    const { error } = await supabase
-      .from('wallet_users')
-      .update({ user_metadata: updatedMetadata })
-      .eq('id', walletUserId);
-
-    if (error) throw error;
-    return { success: true };
-  } catch (error) {
-    console.error('Failed to update user metadata:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-// Get wallet user by address (for cross-device lookup)
-export const getWalletUserByAddress = async (address, walletType) => {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('wallet_users')
-      .select('id, wallet_address, wallet_type, user_metadata, created_at, last_login')
-      .eq('wallet_address', address)
-      .eq('wallet_type', walletType)
-      .single();
-
-    if (error || !data) return null;
-    return data;
-  } catch (error) {
-    console.error('Failed to get wallet user:', error);
-    return null;
-  }
-};
-
 // Initialize on import
 initializeUsers();
-

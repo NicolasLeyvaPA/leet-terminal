@@ -75,8 +75,8 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
           return;
         }
 
-        // Create user locally using email
-        const result = createUser(email, password);
+        // Create user locally using email (async for password hashing)
+        const result = await createUser(email, password);
         if (result.success) {
           onSignup();
         } else {
