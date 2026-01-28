@@ -59,9 +59,11 @@ const Terminal = ({ onLogout }) => {
       }));
 
       setMarkets(enrichedMarkets);
-      if (enrichedMarkets.length > 0 && !selectedMarket) {
-        setSelectedMarket(enrichedMarkets[0]);
-      }
+      // FIX: Use functional update to avoid stale closure
+      setSelectedMarket(prev => {
+        if (prev) return prev; // Keep existing selection
+        return enrichedMarkets.length > 0 ? enrichedMarkets[0] : null;
+      });
       setLastRefresh(new Date());
       setStatusMessage(`${enrichedMarkets.length} markets`);
       setTimeout(() => setStatusMessage(""), 2000);
@@ -71,7 +73,7 @@ const Terminal = ({ onLogout }) => {
     } finally {
       setLoadingMarkets(false);
     }
-  }, [marketLimit, selectedMarket]);
+  }, [marketLimit]); // FIX: Removed selectedMarket from deps to prevent stale closure
 
   // Initial load and refresh interval
   useEffect(() => {
@@ -207,69 +209,89 @@ const Terminal = ({ onLogout }) => {
     }
   };
 
+  // FIX: Stable refs for drag handlers to prevent memory leaks
   const onDragRef = useRef(null);
   const stopDragRef = useRef(null);
+  const isDraggingRef = useRef(false);
 
-  const onDrag = useCallback((event) => {
-    const state = dragStateRef.current;
-    if (!state.type) return;
+  // FIX: Use refs to access current state values without recreating handlers
+  const leftWidthRef = useRef(leftWidth);
+  const detailHeightRef = useRef(detailHeight);
+  const analyticsWidthRef = useRef(analyticsWidth);
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    leftWidthRef.current = leftWidth;
+    detailHeightRef.current = detailHeight;
+    analyticsWidthRef.current = analyticsWidth;
+  }, [leftWidth, detailHeight, analyticsWidth]);
 
-    if (state.type === "left") {
-      const dx = event.clientX - state.startX;
-      let next = state.startVal + dx;
-      const maxWidth = window.innerWidth - 260;
-      next = Math.max(140, Math.min(maxWidth, next));
-      setLeftWidth(next);
-    } else if (state.type === "detail") {
-      const dy = event.clientY - state.startY;
-      let next = state.startVal - dy;
-      const maxHeight = window.innerHeight - 160;
-      next = Math.max(80, Math.min(maxHeight, next));
-      setDetailHeight(next);
-    } else if (state.type === "analytics") {
-      const dx = event.clientX - state.startX;
-      let next = state.startVal + dx;
-      const container = document.getElementById("analytics-container");
-      const containerWidth = container ? container.clientWidth : window.innerWidth;
-      const maxWidth = containerWidth - 260;
-      next = Math.max(260, Math.min(maxWidth, next));
-      setAnalyticsWidth(next);
-    }
-  }, []);
+  // FIX: Create stable handlers that don't change on re-render
+  useEffect(() => {
+    const handleDrag = (event) => {
+      const state = dragStateRef.current;
+      if (!state.type) return;
 
-  const stopDrag = useCallback(() => {
-    dragStateRef.current = { type: null, startX: 0, startY: 0, startVal: 0 };
-    if (onDragRef.current) {
-      window.removeEventListener("mousemove", onDragRef.current);
-    }
-    if (stopDragRef.current) {
-      window.removeEventListener("mouseup", stopDragRef.current);
-    }
-  }, []);
+      if (state.type === "left") {
+        const dx = event.clientX - state.startX;
+        let next = state.startVal + dx;
+        const maxWidth = window.innerWidth - 260;
+        const MIN_LEFT_WIDTH = 140;
+        next = Math.max(MIN_LEFT_WIDTH, Math.min(maxWidth, next));
+        setLeftWidth(next);
+      } else if (state.type === "detail") {
+        const dy = event.clientY - state.startY;
+        let next = state.startVal - dy;
+        const maxHeight = window.innerHeight - 160;
+        const MIN_DETAIL_HEIGHT = 80;
+        next = Math.max(MIN_DETAIL_HEIGHT, Math.min(maxHeight, next));
+        setDetailHeight(next);
+      } else if (state.type === "analytics") {
+        const dx = event.clientX - state.startX;
+        let next = state.startVal + dx;
+        const container = document.getElementById("analytics-container");
+        const containerWidth = container ? container.clientWidth : window.innerWidth;
+        const maxWidth = containerWidth - 260;
+        const MIN_ANALYTICS_WIDTH = 260;
+        next = Math.max(MIN_ANALYTICS_WIDTH, Math.min(maxWidth, next));
+        setAnalyticsWidth(next);
+      }
+    };
 
-  onDragRef.current = onDrag;
-  stopDragRef.current = stopDrag;
+    const handleStopDrag = () => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      dragStateRef.current = { type: null, startX: 0, startY: 0, startVal: 0 };
+      window.removeEventListener("mousemove", handleDrag);
+      window.removeEventListener("mouseup", handleStopDrag);
+    };
+
+    // Store refs for external access
+    onDragRef.current = handleDrag;
+    stopDragRef.current = handleStopDrag;
+
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener("mousemove", handleDrag);
+      window.removeEventListener("mouseup", handleStopDrag);
+    };
+  }, []); // Empty deps - handlers are stable
 
   const startDrag = useCallback((type, event) => {
+    if (isDraggingRef.current) return; // Prevent multiple drag sessions
+    isDraggingRef.current = true;
+    
     if (type === "left") {
-      dragStateRef.current = { type, startX: event.clientX, startVal: leftWidth };
+      dragStateRef.current = { type, startX: event.clientX, startY: 0, startVal: leftWidthRef.current };
     } else if (type === "detail") {
-      dragStateRef.current = { type, startY: event.clientY, startVal: detailHeight };
+      dragStateRef.current = { type, startX: 0, startY: event.clientY, startVal: detailHeightRef.current };
     } else if (type === "analytics") {
-      dragStateRef.current = { type, startX: event.clientX, startVal: analyticsWidth };
+      dragStateRef.current = { type, startX: event.clientX, startY: 0, startVal: analyticsWidthRef.current };
     }
-    window.addEventListener("mousemove", onDrag);
-    window.addEventListener("mouseup", stopDrag);
-  }, [leftWidth, detailHeight, analyticsWidth, onDrag, stopDrag]);
-
-  useEffect(() => {
-    const currentOnDrag = onDragRef.current;
-    const currentStopDrag = stopDragRef.current;
-    return () => {
-      if (currentOnDrag) window.removeEventListener("mousemove", currentOnDrag);
-      if (currentStopDrag) window.removeEventListener("mouseup", currentStopDrag);
-    };
-  }, []);
+    
+    if (onDragRef.current) window.addEventListener("mousemove", onDragRef.current);
+    if (stopDragRef.current) window.addEventListener("mouseup", stopDragRef.current);
+  }, []); // Empty deps - uses refs
 
   // Bloomberg-style ticker tape
   const tickerItems = useMemo(() => {
