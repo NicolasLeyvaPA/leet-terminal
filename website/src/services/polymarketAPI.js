@@ -242,7 +242,7 @@ function transformEventToMarket(event) {
     // Core pricing
     market_prob: midPrice,
     model_prob: modelProb,
-    prev_prob: midPrice - (Math.random() * 0.02 - 0.01), // Simulated previous
+    prev_prob: null, // Will be calculated from price history if available
 
     // Market metrics
     bestBid,
@@ -269,7 +269,7 @@ function transformEventToMarket(event) {
     outcomePrices,
 
     // Generated analysis (will be calculated from real data)
-    factors: generateFactors(midPrice, modelProb, volume24h, liquidity),
+    factors: generateFactors(midPrice, modelProb, volume24h, liquidity, market),
     model_breakdown: generateModelBreakdown(modelProb),
     greeks: calculateGreeks(midPrice, event.endDate),
     correlations: {},
@@ -289,125 +289,180 @@ function generateTicker(title) {
   return words.map(w => w[0]).join('').toUpperCase() || 'MKT';
 }
 
-// Calculate model probability (simplified edge detection)
-function calculateModelProbability(marketProb, volume24h, liquidity, market) {
-  // Base: start with market probability
-  let modelProb = marketProb;
+// Calculate heuristic probability estimate (NOT ML - just market signal analysis)
+// This is a deterministic heuristic based on observable market data
+function calculateHeuristicProbability(marketProb, volume24h, liquidity, market) {
+  // Base: start with market probability (the wisdom of the crowd)
+  let heuristicProb = marketProb;
 
   // Volume momentum factor: high recent volume may indicate informed trading
+  // Max adjustment: +5% if volume > $100k
   const volumeFactor = Math.min(volume24h / 100000, 0.05);
 
-  // Liquidity factor: more liquidity = more efficient pricing
-  const liquidityFactor = Math.min(liquidity / 500000, 0.03);
-
   // Bid/Ask imbalance: more bids than asks = bullish signal
+  // This is REAL data from the orderbook
   const bestBid = parseFloat(market.bestBid) || 0;
   const bestAsk = parseFloat(market.bestAsk) || 0;
   const imbalance = bestBid > 0 && bestAsk > 0
     ? (bestBid / bestAsk - 1) * 0.1
     : 0;
 
-  // Spread factor: tight spread = more confidence in price
+  // Spread factor: tight spread = more liquid/efficient market
   const spread = bestAsk - bestBid;
   const spreadFactor = spread < 0.02 ? 0.01 : spread > 0.1 ? -0.02 : 0;
 
-  // Combine factors
-  modelProb += volumeFactor + imbalance + spreadFactor;
-
-  // Add slight random noise for variation (simulating model uncertainty)
-  modelProb += (Math.random() - 0.5) * 0.04;
+  // Combine factors (deterministic - NO random noise)
+  heuristicProb += volumeFactor + imbalance + spreadFactor;
 
   // Clamp to valid probability range
-  return Math.max(0.01, Math.min(0.99, modelProb));
+  return Math.max(0.01, Math.min(0.99, heuristicProb));
 }
 
-// Generate analysis factors from real data
-function generateFactors(marketProb, modelProb, volume24h, liquidity) {
-  const edge = modelProb - marketProb;
+// Alias for backward compatibility
+const calculateModelProbability = calculateHeuristicProbability;
+
+// Generate market signal factors
+// HONEST: Clearly marks which factors have real data vs no data
+function generateFactors(marketProb, heuristicProb, volume24h, liquidity, market) {
+  const edge = heuristicProb - marketProb;
   const direction = edge > 0.02 ? 'bullish' : edge < -0.02 ? 'bearish' : 'neutral';
 
-  // Orderbook imbalance (simulated from edge)
-  const obImbalance = 0.5 + edge * 2;
+  // Calculate REAL orderbook imbalance if we have bid/ask data
+  const bestBid = parseFloat(market?.bestBid) || 0;
+  const bestAsk = parseFloat(market?.bestAsk) || 0;
+  const hasOrderbookData = bestBid > 0 && bestAsk > 0;
+  const realImbalance = hasOrderbookData ? bestBid / (bestBid + bestAsk) : null;
 
-  // Volume trend
+  // Volume metrics (REAL data from API)
   const volumeScore = Math.min(volume24h / 200000, 1);
   const volumeDirection = volumeScore > 0.5 ? 'bullish' : volumeScore < 0.3 ? 'bearish' : 'neutral';
 
-  // Liquidity score
+  // Liquidity score (REAL data from API)
   const liqScore = Math.min(liquidity / 1000000, 1);
 
   return {
+    // REAL DATA FACTORS
     orderbook_imbalance: {
-      value: Math.max(0, Math.min(1, obImbalance)),
-      contribution: edge * 0.3,
-      direction,
-      desc: edge > 0 ? 'Buy-side pressure detected' : 'Sell-side pressure detected'
-    },
-    price_momentum: {
-      value: 0.5 + edge,
-      contribution: edge * 0.2,
-      direction,
-      desc: 'Based on recent price movement'
+      value: hasOrderbookData ? realImbalance : null,
+      contribution: hasOrderbookData ? (realImbalance - 0.5) * 0.3 : 0,
+      direction: hasOrderbookData ? (realImbalance > 0.55 ? 'bullish' : realImbalance < 0.45 ? 'bearish' : 'neutral') : 'unknown',
+      desc: hasOrderbookData ? `Bid/Ask ratio: ${(realImbalance * 100).toFixed(1)}%` : 'No orderbook data',
+      isReal: hasOrderbookData,
     },
     volume_trend: {
       value: volumeScore,
       contribution: volumeScore * 0.1,
       direction: volumeDirection,
-      desc: `24h volume: $${(volume24h / 1000).toFixed(1)}K`
-    },
-    news_sentiment: {
-      value: 0.5,
-      contribution: 0,
-      direction: 'neutral',
-      desc: 'No news data available'
-    },
-    social_sentiment: {
-      value: 0.5,
-      contribution: 0,
-      direction: 'neutral',
-      desc: 'Social data not available'
-    },
-    smart_money: {
-      value: 0.5 + edge * 1.5,
-      contribution: edge * 0.15,
-      direction,
-      desc: 'Inferred from orderbook depth'
-    },
-    historical_pattern: {
-      value: 0.5,
-      contribution: 0,
-      direction: 'neutral',
-      desc: 'Historical patterns not analyzed'
-    },
-    time_decay: {
-      value: 0.5,
-      contribution: 0,
-      direction: 'neutral',
-      desc: 'Time decay factor'
+      desc: `24h volume: $${(volume24h / 1000).toFixed(1)}K`,
+      isReal: true,
     },
     liquidity_score: {
       value: liqScore,
       contribution: liqScore * 0.05,
       direction: liqScore > 0.5 ? 'bullish' : 'neutral',
-      desc: `Liquidity: $${(liquidity / 1000).toFixed(1)}K`
+      desc: `Liquidity: $${(liquidity / 1000).toFixed(1)}K`,
+      isReal: true,
     },
-    model_confidence: {
-      value: Math.abs(edge) > 0.05 ? 0.8 : 0.5,
-      contribution: Math.abs(edge) * 0.2,
+    spread_analysis: {
+      value: hasOrderbookData ? Math.max(0, 1 - (bestAsk - bestBid) * 10) : null,
+      contribution: hasOrderbookData ? (bestAsk - bestBid < 0.02 ? 0.02 : -0.02) : 0,
+      direction: hasOrderbookData ? (bestAsk - bestBid < 0.03 ? 'bullish' : 'bearish') : 'unknown',
+      desc: hasOrderbookData ? `Spread: ${((bestAsk - bestBid) * 100).toFixed(2)}%` : 'No spread data',
+      isReal: hasOrderbookData,
+    },
+    
+    // NO DATA FACTORS - Honestly marked
+    news_sentiment: {
+      value: null,
+      contribution: 0,
+      direction: 'unknown',
+      desc: 'News API not connected',
+      isReal: false,
+    },
+    social_sentiment: {
+      value: null,
+      contribution: 0,
+      direction: 'unknown',
+      desc: 'Social API not connected',
+      isReal: false,
+    },
+    historical_pattern: {
+      value: null,
+      contribution: 0,
+      direction: 'unknown',
+      desc: 'Historical analysis not available',
+      isReal: false,
+    },
+    
+    // DERIVED/HEURISTIC FACTORS
+    heuristic_edge: {
+      value: 0.5 + edge,
+      contribution: edge * 0.2,
       direction,
-      desc: `Edge detected: ${(edge * 100).toFixed(1)}%`
+      desc: `Heuristic edge: ${(edge * 100).toFixed(1)}%`,
+      isReal: false,
+      isHeuristic: true,
     },
   };
 }
 
-// Generate model breakdown
-function generateModelBreakdown(modelProb) {
-  const noise = () => (Math.random() - 0.5) * 0.06;
+// Generate HONEST signal breakdown
+// These are market signals derived from real data, NOT ML predictions
+function generateSignalBreakdown(marketProb, volume24h, liquidity, market) {
+  const bestBid = parseFloat(market?.bestBid) || 0;
+  const bestAsk = parseFloat(market?.bestAsk) || 0;
+  const spread = bestAsk - bestBid;
+  const hasOrderbook = bestBid > 0 && bestAsk > 0;
+  
+  const volumeConfidence = Math.min(volume24h / 100000, 1);
+  const liquidityConfidence = Math.min(liquidity / 500000, 1);
+  
   return {
-    lightgbm: { prob: Math.max(0.01, Math.min(0.99, modelProb + noise())), weight: 0.35, confidence: 0.75 + Math.random() * 0.15 },
-    xgboost: { prob: Math.max(0.01, Math.min(0.99, modelProb + noise())), weight: 0.3, confidence: 0.72 + Math.random() * 0.15 },
-    logistic: { prob: Math.max(0.01, Math.min(0.99, modelProb + noise())), weight: 0.2, confidence: 0.68 + Math.random() * 0.12 },
-    bayesian: { prob: Math.max(0.01, Math.min(0.99, modelProb + noise())), weight: 0.15, confidence: 0.7 + Math.random() * 0.14 },
+    market_consensus: { 
+      prob: marketProb, 
+      weight: 0.50, 
+      confidence: 1.0,
+      label: 'Market Consensus',
+      desc: 'Current trading price',
+      isReal: true,
+    },
+    volume_weight: { 
+      prob: marketProb, 
+      weight: 0.25, 
+      confidence: volumeConfidence,
+      label: 'Volume Signal',
+      desc: volume24h > 50000 ? 'High activity' : 'Low activity',
+      isReal: true,
+    },
+    liquidity_depth: { 
+      prob: marketProb, 
+      weight: 0.15, 
+      confidence: liquidityConfidence,
+      label: 'Liquidity',
+      desc: liquidity > 100000 ? 'Deep market' : 'Thin market',
+      isReal: true,
+    },
+    orderbook_bias: { 
+      prob: hasOrderbook ? Math.max(0.01, Math.min(0.99, marketProb + (bestBid/bestAsk - 1) * 0.1)) : marketProb, 
+      weight: 0.10, 
+      confidence: hasOrderbook ? 0.7 : 0,
+      label: 'Order Flow',
+      desc: hasOrderbook ? `Spread: ${(spread * 100).toFixed(2)}%` : 'No data',
+      isReal: hasOrderbook,
+    },
+    _isHeuristic: true,
+    _disclaimer: 'Market signals from real data - not ML predictions',
+  };
+}
+
+// Backward compatibility wrapper
+function generateModelBreakdown(modelProb) {
+  // Return structure compatible with old UI, but honestly labeled
+  return {
+    market_price: { prob: modelProb, weight: 0.60, confidence: 1.0 },
+    volume_signal: { prob: modelProb, weight: 0.25, confidence: 0.7 },
+    liquidity_signal: { prob: modelProb, weight: 0.15, confidence: 0.6 },
+    _disclaimer: 'Heuristic signals - no ML models',
   };
 }
 

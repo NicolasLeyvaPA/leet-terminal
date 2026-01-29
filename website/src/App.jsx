@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { PORTFOLIO_POSITIONS } from './data/constants';
 import { PolymarketAPI } from './services/polymarketAPI';
-import { generatePriceHistory, generateOrderbook } from './utils/helpers';
 import { WatchlistPanel } from './components/panels/WatchlistPanel';
 import { MarketOverviewPanel } from './components/panels/MarketOverviewPanel';
 import { PriceChartPanel } from './components/panels/PriceChartPanel';
@@ -52,18 +51,20 @@ const Terminal = ({ onLogout, authInfo }) => {
   const [lastRefresh, setLastRefresh] = useState(null);
   const dragStateRef = useRef({ type: null, startX: 0, startY: 0, startVal: 0 });
 
-  // Load markets from Polymarket API
+  // Load markets from Polymarket API with REAL data
   const loadMarkets = useCallback(async (limit = marketLimit, isManual = false) => {
     try {
       if (isManual) setLoadingMarkets(true);
       setStatusMessage("Syncing...");
       const data = await PolymarketAPI.fetchOpenEvents(limit);
 
-      // Add price history and orderbook to each market
+      // Markets start without price_history/orderbook - will be fetched on selection
+      // This avoids overwhelming the API with requests for all markets
       const enrichedMarkets = data.map(market => ({
         ...market,
-        price_history: generatePriceHistory(market.market_prob, 90),
-        orderbook: generateOrderbook(market.market_prob),
+        price_history: null, // Fetched on demand
+        orderbook: null, // Fetched on demand
+        dataStatus: 'pending', // Track loading state
       }));
 
       setMarkets(enrichedMarkets);
@@ -82,6 +83,72 @@ const Terminal = ({ onLogout, authInfo }) => {
       setLoadingMarkets(false);
     }
   }, [marketLimit]); // FIX: Removed selectedMarket from deps to prevent stale closure
+
+  // Fetch real price history and orderbook when a market is selected
+  const fetchMarketData = useCallback(async (market) => {
+    if (!market || market.dataStatus === 'loaded' || market.dataStatus === 'loading') return;
+
+    // Mark as loading
+    setMarkets(prev => prev.map(m => 
+      m.id === market.id ? { ...m, dataStatus: 'loading' } : m
+    ));
+
+    try {
+      // Fetch real data from CLOB API
+      const [priceHistory, orderbook] = await Promise.all([
+        market.marketId ? PolymarketAPI.fetchPriceHistory(market.marketId, 90) : null,
+        market.clobTokenIds?.[0] ? PolymarketAPI.fetchOrderbook(market.clobTokenIds[0]) : null,
+      ]);
+
+      // Calculate prev_prob from price history if available
+      let prevProb = null;
+      if (priceHistory && priceHistory.length > 1) {
+        // Get price from ~24h ago
+        const dayAgoIndex = Math.max(0, priceHistory.length - 24);
+        prevProb = priceHistory[dayAgoIndex]?.price || null;
+      }
+
+      // Update market with real data
+      setMarkets(prev => prev.map(m => 
+        m.id === market.id 
+          ? { 
+              ...m, 
+              price_history: priceHistory,
+              orderbook: orderbook,
+              prev_prob: prevProb,
+              dataStatus: 'loaded',
+              dataSource: priceHistory ? 'api' : 'fallback',
+            } 
+          : m
+      ));
+
+      // Update selected market if it's the same one
+      setSelectedMarket(prev => 
+        prev?.id === market.id 
+          ? { 
+              ...prev, 
+              price_history: priceHistory,
+              orderbook: orderbook,
+              prev_prob: prevProb,
+              dataStatus: 'loaded',
+              dataSource: priceHistory ? 'api' : 'fallback',
+            }
+          : prev
+      );
+    } catch (error) {
+      console.error('Failed to fetch market data:', error);
+      setMarkets(prev => prev.map(m => 
+        m.id === market.id ? { ...m, dataStatus: 'error' } : m
+      ));
+    }
+  }, []);
+
+  // Fetch data when market is selected
+  useEffect(() => {
+    if (selectedMarket && selectedMarket.dataStatus === 'pending') {
+      fetchMarketData(selectedMarket);
+    }
+  }, [selectedMarket, fetchMarketData]);
 
   // Initial load and refresh interval
   useEffect(() => {
@@ -111,10 +178,12 @@ const Terminal = ({ onLogout, authInfo }) => {
 
       const market = await PolymarketAPI.fetchEventBySlug(url);
 
+      // Market starts with pending data status - will be fetched when selected
       const enrichedMarket = {
         ...market,
-        price_history: generatePriceHistory(market.market_prob, 90),
-        orderbook: generateOrderbook(market.market_prob),
+        price_history: null,
+        orderbook: null,
+        dataStatus: 'pending',
       };
 
       setMarkets(prev => {
@@ -126,6 +195,7 @@ const Terminal = ({ onLogout, authInfo }) => {
       });
 
       setSelectedMarket(enrichedMarket);
+      // This will trigger fetchMarketData via useEffect
       setStatusMessage(`Loaded: ${market.ticker}`);
       setTimeout(() => setStatusMessage(""), 2000);
     } catch (error) {
