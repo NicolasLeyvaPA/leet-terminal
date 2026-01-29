@@ -18,14 +18,22 @@ import { MarketDetailDock } from './components/MarketDetailDock';
 import { useWatchlist } from './utils/useWatchlist';
 import Login from './components/Login';
 import Signup from './components/Signup';
-import { getSession, signOut, getPhantomAuth, getMetaMaskAuth, verifyAuthentication } from './utils/auth';
+import ErrorBoundary, { PanelErrorBoundary } from './components/ErrorBoundary';
+import { getSession, signOut, verifyAuthentication } from './utils/auth';
 import { isSupabaseConfigured } from './utils/supabase';
+
+// Layout constants (moved from magic numbers)
+const MIN_LEFT_PANEL_WIDTH = 140;
+const MIN_DETAIL_HEIGHT = 80;
+const MIN_ANALYTICS_WIDTH = 260;
+const MAX_WIDTH_OFFSET = 260;
+const MAX_HEIGHT_OFFSET = 160;
 
 // Market limit options
 const MARKET_LIMITS = [10, 25, 50, 100];
 const REFRESH_INTERVAL = 15000; // 15 seconds
 
-const Terminal = ({ onLogout }) => {
+const Terminal = ({ onLogout, authInfo }) => {
   const { watchlist } = useWatchlist();
   const [markets, setMarkets] = useState([]);
   const [loadingMarkets, setLoadingMarkets] = useState(true);
@@ -328,23 +336,35 @@ const Terminal = ({ onLogout }) => {
         <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
           {/* Row 1 */}
           <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <MarketOverviewPanel market={selectedMarket} />
+            <PanelErrorBoundary panelName="Market Overview">
+              <MarketOverviewPanel market={selectedMarket} />
+            </PanelErrorBoundary>
           </div>
           <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <PriceChartPanel market={selectedMarket} />
+            <PanelErrorBoundary panelName="Price Chart">
+              <PriceChartPanel market={selectedMarket} />
+            </PanelErrorBoundary>
           </div>
           <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <ConfluencePanel market={selectedMarket} />
+            <PanelErrorBoundary panelName="Confluence">
+              <ConfluencePanel market={selectedMarket} />
+            </PanelErrorBoundary>
           </div>
           {/* Row 2 */}
           <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <ModelBreakdownPanel market={selectedMarket} />
+            <PanelErrorBoundary panelName="Model Breakdown">
+              <ModelBreakdownPanel market={selectedMarket} />
+            </PanelErrorBoundary>
           </div>
           <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <MonteCarloPanel market={selectedMarket} />
+            <PanelErrorBoundary panelName="Monte Carlo">
+              <MonteCarloPanel market={selectedMarket} />
+            </PanelErrorBoundary>
           </div>
           <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <GreeksPanel market={selectedMarket} />
+            <PanelErrorBoundary panelName="Greeks">
+              <GreeksPanel market={selectedMarket} />
+            </PanelErrorBoundary>
           </div>
         </div>
       );
@@ -730,7 +750,11 @@ const App = () => {
     return <Login onLogin={handleLogin} onSwitchToSignup={() => setShowSignup(true)} />;
   }
 
-  return <Terminal onLogout={handleLogout} />;
+  return (
+    <ErrorBoundary showDetails={import.meta.env.DEV}>
+      <Terminal onLogout={handleLogout} authInfo={authInfo} />
+    </ErrorBoundary>
+  );
 };
 
 export default App;
