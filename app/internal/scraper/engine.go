@@ -13,6 +13,7 @@ import (
 	"github.com/NicolasLeyvaPA/leet-terminal/internal/storage"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"go.uber.org/zap"
 )
@@ -158,24 +159,45 @@ func (e *Engine) HandleNewsSourceScrape(ctx context.Context, task *asynq.Task) e
 		zap.String("url", payload.URL),
 	)
 
-	var articles []storage.ArticleExtended
-	var err error
+	// Fetch the news source from database to get latest config and API keys
+	source, err := e.db.GetNewsSource(payload.SourceID, nil)
+	if err != nil {
+		e.logger.Error("Failed to fetch news source from database", zap.Error(err))
+		return err
+	}
 
-	switch payload.SourceType {
+	// Check if source is still active
+	if !source.IsActive {
+		e.logger.Info("Skipping inactive news source", zap.String("source_id", payload.SourceID))
+		return nil
+	}
+
+	var articles []storage.ArticleExtended
+
+	switch source.SourceType {
 	case "rss":
-		articles, err = e.scrapeRSS(payload.URL)
+		articles, err = e.scrapeRSS(source.URL)
 	case "api":
-		articles, err = e.scrapeNewsAPI(payload.Config)
+		// Decrypt API key if needed
+		var apiKey string
+		if source.APIKeyEncrypted != nil {
+			apiKey, err = storage.DecryptAPIKey(*source.APIKeyEncrypted)
+			if err != nil {
+				e.logger.Error("Failed to decrypt API key", zap.Error(err))
+				return err
+			}
+		}
+		articles, err = e.scrapeNewsAPI(source.Config, apiKey)
 	case "web":
-		articles, err = e.scrapeWebPage(payload.URL)
+		articles, err = e.scrapeWebPage(source.URL)
 	default:
-		return fmt.Errorf("unsupported source type: %s", payload.SourceType)
+		return fmt.Errorf("unsupported source type: %s", source.SourceType)
 	}
 
 	if err != nil {
 		e.logger.Error("News scraping failed",
 			zap.String("source_id", payload.SourceID),
-			zap.String("type", payload.SourceType),
+			zap.String("type", source.SourceType),
 			zap.Error(err),
 		)
 		return err
@@ -186,14 +208,31 @@ func (e *Engine) HandleNewsSourceScrape(ctx context.Context, task *asynq.Task) e
 		zap.Int("articles", len(articles)),
 	)
 
-	// TODO: Store articles in database with source_id
-	// For now, just log success
-	for i, article := range articles {
-		e.logger.Debug("Scraped article",
-			zap.Int("index", i),
-			zap.String("title", article.Title),
-			zap.String("url", article.URL),
-		)
+	// Store articles in database with source_id
+	storedCount := 0
+	for _, article := range articles {
+		article.SourceID = &source.ID
+		article.ID = uuid.New().String()
+		
+		if err := e.db.CreateArticle(&article); err != nil {
+			e.logger.Warn("Failed to store article",
+				zap.String("title", article.Title),
+				zap.Error(err),
+			)
+			continue
+		}
+		storedCount++
+	}
+
+	e.logger.Info("Articles stored in database",
+		zap.String("source_id", payload.SourceID),
+		zap.Int("stored", storedCount),
+		zap.Int("total", len(articles)),
+	)
+
+	// Update last scraped timestamp
+	if err := e.db.UpdateNewsSourceLastScraped(payload.SourceID); err != nil {
+		e.logger.Error("Failed to update last scraped timestamp", zap.Error(err))
 	}
 
 	return nil
@@ -205,7 +244,15 @@ func (e *Engine) scrapeRSS(feedURL string) ([]storage.ArticleExtended, error) {
 }
 
 // scrapeNewsAPI fetches articles from NewsAPI
-func (e *Engine) scrapeNewsAPI(config map[string]interface{}) ([]storage.ArticleExtended, error) {
+func (e *Engine) scrapeNewsAPI(config map[string]interface{}, apiKey string) ([]storage.ArticleExtended, error) {
+	// Use provided API key or fall back to default from config
+	if apiKey == "" {
+		apiKey = e.config.NewsAPIKey
+	}
+	
+	// Create a temporary client with the specific API key
+	client := NewNewsAPIClient(apiKey, e.logger)
+	
 	params := NewsAPIParams{
 		PageSize: 100,
 	}
@@ -226,10 +273,10 @@ func (e *Engine) scrapeNewsAPI(config map[string]interface{}) ([]storage.Article
 
 	// Determine which endpoint to use
 	if params.Category != "" || params.Country != "" {
-		return e.newsAPI.GetTopHeadlines(params)
+		return client.GetTopHeadlines(params)
 	}
 
-	return e.newsAPI.GetEverything(params)
+	return client.GetEverything(params)
 }
 
 // scrapeWebPage scrapes a single web page for news article

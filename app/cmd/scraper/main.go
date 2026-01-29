@@ -42,6 +42,11 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize encryption key for decrypting API keys
+	if err := storage.SetEncryptionKey(cfg.EncryptionKey); err != nil {
+		logger.Fatal("Failed to set encryption key", zap.Error(err))
+	}
+
 	// Initialize cache
 	redisClient, err := cache.NewRedisClient(cfg)
 	if err != nil {
@@ -58,6 +63,12 @@ func main() {
 
 	// Create scraper engine
 	engine := scraper.NewEngine(db, redisClient, cfg, logger)
+
+	// Create and start scheduler for periodic news source scraping
+	// Check every 5 minutes for sources that need scraping
+	scheduler := scraper.NewScheduler(db, queueClient, logger, 5*time.Minute)
+	scheduler.Start(context.Background())
+	defer scheduler.Stop()
 
 	// Create queue server for processing scraping jobs
 	srv := queue.NewAsynqServer(cfg, logger)

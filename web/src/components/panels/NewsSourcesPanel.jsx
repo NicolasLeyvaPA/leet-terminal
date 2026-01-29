@@ -12,6 +12,7 @@ export default function NewsSourcesPanel() {
     name: '',
     source_type: 'rss',
     url: '',
+    api_key: '',
     scrape_interval_minutes: 60,
   });
 
@@ -61,6 +62,7 @@ export default function NewsSourcesPanel() {
         name: '',
         source_type: 'rss',
         url: '',
+        api_key: '',
         scrape_interval_minutes: 60,
       });
     } catch (err) {
@@ -190,6 +192,20 @@ export default function NewsSourcesPanel() {
               required
             />
           </div>
+
+          {newSource.source_type === 'api' && (
+            <div>
+              <label className="block text-cyan-400 text-xs font-mono mb-1">API Key (Optional)</label>
+              <input
+                type="password"
+                value={newSource.api_key}
+                onChange={(e) => setNewSource({ ...newSource, api_key: e.target.value })}
+                className="w-full px-2 py-1 bg-black/40 border border-cyan-500/30 text-cyan-400 text-xs font-mono rounded focus:outline-none focus:border-cyan-500"
+                placeholder="Enter API key if required"
+              />
+              <p className="text-gray-500 text-xs mt-1">Leave empty to use default API key</p>
+            </div>
+          )}
 
           <div>
             <label className="block text-cyan-400 text-xs font-mono mb-1">Scrape Interval (minutes)</label>

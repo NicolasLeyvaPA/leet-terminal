@@ -13,7 +13,11 @@ import (
 
 // CreateNewsSource adds a new news source
 func (h *Handler) CreateNewsSource(c *gin.Context) {
-	userID, _ := c.Get("user_id")
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
 	
 	var req struct {
 		Name                  string                 `json:"name" binding:"required"`
@@ -37,8 +41,16 @@ func (h *Handler) CreateNewsSource(c *gin.Context) {
 		req.Config = make(map[string]interface{})
 	}
 
-	// TODO: Encrypt API key if provided
-	// For now, storing as-is (should use crypto/aes)
+	// Encrypt API key if provided
+	var encryptedAPIKey *string
+	if req.APIKey != "" {
+		encrypted, err := storage.EncryptAPIKey(req.APIKey)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encrypt API key"})
+			return
+		}
+		encryptedAPIKey = &encrypted
+	}
 	
 	sourceID := uuid.New().String()
 	userIDStr := userID.(string)
@@ -49,6 +61,7 @@ func (h *Handler) CreateNewsSource(c *gin.Context) {
 		Name:                  req.Name,
 		SourceType:            req.SourceType,
 		URL:                   req.URL,
+		APIKeyEncrypted:       encryptedAPIKey,
 		Config:                req.Config,
 		IsActive:              true,
 		ScrapeIntervalMinutes: req.ScrapeIntervalMinutes,
@@ -56,8 +69,13 @@ func (h *Handler) CreateNewsSource(c *gin.Context) {
 		UpdatedAt:             time.Now(),
 	}
 
-	// TODO: Save to database
-	// For now, just enqueue an immediate scrape job
+	// Save to database
+	if err := h.db.CreateNewsSource(source); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create news source"})
+		return
+	}
+
+	// Enqueue an immediate scrape job
 	if h.queue != nil {
 		h.queue.EnqueueNewsSourceScrape(sourceID, req.URL, req.SourceType, req.Config)
 	}
@@ -70,11 +88,18 @@ func (h *Handler) CreateNewsSource(c *gin.Context) {
 
 // ListNewsSources returns all news sources for the user
 func (h *Handler) ListNewsSources(c *gin.Context) {
-	// userID, _ := c.Get("user_id")
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
 	
-	// TODO: Fetch from database using userID
-	// For now, return empty array
-	sources := []storage.NewsSource{}
+	userIDStr := userID.(string)
+	sources, err := h.db.ListNewsSources(&userIDStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news sources"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"sources": sources,
@@ -85,26 +110,39 @@ func (h *Handler) ListNewsSources(c *gin.Context) {
 // GetNewsSource returns a specific news source
 func (h *Handler) GetNewsSource(c *gin.Context) {
 	sourceID := c.Param("id")
-	// userID, _ := c.Get("user_id")
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
 
-	// TODO: Fetch from database and verify ownership using userID
-	_ = sourceID
+	userIDStr := userID.(string)
+	source, err := h.db.GetNewsSource(sourceID, &userIDStr)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "News source not found"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Feature not implemented yet",
+		"source": source,
 	})
 }
 
 // UpdateNewsSource updates a news source configuration
 func (h *Handler) UpdateNewsSource(c *gin.Context) {
 	sourceID := c.Param("id")
-	// userID, _ := c.Get("user_id")
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
 
 	var req struct {
 		Name                  *string                 `json:"name"`
 		IsActive              *bool                   `json:"is_active"`
 		ScrapeIntervalMinutes *int                    `json:"scrape_interval_minutes"`
 		Config                *map[string]interface{} `json:"config"`
+		APIKey                *string                 `json:"api_key"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -112,8 +150,34 @@ func (h *Handler) UpdateNewsSource(c *gin.Context) {
 		return
 	}
 
-	// TODO: Update in database and verify ownership using userID
-	_ = sourceID
+	updates := make(map[string]interface{})
+	
+	if req.Name != nil {
+		updates["name"] = *req.Name
+	}
+	if req.IsActive != nil {
+		updates["is_active"] = *req.IsActive
+	}
+	if req.ScrapeIntervalMinutes != nil {
+		updates["scrape_interval_minutes"] = *req.ScrapeIntervalMinutes
+	}
+	if req.Config != nil {
+		updates["config"] = *req.Config
+	}
+	if req.APIKey != nil && *req.APIKey != "" {
+		encrypted, err := storage.EncryptAPIKey(*req.APIKey)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encrypt API key"})
+			return
+		}
+		updates["api_key_encrypted"] = &encrypted
+	}
+
+	userIDStr := userID.(string)
+	if err := h.db.UpdateNewsSource(sourceID, &userIDStr, updates); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "News source updated successfully",
@@ -123,10 +187,17 @@ func (h *Handler) UpdateNewsSource(c *gin.Context) {
 // DeleteNewsSource removes a news source
 func (h *Handler) DeleteNewsSource(c *gin.Context) {
 	sourceID := c.Param("id")
-	// userID, _ := c.Get("user_id")
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
 
-	// TODO: Delete from database and verify ownership using userID
-	_ = sourceID
+	userIDStr := userID.(string)
+	if err := h.db.DeleteNewsSource(sourceID, &userIDStr); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "News source deleted successfully",
@@ -136,14 +207,22 @@ func (h *Handler) DeleteNewsSource(c *gin.Context) {
 // TriggerNewsSourceScrape manually triggers a scrape for a specific source
 func (h *Handler) TriggerNewsSourceScrape(c *gin.Context) {
 	sourceID := c.Param("id")
-	// userID, _ := c.Get("user_id")
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
 
-	// TODO: Verify ownership using userID and fetch source details
+	userIDStr := userID.(string)
+	source, err := h.db.GetNewsSource(sourceID, &userIDStr)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "News source not found"})
+		return
+	}
 
 	// Enqueue scrape job
 	if h.queue != nil {
-		// TODO: Get actual source details from database
-		h.queue.EnqueueNewsSourceScrape(sourceID, "", "", nil)
+		h.queue.EnqueueNewsSourceScrape(source.ID, source.URL, source.SourceType, source.Config)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

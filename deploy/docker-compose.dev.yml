@@ -60,6 +60,7 @@ services:
       REDIS_PASSWORD: ""
       ASYNQ_REDIS_ADDR: redis:6379
       JWT_SECRET: dev_jwt_secret_key_for_testing_only
+      ENCRYPTION_KEY: dev-key-32-bytes-change-prod!!
       CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://localhost:80,http://localhost
       LOG_LEVEL: debug
       STORAGE_PATH: /var/lib/leet-terminal/data
@@ -100,6 +101,7 @@ services:
       REDIS_PASSWORD: ""
       ASYNQ_REDIS_ADDR: redis:6379
       ASYNQ_CONCURRENCY: 5
+      ENCRYPTION_KEY: dev-key-32-bytes-change-prod!!
       SCRAPER_MAX_CONCURRENT: 5
       LOG_LEVEL: debug
     depends_on:

@@ -46,6 +46,11 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize encryption key for API keys
+	if err := storage.SetEncryptionKey(cfg.EncryptionKey); err != nil {
+		logger.Fatal("Failed to set encryption key", zap.Error(err))
+	}
+
 	// Initialize cache
 	redisClient, err := cache.NewRedisClient(cfg)
 	if err != nil {

@@ -1,7 +1,7 @@
 # Frontend build stage
 FROM node:18-alpine AS builder
 
-WORKDIR /app
+WORKDIR /app/web
 
 # Copy package files
 COPY web/package*.json ./
@@ -10,10 +10,10 @@ COPY web/package*.json ./
 RUN npm ci --legacy-peer-deps
 
 # Copy all source code
-COPY web/ .
+COPY deploy/web/ .
 
 # Build the application with base path set to root
-RUN npm run build -- --base=/
+RUN npm ci --legacy-peer-deps && npm run build -- --base=/
 
 # Runtime stage
 FROM nginx:alpine

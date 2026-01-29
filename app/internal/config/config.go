@@ -55,6 +55,9 @@ type Config struct {
 	JWTExpiration        time.Duration
 	JWTRefreshExpiration time.Duration
 
+	// Encryption
+	EncryptionKey string // 32 bytes for AES-256
+
 	// WebSocket
 	WSReadBufferSize    int
 	WSWriteBufferSize   int
@@ -134,6 +137,9 @@ func Load() (*Config, error) {
 		JWTSecret:            getEnv("JWT_SECRET", "your_secret_key_change_in_production"),
 		JWTExpiration:        getEnvAsDuration("JWT_EXPIRATION", 24*time.Hour),
 		JWTRefreshExpiration: getEnvAsDuration("JWT_REFRESH_EXPIRATION", 168*time.Hour),
+
+		// Encryption - 32 bytes for AES-256
+		EncryptionKey: getEnv("ENCRYPTION_KEY", "dev-key-32-bytes-change-prod!!"),
 
 		// WebSocket
 		WSReadBufferSize:    getEnvAsInt("WS_READ_BUFFER_SIZE", 1024),

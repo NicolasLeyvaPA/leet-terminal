@@ -46,6 +46,7 @@ ASYNQ_CONCURRENCY=10                   # Number of concurrent workers
 JWT_SECRET=your_secret_key_change_in_production  # JWT signing secret (REQUIRED in production)
 JWT_EXPIRATION=24h                     # Access token expiration
 JWT_REFRESH_EXPIRATION=168h            # Refresh token expiration (7 days)
+ENCRYPTION_KEY=change_this_to_32_byte_key_prod  # 32-byte key for AES-256 encryption (REQUIRED in production)
 ```
 
 ## WebSocket
@@ -108,6 +109,7 @@ VITE_SUPABASE_ANON_KEY=                # Supabase key (optional, legacy)
 **MUST CHANGE** these values in production:
 - `DB_PASSWORD` - Use strong, unique password
 - `JWT_SECRET` - Use cryptographically secure random string (32+ chars)
+- `ENCRYPTION_KEY` - **MUST be exactly 32 bytes** for AES-256 encryption (used for API keys)
 - `CORS_ORIGINS` - Set to your production domain only
 - `DB_SSL_MODE` - Set to `require` or `verify-full`
 
