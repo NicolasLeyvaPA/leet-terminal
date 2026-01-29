@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { PORTFOLIO_POSITIONS } from './data/constants';
 import { PolymarketAPI } from './services/polymarketAPI';
+import { KalshiAPI } from './services/kalshiAPI';
 import { WatchlistPanel } from './components/panels/WatchlistPanel';
 import { MarketOverviewPanel } from './components/panels/MarketOverviewPanel';
 import { PriceChartPanel } from './components/panels/PriceChartPanel';
@@ -51,16 +52,27 @@ const Terminal = ({ onLogout, authInfo }) => {
   const [lastRefresh, setLastRefresh] = useState(null);
   const dragStateRef = useRef({ type: null, startX: 0, startY: 0, startVal: 0 });
 
-  // Load markets from Polymarket API with REAL data
+  // Load markets from Polymarket AND Kalshi APIs with REAL data
   const loadMarkets = useCallback(async (limit = marketLimit, isManual = false) => {
     try {
       if (isManual) setLoadingMarkets(true);
       setStatusMessage("Syncing...");
-      const data = await PolymarketAPI.fetchOpenEvents(limit);
+      
+      // Fetch from both platforms in parallel
+      const [polymarketData, kalshiData] = await Promise.all([
+        PolymarketAPI.fetchOpenEvents(Math.ceil(limit * 0.7)), // 70% from Polymarket
+        KalshiAPI.fetchOpenEvents(Math.ceil(limit * 0.3)).catch(err => {
+          console.warn('Kalshi fetch failed:', err.message);
+          return []; // Don't fail if Kalshi fails
+        }),
+      ]);
+
+      // Combine markets from both platforms
+      const allMarkets = [...polymarketData, ...kalshiData];
 
       // Markets start without price_history/orderbook - will be fetched on selection
       // This avoids overwhelming the API with requests for all markets
-      const enrichedMarkets = data.map(market => ({
+      const enrichedMarkets = allMarkets.map(market => ({
         ...market,
         price_history: null, // Fetched on demand
         orderbook: null, // Fetched on demand
@@ -74,8 +86,12 @@ const Terminal = ({ onLogout, authInfo }) => {
         return enrichedMarkets.length > 0 ? enrichedMarkets[0] : null;
       });
       setLastRefresh(new Date());
-      setStatusMessage(`${enrichedMarkets.length} markets`);
-      setTimeout(() => setStatusMessage(""), 2000);
+      
+      // Show platform breakdown in status
+      const polyCount = polymarketData.length;
+      const kalshiCount = kalshiData.length;
+      setStatusMessage(`${enrichedMarkets.length} markets (P:${polyCount} K:${kalshiCount})`);
+      setTimeout(() => setStatusMessage(""), 3000);
     } catch (error) {
       console.error('Failed to load markets:', error);
       setStatusMessage("Sync failed");
@@ -94,11 +110,24 @@ const Terminal = ({ onLogout, authInfo }) => {
     ));
 
     try {
-      // Fetch real data from CLOB API
-      const [priceHistory, orderbook] = await Promise.all([
-        market.marketId ? PolymarketAPI.fetchPriceHistory(market.marketId, 90) : null,
-        market.clobTokenIds?.[0] ? PolymarketAPI.fetchOrderbook(market.clobTokenIds[0]) : null,
-      ]);
+      let priceHistory, orderbook;
+      
+      // Use different APIs based on platform
+      const isKalshi = market.platform === 'Kalshi' || market._source === 'kalshi';
+      
+      if (isKalshi) {
+        // Fetch from Kalshi API
+        [priceHistory, orderbook] = await Promise.all([
+          market.marketId ? KalshiAPI.fetchPriceHistory(market.marketId, 90) : null,
+          market.marketId ? KalshiAPI.fetchOrderbook(market.marketId) : null,
+        ]);
+      } else {
+        // Fetch from Polymarket CLOB API
+        [priceHistory, orderbook] = await Promise.all([
+          market.marketId ? PolymarketAPI.fetchPriceHistory(market.marketId, 90) : null,
+          market.clobTokenIds?.[0] ? PolymarketAPI.fetchOrderbook(market.clobTokenIds[0]) : null,
+        ]);
+      }
 
       // Calculate prev_prob from price history if available
       let prevProb = null;
@@ -168,7 +197,7 @@ const Terminal = ({ onLogout, authInfo }) => {
     loadMarkets(newLimit, true);
   };
 
-  // Handle loading market from URL
+  // Handle loading market from URL (supports both Polymarket and Kalshi)
   const loadMarketFromUrl = async (url) => {
     if (!url.trim()) return;
 
@@ -176,7 +205,18 @@ const Terminal = ({ onLogout, authInfo }) => {
       setLoadingUrl(true);
       setStatusMessage("Loading...");
 
-      const market = await PolymarketAPI.fetchEventBySlug(url);
+      let market;
+      const isKalshi = KalshiAPI.isKalshiUrl(url);
+      
+      if (isKalshi) {
+        // Load from Kalshi
+        market = await KalshiAPI.fetchEventByTicker(url);
+        setStatusMessage(`Kalshi: ${market.ticker}`);
+      } else {
+        // Load from Polymarket
+        market = await PolymarketAPI.fetchEventBySlug(url);
+        setStatusMessage(`Polymarket: ${market.ticker}`);
+      }
 
       // Market starts with pending data status - will be fetched when selected
       const enrichedMarket = {
@@ -196,11 +236,10 @@ const Terminal = ({ onLogout, authInfo }) => {
 
       setSelectedMarket(enrichedMarket);
       // This will trigger fetchMarketData via useEffect
-      setStatusMessage(`Loaded: ${market.ticker}`);
       setTimeout(() => setStatusMessage(""), 2000);
     } catch (error) {
       console.error('Failed to load market from URL:', error);
-      setStatusMessage("Failed - check URL");
+      setStatusMessage("Failed - check URL/ticker");
       setTimeout(() => setStatusMessage(""), 3000);
     } finally {
       setLoadingUrl(false);
@@ -211,7 +250,15 @@ const Terminal = ({ onLogout, authInfo }) => {
     if (e.key === "Enter" && command) {
       const cmd = command.trim();
 
-      if (cmd.includes('polymarket.com')) {
+      // Handle Polymarket or Kalshi URLs
+      if (cmd.includes('polymarket.com') || cmd.includes('kalshi.com')) {
+        loadMarketFromUrl(cmd);
+        setCommand("");
+        return;
+      }
+      
+      // Handle Kalshi tickers (start with KX)
+      if (cmd.toUpperCase().startsWith('KX')) {
         loadMarketFromUrl(cmd);
         setCommand("");
         return;
@@ -376,12 +423,16 @@ const Terminal = ({ onLogout, authInfo }) => {
     return markets.slice(0, 20).map((m) => {
       const edge = m.model_prob - m.market_prob;
       const change = m.market_prob - (m.prev_prob || m.market_prob);
+      const isKalshi = m.platform === 'Kalshi';
       return (
         <span
           key={m.id}
           className="inline-flex items-center gap-1.5 mx-4 text-xs cursor-pointer hover:bg-gray-800/50 px-2 py-0.5 rounded"
           onClick={() => setSelectedMarket(m)}
         >
+          <span className={`text-[9px] px-1 rounded ${isKalshi ? 'bg-purple-500/30 text-purple-400' : 'bg-blue-500/30 text-blue-400'}`}>
+            {isKalshi ? 'K' : 'P'}
+          </span>
           <span className="text-orange-500 font-bold">{m.ticker}</span>
           <span className="text-white font-medium">{(m.market_prob * 100).toFixed(1)}¢</span>
           <span className={change > 0 ? "text-green-400" : change < 0 ? "text-red-400" : "text-gray-500"}>
@@ -558,6 +609,8 @@ const Terminal = ({ onLogout, authInfo }) => {
             <span className="text-orange-400 animate-pulse">{statusMessage}</span>
           )}
           <span className="text-gray-600">POLYMARKET</span>
+          <span className="text-gray-700">|</span>
+          <span className="text-gray-600">KALSHI</span>
           <span className="mono text-orange-500 font-medium">{time.toLocaleTimeString()}</span>
           <button
             onClick={onLogout}
@@ -572,9 +625,9 @@ const Terminal = ({ onLogout, authInfo }) => {
       {/* Bloomberg-style Ticker Tape */}
       <div className="ticker-tape h-6 flex items-center text-xs mono flex-shrink-0 bg-[#050505] border-b border-gray-800">
         {loadingMarkets ? (
-          <span className="text-gray-500 px-4">Loading live markets...</span>
+          <span className="text-gray-500 px-4">Loading markets from Polymarket & Kalshi...</span>
         ) : markets.length === 0 ? (
-          <span className="text-gray-500 px-4">No markets loaded - paste a Polymarket URL below</span>
+          <span className="text-gray-500 px-4">No markets loaded - paste a Polymarket/Kalshi URL or ticker below</span>
         ) : (
           <div className="ticker-content">{tickerItems}{tickerItems}</div>
         )}
@@ -588,9 +641,27 @@ const Terminal = ({ onLogout, authInfo }) => {
           value={command}
           onChange={(e) => setCommand(e.target.value)}
           onKeyDown={handleCommand}
-          placeholder="Paste Polymarket URL or enter ticker..."
+          placeholder="Paste Polymarket/Kalshi URL or enter ticker (e.g., KXELONMARS-99)..."
           className="flex-1 px-2 py-1 text-xs bg-transparent border-none outline-none text-gray-300 placeholder-gray-600"
         />
+
+        {/* Platform Filter */}
+        <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
+          <span className="text-[10px] text-gray-500">SRC:</span>
+          {['all', 'polymarket', 'kalshi'].map(plat => (
+            <button
+              key={plat}
+              onClick={() => setPlatformFilter(plat)}
+              className={`text-[10px] px-1.5 py-0.5 rounded transition-all ${
+                platformFilter === plat
+                  ? 'bg-orange-500 text-black font-bold'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {plat === 'all' ? 'ALL' : plat === 'polymarket' ? 'PM' : 'KA'}
+            </button>
+          ))}
+        </div>
 
         {/* Market Limit Selector */}
         <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
