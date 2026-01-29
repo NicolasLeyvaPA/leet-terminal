@@ -114,7 +114,6 @@ export const NewsFeedPanel = ({ news, onNewsClick, fullPage = false, loading = f
                       <div className="flex flex-wrap gap-2">
                         <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">Polymarket</span>
                         <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded">Kalshi</span>
-                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">Manifold</span>
                       </div>
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-800">

@@ -5,6 +5,8 @@
  * Docs: https://docs.polymarket.com/#websocket-api
  */
 
+import { useState, useEffect } from 'react';
+
 const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 
 class PolymarketWebSocket {
@@ -384,6 +386,3 @@ export function usePolymarketPrice(tokenId) {
 
   return { price, status };
 }
-
-// Need to import useState and useEffect for the hook
-import { useState, useEffect } from 'react';

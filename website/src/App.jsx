@@ -130,7 +130,7 @@ const Terminal = ({ onLogout, authInfo }) => {
     return () => clearInterval(interval);
   }, [markets.length > 0 ? 'loaded' : 'empty']); // Re-run when markets are loaded
 
-  // Load markets from Polymarket, Kalshi, AND Manifold APIs with REAL data
+  // Load markets from Polymarket and Kalshi APIs with REAL data
   const loadMarkets = useCallback(async (limit = marketLimit, isManual = false) => {
     try {
       if (isManual) setLoadingMarkets(true);

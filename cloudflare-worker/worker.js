@@ -19,10 +19,10 @@ const ALLOWED_API_HOSTS = [
   'gamma-api.polymarket.com',
   'clob.polymarket.com',
   'api.elections.kalshi.com',
-  'api.manifold.markets',
   'trading-api.kalshi.com',
   'newsapi.org',
   'gnews.io',
+  'api.parallel.ai',
 ];
 
 // Rate limiting (per IP, per minute)
