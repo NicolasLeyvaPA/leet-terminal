@@ -17,6 +17,7 @@ import { PortfolioPanel } from './components/panels/PortfolioPanel';
 import { QuantumLabPanel } from './components/panels/QuantumLabPanel';
 import { NewsFeedPanel } from './components/panels/NewsFeedPanel';
 import { BetsMarketPanel } from './components/panels/BetsMarketPanel';
+import { ResearchPanel } from './components/panels/ResearchPanel';
 import { MarketDetailDock } from './components/MarketDetailDock';
 import { useWatchlist } from './utils/useWatchlist';
 import Login from './components/Login';
@@ -593,6 +594,28 @@ const Terminal = ({ onLogout, authInfo }) => {
       );
     }
 
+    if (workspace === "research") {
+      return (
+        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+          <div className="col-span-2 row-span-2 min-h-0 overflow-hidden">
+            <PanelErrorBoundary panelName="Research">
+              <ResearchPanel market={selectedMarket} />
+            </PanelErrorBoundary>
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <PanelErrorBoundary panelName="Market Overview">
+              <MarketOverviewPanel market={selectedMarket} />
+            </PanelErrorBoundary>
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <PanelErrorBoundary panelName="Price Chart">
+              <PriceChartPanel market={selectedMarket} />
+            </PanelErrorBoundary>
+          </div>
+        </div>
+      );
+    }
+
     if (workspace === "portfolio") {
       return (
         <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
@@ -691,7 +714,7 @@ const Terminal = ({ onLogout, authInfo }) => {
           </div>
           <div className="h-4 w-px bg-gray-700" />
           <div className="flex">
-            {["analysis", "portfolio", "lab", "news", "bets"].map((ws) => (
+            {["analysis", "research", "portfolio", "lab", "news", "bets"].map((ws) => (
               <button
                 key={ws}
                 onClick={() => setWorkspace(ws)}
