@@ -3,6 +3,8 @@ import { PORTFOLIO_POSITIONS } from './data/constants';
 import { PolymarketAPI } from './services/polymarketAPI';
 import { KalshiAPI } from './services/kalshiAPI';
 import { ManifoldAPI } from './services/manifoldAPI';
+import { NewsAPI } from './services/newsAPI';
+import { polymarketWS } from './services/polymarketWebSocket';
 import { WatchlistPanel } from './components/panels/WatchlistPanel';
 import { MarketOverviewPanel } from './components/panels/MarketOverviewPanel';
 import { PriceChartPanel } from './components/panels/PriceChartPanel';
@@ -51,7 +53,82 @@ const Terminal = ({ onLogout, authInfo }) => {
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [wsStatus, setWsStatus] = useState('disconnected');
+  const [news, setNews] = useState([]);
+  const [newsLoading, setNewsLoading] = useState(false);
   const dragStateRef = useRef({ type: null, startX: 0, startY: 0, startVal: 0 });
+  const wsSubscriptions = useRef(new Map());
+
+  // WebSocket status listener
+  useEffect(() => {
+    const unsubscribe = polymarketWS.onStatusChange(setWsStatus);
+    return () => unsubscribe();
+  }, []);
+
+  // Subscribe to WebSocket for selected Polymarket market
+  useEffect(() => {
+    if (!selectedMarket) return;
+    
+    // Only subscribe to Polymarket markets
+    if (selectedMarket.platform !== 'Polymarket' || !selectedMarket.clobTokenIds?.[0]) return;
+    
+    const tokenId = selectedMarket.clobTokenIds[0];
+    
+    // Clean up previous subscription for this market
+    if (wsSubscriptions.current.has(selectedMarket.id)) {
+      wsSubscriptions.current.get(selectedMarket.id)();
+      wsSubscriptions.current.delete(selectedMarket.id);
+    }
+    
+    // Subscribe to real-time updates
+    const unsubscribe = polymarketWS.subscribe(tokenId, (data) => {
+      if (data.type === 'price' || data.type === 'trade') {
+        // Update market price in real-time
+        setMarkets(prev => prev.map(m => 
+          m.id === selectedMarket.id 
+            ? { ...m, market_prob: data.price, _wsUpdated: Date.now() }
+            : m
+        ));
+        setSelectedMarket(prev => 
+          prev?.id === selectedMarket.id
+            ? { ...prev, market_prob: data.price, _wsUpdated: Date.now() }
+            : prev
+        );
+      }
+    });
+    
+    wsSubscriptions.current.set(selectedMarket.id, unsubscribe);
+    
+    return () => {
+      if (wsSubscriptions.current.has(selectedMarket.id)) {
+        wsSubscriptions.current.get(selectedMarket.id)();
+        wsSubscriptions.current.delete(selectedMarket.id);
+      }
+    };
+  }, [selectedMarket?.id, selectedMarket?.clobTokenIds]);
+
+  // Load news on mount and periodically
+  useEffect(() => {
+    const loadNews = async () => {
+      if (!NewsAPI.isConfigured()) return;
+      
+      setNewsLoading(true);
+      try {
+        const articles = await NewsAPI.fetchMarketNews({ limit: 30 });
+        const matchedNews = NewsAPI.matchNewsToMarkets(articles, markets);
+        setNews(matchedNews);
+      } catch (error) {
+        console.warn('Failed to load news:', error.message);
+      } finally {
+        setNewsLoading(false);
+      }
+    };
+
+    loadNews();
+    // Refresh news every 5 minutes
+    const interval = setInterval(loadNews, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [markets.length > 0 ? 'loaded' : 'empty']); // Re-run when markets are loaded
 
   // Load markets from Polymarket, Kalshi, AND Manifold APIs with REAL data
   const loadMarkets = useCallback(async (limit = marketLimit, isManual = false) => {
@@ -563,7 +640,7 @@ const Terminal = ({ onLogout, authInfo }) => {
     if (workspace === "news") {
       return (
         <div className="h-full overflow-hidden">
-          <NewsFeedPanel news={[]} onNewsClick={handleNewsSelect} fullPage />
+          <NewsFeedPanel news={news} onNewsClick={handleNewsSelect} fullPage loading={newsLoading} />
         </div>
       );
     }
@@ -776,6 +853,14 @@ const Terminal = ({ onLogout, authInfo }) => {
             <span className={`w-2 h-2 rounded-full ${loadingMarkets ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`} />
             <span className="text-gray-500">{loadingMarkets ? 'SYNCING' : 'LIVE'}</span>
           </span>
+          <span className="flex items-center gap-1.5" title="WebSocket real-time feed">
+            <span className={`w-2 h-2 rounded-full ${
+              wsStatus === 'connected' ? 'bg-cyan-500' : 
+              wsStatus === 'connecting' || wsStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' : 
+              'bg-gray-600'
+            }`} />
+            <span className="text-gray-500">WS</span>
+          </span>
           <span className="text-gray-600">
             Markets: <span className="text-orange-400 font-medium">{filteredMarkets.length}</span>
             {categoryFilter !== 'all' && <span className="text-gray-500">/{markets.length}</span>}
@@ -785,19 +870,19 @@ const Terminal = ({ onLogout, authInfo }) => {
               {filteredMarkets.filter((m) => Math.abs(m.model_prob - m.market_prob) > 0.03).length}
             </span>
           </span>
-          <span className="text-gray-600">
-            Refresh: <span className="text-gray-500">15s</span>
-          </span>
           {selectedMarket && (
             <span className="text-gray-600">
               <span className="text-orange-400">{selectedMarket.ticker}</span>
+              {selectedMarket._wsUpdated && (
+                <span className="text-cyan-500 ml-1" title="Real-time price">●</span>
+              )}
             </span>
           )}
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-orange-500/70 font-medium">LEET QUANTUM TERMINAL</span>
+          <span className="text-orange-500/70 font-medium">LEET TERMINAL</span>
           <span className="text-yellow-500/80">ANALYSIS ONLY</span>
-          <span className="text-gray-600">v3.1.0</span>
+          <span className="text-gray-600">v4.0.0</span>
         </div>
       </div>
     </div>

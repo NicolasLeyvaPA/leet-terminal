@@ -98,6 +98,16 @@ export const PriceChart = ({ data }) => {
     );
   }
 
+  // Show message when no data
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-gray-600 text-xs">
+        <div className="text-gray-500 mb-1">○ No Price History</div>
+        <div className="text-gray-700 text-[10px]">Data unavailable from API</div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full">
       <canvas ref={canvasRef} className="h-full w-full" />
