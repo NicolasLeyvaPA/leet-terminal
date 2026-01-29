@@ -1,7 +1,28 @@
 import { PanelHeader } from '../PanelHeader';
+import { NewsAPI } from '../../services/newsAPI';
 
-export const NewsFeedPanel = ({ news, onNewsClick, fullPage = false }) => {
-  // Empty state - Bloomberg style information display
+export const NewsFeedPanel = ({ news, onNewsClick, fullPage = false, loading = false }) => {
+  const isConfigured = NewsAPI.isConfigured();
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="terminal-panel h-full">
+        <PanelHeader
+          title="NEWS & MARKET INTELLIGENCE"
+          subtitle="Loading..."
+        />
+        <div className="panel-content flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="text-orange-500 animate-pulse text-lg mb-2">Loading News...</div>
+            <div className="text-gray-500 text-xs">Fetching from news sources</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state - show help or API configuration prompt
   if (!news || news.length === 0) {
     if (fullPage) {
       return (
@@ -43,56 +64,38 @@ export const NewsFeedPanel = ({ news, onNewsClick, fullPage = false }) => {
                 </div>
               </div>
 
-              {/* Features */}
+              {/* News API Setup */}
               <div className="flex flex-col">
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-t px-4 py-3">
-                  <span className="text-blue-400 text-sm font-bold">ANALYSIS FEATURES</span>
+                <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-t px-4 py-3">
+                  <span className="text-cyan-400 text-sm font-bold">
+                    {isConfigured ? 'NEWS FEED ACTIVE' : 'ENABLE NEWS FEED'}
+                  </span>
                 </div>
                 <div className="flex-1 bg-[#050505] border-x border-b border-gray-800 rounded-b p-4">
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-2">
-                      <span className="text-green-400 text-xs">+</span>
-                      <div>
-                        <div className="text-gray-300 text-xs font-medium">Edge Detection</div>
-                        <div className="text-gray-600 text-xs">Model vs market probability analysis</div>
+                  {isConfigured ? (
+                    <div className="space-y-3">
+                      <div className="text-green-400 text-sm">✓ News API configured</div>
+                      <div className="text-gray-400 text-xs">
+                        No news articles found matching prediction market topics. 
+                        News updates every 5 minutes.
                       </div>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-green-400 text-xs">+</span>
-                      <div>
-                        <div className="text-gray-300 text-xs font-medium">Kelly Criterion</div>
-                        <div className="text-gray-600 text-xs">Optimal position sizing</div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="text-gray-400 text-xs">
+                        Add news API keys to your .env file to enable the news feed:
+                      </div>
+                      <div className="bg-gray-900 rounded p-3 text-xs font-mono space-y-1">
+                        <div className="text-gray-500"># Get free key from newsapi.org</div>
+                        <div className="text-cyan-400">VITE_NEWS_API_KEY=your_key</div>
+                        <div className="text-gray-500 mt-2"># Or from gnews.io</div>
+                        <div className="text-cyan-400">VITE_GNEWS_API_KEY=your_key</div>
+                      </div>
+                      <div className="text-gray-500 text-xs mt-2">
+                        Free tiers: 100 requests/day each
                       </div>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-green-400 text-xs">+</span>
-                      <div>
-                        <div className="text-gray-300 text-xs font-medium">Monte Carlo Simulation</div>
-                        <div className="text-gray-600 text-xs">5,000 simulations for risk analysis</div>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-green-400 text-xs">+</span>
-                      <div>
-                        <div className="text-gray-300 text-xs font-medium">Options Greeks</div>
-                        <div className="text-gray-600 text-xs">Delta, Gamma, Theta, Vega</div>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-green-400 text-xs">+</span>
-                      <div>
-                        <div className="text-gray-300 text-xs font-medium">Confluence Analysis</div>
-                        <div className="text-gray-600 text-xs">Multi-factor signal aggregation</div>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-green-400 text-xs">+</span>
-                      <div>
-                        <div className="text-gray-300 text-xs font-medium">Order Book Analysis</div>
-                        <div className="text-gray-600 text-xs">Depth visualization & imbalance</div>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
@@ -104,21 +107,21 @@ export const NewsFeedPanel = ({ news, onNewsClick, fullPage = false }) => {
                 <div className="flex-1 bg-[#050505] border-x border-b border-gray-800 rounded-b p-4">
                   <div className="space-y-4">
                     <div className="text-gray-400 text-xs">
-                      Markets are loaded automatically from Polymarket API. Check the BETS tab to browse all open markets.
+                      Markets are loaded automatically. Check the BETS tab to browse all open markets.
                     </div>
                     <div className="border border-gray-800 rounded p-3">
-                      <div className="text-gray-500 text-xs mb-2">EXAMPLE URLS</div>
-                      <div className="space-y-2 text-xs font-mono">
-                        <div className="text-orange-400 break-all">polymarket.com/event/will-the-us-invade-venezuela-in-2025</div>
-                        <div className="text-orange-400 break-all">polymarket.com/event/bitcoin-above-100k</div>
-                        <div className="text-orange-400 break-all">polymarket.com/event/presidential-election</div>
+                      <div className="text-gray-500 text-xs mb-2">SUPPORTED PLATFORMS</div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">Polymarket</span>
+                        <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded">Kalshi</span>
+                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">Manifold</span>
                       </div>
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-800">
-                      <div className="text-gray-500 text-xs mb-2">DATA SOURCES</div>
+                      <div className="text-gray-500 text-xs mb-2">FEATURES</div>
                       <div className="flex flex-wrap gap-2">
-                        <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded">Polymarket API</span>
                         <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded">Real-time Prices</span>
+                        <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded">WebSocket</span>
                         <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded">Order Book</span>
                       </div>
                     </div>
@@ -135,58 +138,95 @@ export const NewsFeedPanel = ({ news, onNewsClick, fullPage = false }) => {
       <div className="terminal-panel h-full flex items-center justify-center text-gray-600 text-xs">
         <div className="text-center p-4">
           <div className="text-orange-500 mb-2 font-bold">NO NEWS DATA</div>
-          <div className="text-gray-500">News feed requires external API</div>
+          <div className="text-gray-500">
+            {isConfigured ? 'No matching articles found' : 'Configure NEWS_API_KEY in .env'}
+          </div>
         </div>
       </div>
     );
   }
 
   // Group news by sentiment for full page view
-  const positiveNews = news.filter(item => item.sentiment > 0.1);
-  const negativeNews = news.filter(item => item.sentiment < -0.1);
-  const neutralNews = news.filter(item => item.sentiment >= -0.1 && item.sentiment <= 0.1);
+  const positiveNews = news.filter(item => item.sentiment === 'bullish');
+  const negativeNews = news.filter(item => item.sentiment === 'bearish');
+  const neutralNews = news.filter(item => item.sentiment === 'neutral' || !item.sentiment);
+
+  // Format time ago
+  const formatTimeAgo = (timestamp) => {
+    if (!timestamp) return '';
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return 'just now';
+  };
 
   const NewsItem = ({ item }) => (
     <div
       className={`news-item px-3 py-2.5 border-b border-gray-900 cursor-pointer hover:bg-gray-900/70 transition-colors ${
-        item.sentiment > 0.3
-          ? "news-positive"
-          : item.sentiment < -0.3
-          ? "news-negative"
-          : "news-neutral"
+        item.sentiment === 'bullish'
+          ? "border-l-2 border-l-green-500/50"
+          : item.sentiment === 'bearish'
+          ? "border-l-2 border-l-red-500/50"
+          : "border-l-2 border-l-gray-700"
       }`}
-      onClick={() => onNewsClick && onNewsClick(item)}
+      onClick={() => {
+        if (item.url) {
+          window.open(item.url, '_blank');
+        }
+        if (onNewsClick) onNewsClick(item);
+      }}
     >
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs text-orange-500 font-medium">
           {item.source}
         </span>
         <span className="text-xs text-gray-600">
-          {item.time}
+          {formatTimeAgo(item.timestamp)}
         </span>
       </div>
-      <div className="text-sm text-gray-300 leading-snug mb-2">
+      <div className="text-sm text-gray-300 leading-snug mb-2 line-clamp-2">
         {item.title}
       </div>
+      {item.description && (
+        <div className="text-xs text-gray-500 mb-2 line-clamp-1">
+          {item.description}
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <span
-          className={`text-xs font-medium ${
-            item.sentiment > 0 ? "positive" : item.sentiment < 0 ? "negative" : "text-gray-500"
+          className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+            item.sentiment === 'bullish' 
+              ? "bg-green-500/20 text-green-400" 
+              : item.sentiment === 'bearish' 
+              ? "bg-red-500/20 text-red-400" 
+              : "bg-gray-700 text-gray-400"
           }`}
         >
-          {item.sentiment > 0 ? "+" : item.sentiment < 0 ? "-" : ""}{" "}
-          {Math.abs(item.sentiment * 100).toFixed(0)}% sentiment
+          {item.sentiment || 'neutral'}
         </span>
-        <div className="flex gap-1.5 flex-wrap">
-          {item.markets?.map((t) => (
-            <span
-              key={t}
-              className="text-xs text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20 hover:bg-orange-500/20"
-            >
-              {t}
-            </span>
-          ))}
-        </div>
+        {item.category && (
+          <span className="text-xs text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">
+            {item.category}
+          </span>
+        )}
+        {item.markets?.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap">
+            {item.markets.slice(0, 3).map((t) => (
+              <span
+                key={t}
+                className="text-xs text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -196,7 +236,7 @@ export const NewsFeedPanel = ({ news, onNewsClick, fullPage = false }) => {
       <div className="terminal-panel h-full">
         <PanelHeader
           title="NEWS & SOCIAL FEED"
-          subtitle={`${news.length} articles • LEET QUANTUM TERMINAL`}
+          subtitle={`${news.length} articles • LEET TERMINAL`}
         />
         <div className="panel-content">
           <div className="grid grid-cols-3 gap-1.5 h-full p-1.5">
@@ -253,9 +293,9 @@ export const NewsFeedPanel = ({ news, onNewsClick, fullPage = false }) => {
   // Compact view for sidebar usage
   return (
     <div className="terminal-panel h-full">
-      <PanelHeader title="NEWS & SOCIAL" subtitle="Live feed" />
-      <div className="panel-content">
-        {news.map((item) => (
+      <PanelHeader title="NEWS & SOCIAL" subtitle={`${news.length} articles`} />
+      <div className="panel-content overflow-y-auto">
+        {news.slice(0, 10).map((item) => (
           <NewsItem key={item.id} item={item} />
         ))}
       </div>

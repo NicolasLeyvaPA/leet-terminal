@@ -1,30 +1,61 @@
 // Polymarket API Service - Real market data integration
+// v2.0 - With caching, rate limiting, and honest data handling
 import { sanitizeText, sanitizeUrl } from '../utils/sanitize';
+import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
 
 const GAMMA_API = 'https://gamma-api.polymarket.com';
 const CLOB_API = 'https://clob.polymarket.com';
 
-// CORS proxy options (fallbacks if direct/vite proxy fails)
-// NOTE: These are public proxies and may be unreliable or rate-limited
-// For production, consider setting up your own proxy server
+// Use custom CORS proxy if configured, otherwise fallback chain
+const CORS_PROXY = import.meta.env.VITE_CORS_PROXY_URL || '';
+
+// Fallback CORS proxies (public, less reliable)
 const CORS_PROXIES = [
-  // corsproxy.io - generally reliable
   (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  // allorigins - alternative
   (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
 ];
 
-// Track proxy failures to avoid repeated attempts to dead proxies
+// Track proxy failures to avoid repeated attempts
 const proxyFailures = new Map();
-const PROXY_FAILURE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+const PROXY_FAILURE_TIMEOUT = 5 * 60 * 1000;
 
-// Helper to handle API calls with CORS fallback
+// Cache TTLs
+const CACHE_TTL = {
+  MARKETS: 30 * 1000,        // 30 seconds for market list
+  PRICE_HISTORY: 60 * 1000,  // 1 minute for price history
+  ORDERBOOK: 10 * 1000,      // 10 seconds for orderbook (stale quickly)
+  EVENT: 60 * 1000,          // 1 minute for single event
+};
+
+/**
+ * Fetch with CORS proxy fallback and caching
+ */
 async function fetchWithFallback(url, options = {}) {
-  // First try: Vite proxy in development
-  if (import.meta.env.DEV) {
-    const proxyUrl = url
-      .replace(GAMMA_API, '/api/polymarket')
-      .replace(CLOB_API, '/api/clob');
+  const cacheKey = `polymarket:${url}`;
+  const cacheTtl = options.cacheTtl || CACHE_TTL.MARKETS;
+  
+  // Check cache first
+  const cached = getCached(cacheKey);
+  if (cached !== null) {
+    return cached;
+  }
+
+  // Rate limit
+  await waitForRateLimit('polymarket', 300);
+
+  // Build proxy URL if using custom proxy
+  const getProxyUrl = (targetUrl) => {
+    if (CORS_PROXY) {
+      return `${CORS_PROXY}?url=${encodeURIComponent(targetUrl)}`;
+    }
+    return targetUrl;
+  };
+
+  // First try: Custom proxy or Vite proxy in development
+  if (CORS_PROXY || import.meta.env.DEV) {
+    const proxyUrl = CORS_PROXY 
+      ? getProxyUrl(url)
+      : url.replace(GAMMA_API, '/api/polymarket').replace(CLOB_API, '/api/clob');
 
     try {
       const response = await fetch(proxyUrl, {
@@ -35,11 +66,12 @@ async function fetchWithFallback(url, options = {}) {
         },
       });
       if (response.ok) {
-        return await response.json();
+        const data = await response.json();
+        setCache(cacheKey, data, cacheTtl);
+        return data;
       }
-      console.warn(`Vite proxy returned ${response.status}, trying fallbacks...`);
     } catch (error) {
-      console.warn('Vite proxy failed:', error.message);
+      console.warn('Primary proxy failed:', error.message);
     }
   }
 
@@ -53,28 +85,28 @@ async function fetchWithFallback(url, options = {}) {
       },
     });
     if (response.ok) {
-      return await response.json();
+      const data = await response.json();
+      setCache(cacheKey, data, cacheTtl);
+      return data;
     }
   } catch (error) {
     console.warn('Direct fetch failed:', error.message);
   }
 
-  // Third try: CORS proxies as fallback
+  // Third try: Fallback CORS proxies
   for (let i = 0; i < CORS_PROXIES.length; i++) {
     const makeProxyUrl = CORS_PROXIES[i];
     const proxyKey = `proxy_${i}`;
     
-    // Skip proxies that have recently failed
     const lastFailure = proxyFailures.get(proxyKey);
     if (lastFailure && Date.now() - lastFailure < PROXY_FAILURE_TIMEOUT) {
-      console.warn(`Skipping proxy ${i} (recently failed)`);
       continue;
     }
     
     try {
       const proxyUrl = makeProxyUrl(url);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       
       const response = await fetch(proxyUrl, {
         ...options,
@@ -90,27 +122,26 @@ async function fetchWithFallback(url, options = {}) {
       if (response.ok) {
         const text = await response.text();
         try {
-          // Clear failure record on success
           proxyFailures.delete(proxyKey);
-          return JSON.parse(text);
+          const data = JSON.parse(text);
+          setCache(cacheKey, data, cacheTtl);
+          return data;
         } catch {
-          console.warn('Proxy returned non-JSON response');
           continue;
         }
       }
     } catch (error) {
       console.warn(`CORS proxy ${i} failed:`, error.message);
-      // Record failure
       proxyFailures.set(proxyKey, Date.now());
-      continue;
     }
   }
 
-  // All methods failed
-  throw new Error(`Failed to fetch from ${url}. All proxy methods exhausted.`);
+  throw new Error(`Failed to fetch from ${url}. All methods exhausted.`);
 }
 
-// Extract event slug from Polymarket URL
+/**
+ * Extract event slug from Polymarket URL
+ */
 export function extractEventSlug(url) {
   try {
     const urlObj = new URL(url);
@@ -125,52 +156,56 @@ export function extractEventSlug(url) {
   }
 }
 
-// Fetch event by slug
+/**
+ * Fetch event by slug
+ */
 export async function fetchEventBySlug(slug) {
   const cleanSlug = extractEventSlug(slug);
   const url = `${GAMMA_API}/events?slug=${cleanSlug}`;
 
-  try {
-    const data = await fetchWithFallback(url);
+  const data = await fetchWithFallback(url, { cacheTtl: CACHE_TTL.EVENT });
 
-    if (Array.isArray(data) && data.length > 0) {
-      return transformEventToMarket(data[0]);
-    }
-    throw new Error('Event not found');
-  } catch (error) {
-    console.error('Error loading market:', error.message);
-    throw error;
+  if (Array.isArray(data) && data.length > 0) {
+    return transformEventToMarket(data[0]);
   }
+  throw new Error('Event not found');
 }
 
-// Fetch all open events
+/**
+ * Fetch all open events
+ */
 export async function fetchOpenEvents(limit = 50) {
   const url = `${GAMMA_API}/events?closed=false&order=volume&ascending=false&limit=${limit}`;
 
   try {
-    const data = await fetchWithFallback(url);
+    const data = await fetchWithFallback(url, { cacheTtl: CACHE_TTL.MARKETS });
 
     if (!Array.isArray(data)) {
-      console.warn('Unexpected response format, returning empty array');
+      console.warn('Unexpected response format');
       return [];
     }
     return data.map(transformEventToMarket).filter(Boolean);
   } catch (error) {
     console.error('Error loading markets:', error.message);
-    // Return empty array instead of throwing to prevent app crash
     return [];
   }
 }
 
-// Fetch market price history
+/**
+ * Fetch market price history
+ * Returns null if data unavailable (NO FAKE DATA)
+ */
 export async function fetchPriceHistory(marketId, days = 90) {
+  if (!marketId) return null;
+  
   try {
     const endTs = Math.floor(Date.now() / 1000);
     const startTs = endTs - (days * 24 * 60 * 60);
     const url = `${CLOB_API}/prices-history?market=${marketId}&startTs=${startTs}&endTs=${endTs}&fidelity=60`;
-    const data = await fetchWithFallback(url);
+    
+    const data = await fetchWithFallback(url, { cacheTtl: CACHE_TTL.PRICE_HISTORY });
 
-    if (data && data.history) {
+    if (data && data.history && data.history.length > 0) {
       return data.history.map(point => ({
         date: new Date(point.t * 1000).toISOString().split('T')[0],
         time: point.t * 1000,
@@ -178,32 +213,44 @@ export async function fetchPriceHistory(marketId, days = 90) {
         volume: 0,
         high: parseFloat(point.p),
         low: parseFloat(point.p),
+        isReal: true,
       }));
     }
-    return generateFallbackPriceHistory(0.5, days);
+    
+    // NO FAKE DATA - return null if unavailable
+    return null;
   } catch (error) {
-    console.warn('Failed to fetch price history:', error);
-    return generateFallbackPriceHistory(0.5, days);
+    console.warn('Failed to fetch price history:', error.message);
+    return null;
   }
 }
 
-// Fetch orderbook
+/**
+ * Fetch orderbook
+ * Returns null if data unavailable (NO FAKE DATA)
+ */
 export async function fetchOrderbook(tokenId) {
+  if (!tokenId) return null;
+  
   try {
     const url = `${CLOB_API}/book?token_id=${tokenId}`;
-    const data = await fetchWithFallback(url);
+    const data = await fetchWithFallback(url, { cacheTtl: CACHE_TTL.ORDERBOOK });
 
-    if (data && data.bids && data.asks) {
+    if (data && data.bids && data.asks && (data.bids.length > 0 || data.asks.length > 0)) {
       return transformOrderbook(data);
     }
-    return generateFallbackOrderbook(0.5);
+    
+    // NO FAKE DATA - return null if unavailable
+    return null;
   } catch (error) {
-    console.warn('Failed to fetch orderbook:', error);
-    return generateFallbackOrderbook(0.5);
+    console.warn('Failed to fetch orderbook:', error.message);
+    return null;
   }
 }
 
-// Transform Polymarket event to our market format
+/**
+ * Transform Polymarket event to our market format
+ */
 function transformEventToMarket(event) {
   if (!event || !event.markets || event.markets.length === 0) return null;
 
@@ -212,7 +259,7 @@ function transformEventToMarket(event) {
   const bestAsk = parseFloat(market.bestAsk) || 0;
   const midPrice = (bestBid + bestAsk) / 2 || parseFloat(market.lastTradePrice) || 0.5;
 
-  // Parse outcomes and prices safely
+  // Parse outcomes safely
   let outcomes = [];
   let outcomePrices = [];
   try {
@@ -220,31 +267,32 @@ function transformEventToMarket(event) {
     outcomePrices = JSON.parse(market.outcomePrices || '[]');
   } catch {}
 
-  // Calculate edge (we'll use a simple model based on volume and price movement)
   const volume24h = parseFloat(market.volume24hr) || 0;
   const volumeTotal = parseFloat(market.volumeNum) || parseFloat(event.volume) || 0;
   const liquidity = parseFloat(market.liquidityNum) || 0;
 
-  // Simple model probability estimation based on market dynamics
-  // In a real system, this would be a sophisticated ML model
-  const modelProb = calculateModelProbability(midPrice, volume24h, liquidity, market);
+  // Calculate signal probability (HONEST: heuristic, not ML)
+  const signalProb = calculateSignalProbability(midPrice, volume24h, liquidity, market);
 
   return {
     id: event.id,
-    // Sanitize all text fields to prevent XSS
     ticker: sanitizeText(event.ticker || generateTicker(event.title), { maxLength: 20, allowNewlines: false }),
     platform: 'Polymarket',
+    _source: 'polymarket',
     question: sanitizeText(event.title, { maxLength: 500 }),
+    title: sanitizeText(event.title, { maxLength: 500 }),
     description: sanitizeText(event.description, { maxLength: 2000 }),
     category: sanitizeText(event.tags?.[0]?.label || 'General', { maxLength: 50, allowNewlines: false }),
     subcategory: sanitizeText(event.tags?.[1]?.label || '', { maxLength: 50, allowNewlines: false }),
 
     // Core pricing
     market_prob: midPrice,
-    model_prob: modelProb,
-    prev_prob: null, // Will be calculated from price history if available
+    // RENAMED: model_prob is now clearly a signal heuristic, not ML
+    model_prob: signalProb,
+    signal_prob: signalProb,
+    prev_prob: null,
 
-    // Market metrics
+    // Market metrics (REAL DATA)
     bestBid,
     bestAsk,
     spread: bestAsk - bestBid,
@@ -268,19 +316,22 @@ function transformEventToMarket(event) {
     outcomes,
     outcomePrices,
 
-    // Generated analysis (will be calculated from real data)
-    factors: generateFactors(midPrice, modelProb, volume24h, liquidity, market),
-    model_breakdown: generateModelBreakdown(modelProb),
+    // Analysis (marked as heuristic)
+    factors: generateFactors(midPrice, signalProb, volume24h, liquidity, market),
+    signal_breakdown: generateSignalBreakdown(midPrice, volume24h, liquidity, market),
+    model_breakdown: generateSignalBreakdown(midPrice, volume24h, liquidity, market), // Backward compat
     greeks: calculateGreeks(midPrice, event.endDate),
-    correlations: {},
-    related_news: [],
 
-    // Raw event data for reference
+    // Metadata
+    _isHeuristic: true,
+    _disclaimer: 'Signal probabilities are heuristics based on market data, not ML predictions',
     _raw: event,
   };
 }
 
-// Generate ticker from title
+/**
+ * Generate ticker from title
+ */
 function generateTicker(title) {
   if (!title) return 'UNKNOWN';
   const words = title.split(' ')
@@ -289,59 +340,51 @@ function generateTicker(title) {
   return words.map(w => w[0]).join('').toUpperCase() || 'MKT';
 }
 
-// Calculate heuristic probability estimate (NOT ML - just market signal analysis)
-// This is a deterministic heuristic based on observable market data
-function calculateHeuristicProbability(marketProb, volume24h, liquidity, market) {
-  // Base: start with market probability (the wisdom of the crowd)
-  let heuristicProb = marketProb;
+/**
+ * Calculate signal probability (HONEST: heuristic, not ML)
+ * Based on observable market data only
+ */
+function calculateSignalProbability(marketProb, volume24h, liquidity, market) {
+  // Base: start with market probability
+  let signalProb = marketProb;
 
-  // Volume momentum factor: high recent volume may indicate informed trading
-  // Max adjustment: +5% if volume > $100k
+  // Volume momentum: high volume may indicate informed trading
   const volumeFactor = Math.min(volume24h / 100000, 0.05);
 
-  // Bid/Ask imbalance: more bids than asks = bullish signal
-  // This is REAL data from the orderbook
+  // Bid/Ask imbalance: real orderbook signal
   const bestBid = parseFloat(market.bestBid) || 0;
   const bestAsk = parseFloat(market.bestAsk) || 0;
   const imbalance = bestBid > 0 && bestAsk > 0
     ? (bestBid / bestAsk - 1) * 0.1
     : 0;
 
-  // Spread factor: tight spread = more liquid/efficient market
+  // Spread factor: tight spread = efficient market
   const spread = bestAsk - bestBid;
   const spreadFactor = spread < 0.02 ? 0.01 : spread > 0.1 ? -0.02 : 0;
 
-  // Combine factors (deterministic - NO random noise)
-  heuristicProb += volumeFactor + imbalance + spreadFactor;
+  // Combine (DETERMINISTIC - no random)
+  signalProb += volumeFactor + imbalance + spreadFactor;
 
-  // Clamp to valid probability range
-  return Math.max(0.01, Math.min(0.99, heuristicProb));
+  return Math.max(0.01, Math.min(0.99, signalProb));
 }
 
-// Alias for backward compatibility
-const calculateModelProbability = calculateHeuristicProbability;
-
-// Generate market signal factors
-// HONEST: Clearly marks which factors have real data vs no data
-function generateFactors(marketProb, heuristicProb, volume24h, liquidity, market) {
-  const edge = heuristicProb - marketProb;
+/**
+ * Generate market signal factors
+ * HONEST: Marks which have real data
+ */
+function generateFactors(marketProb, signalProb, volume24h, liquidity, market) {
+  const edge = signalProb - marketProb;
   const direction = edge > 0.02 ? 'bullish' : edge < -0.02 ? 'bearish' : 'neutral';
 
-  // Calculate REAL orderbook imbalance if we have bid/ask data
   const bestBid = parseFloat(market?.bestBid) || 0;
   const bestAsk = parseFloat(market?.bestAsk) || 0;
   const hasOrderbookData = bestBid > 0 && bestAsk > 0;
   const realImbalance = hasOrderbookData ? bestBid / (bestBid + bestAsk) : null;
 
-  // Volume metrics (REAL data from API)
   const volumeScore = Math.min(volume24h / 200000, 1);
-  const volumeDirection = volumeScore > 0.5 ? 'bullish' : volumeScore < 0.3 ? 'bearish' : 'neutral';
-
-  // Liquidity score (REAL data from API)
   const liqScore = Math.min(liquidity / 1000000, 1);
 
   return {
-    // REAL DATA FACTORS
     orderbook_imbalance: {
       value: hasOrderbookData ? realImbalance : null,
       contribution: hasOrderbookData ? (realImbalance - 0.5) * 0.3 : 0,
@@ -352,7 +395,7 @@ function generateFactors(marketProb, heuristicProb, volume24h, liquidity, market
     volume_trend: {
       value: volumeScore,
       contribution: volumeScore * 0.1,
-      direction: volumeDirection,
+      direction: volumeScore > 0.5 ? 'bullish' : volumeScore < 0.3 ? 'bearish' : 'neutral',
       desc: `24h volume: $${(volume24h / 1000).toFixed(1)}K`,
       isReal: true,
     },
@@ -370,48 +413,38 @@ function generateFactors(marketProb, heuristicProb, volume24h, liquidity, market
       desc: hasOrderbookData ? `Spread: ${((bestAsk - bestBid) * 100).toFixed(2)}%` : 'No spread data',
       isReal: hasOrderbookData,
     },
-    
-    // NO DATA FACTORS - Honestly marked
+    // Factors without data - honestly marked
     news_sentiment: {
       value: null,
       contribution: 0,
       direction: 'unknown',
-      desc: 'News API not connected',
+      desc: 'Connect News API in settings',
       isReal: false,
     },
     social_sentiment: {
       value: null,
       contribution: 0,
       direction: 'unknown',
-      desc: 'Social API not connected',
+      desc: 'Not available',
       isReal: false,
     },
-    historical_pattern: {
-      value: null,
-      contribution: 0,
-      direction: 'unknown',
-      desc: 'Historical analysis not available',
-      isReal: false,
-    },
-    
-    // DERIVED/HEURISTIC FACTORS
-    heuristic_edge: {
+    signal_edge: {
       value: 0.5 + edge,
       contribution: edge * 0.2,
       direction,
-      desc: `Heuristic edge: ${(edge * 100).toFixed(1)}%`,
+      desc: `Signal edge: ${(edge * 100).toFixed(1)}%`,
       isReal: false,
       isHeuristic: true,
     },
   };
 }
 
-// Generate HONEST signal breakdown
-// These are market signals derived from real data, NOT ML predictions
+/**
+ * Generate signal breakdown (renamed from model breakdown)
+ */
 function generateSignalBreakdown(marketProb, volume24h, liquidity, market) {
   const bestBid = parseFloat(market?.bestBid) || 0;
   const bestAsk = parseFloat(market?.bestAsk) || 0;
-  const spread = bestAsk - bestBid;
   const hasOrderbook = bestBid > 0 && bestAsk > 0;
   
   const volumeConfidence = Math.min(volume24h / 100000, 1);
@@ -422,11 +455,11 @@ function generateSignalBreakdown(marketProb, volume24h, liquidity, market) {
       prob: marketProb, 
       weight: 0.50, 
       confidence: 1.0,
-      label: 'Market Consensus',
-      desc: 'Current trading price',
+      label: 'Market Price',
+      desc: 'Current trading price (real)',
       isReal: true,
     },
-    volume_weight: { 
+    volume_signal: { 
       prob: marketProb, 
       weight: 0.25, 
       confidence: volumeConfidence,
@@ -447,7 +480,7 @@ function generateSignalBreakdown(marketProb, volume24h, liquidity, market) {
       weight: 0.10, 
       confidence: hasOrderbook ? 0.7 : 0,
       label: 'Order Flow',
-      desc: hasOrderbook ? `Spread: ${(spread * 100).toFixed(2)}%` : 'No data',
+      desc: hasOrderbook ? `Spread: ${((bestAsk - bestBid) * 100).toFixed(2)}%` : 'No data',
       isReal: hasOrderbook,
     },
     _isHeuristic: true,
@@ -455,56 +488,41 @@ function generateSignalBreakdown(marketProb, volume24h, liquidity, market) {
   };
 }
 
-// Backward compatibility wrapper
-function generateModelBreakdown(modelProb) {
-  // Return structure compatible with old UI, but honestly labeled
-  return {
-    market_price: { prob: modelProb, weight: 0.60, confidence: 1.0 },
-    volume_signal: { prob: modelProb, weight: 0.25, confidence: 0.7 },
-    liquidity_signal: { prob: modelProb, weight: 0.15, confidence: 0.6 },
-    _disclaimer: 'Heuristic signals - no ML models',
-  };
-}
-
-// Calculate Greeks (options-style metrics for prediction markets)
+/**
+ * Calculate Greeks (options-style metrics)
+ */
 function calculateGreeks(marketProb, endDate) {
   const daysToExpiry = endDate
     ? Math.max(1, (new Date(endDate) - new Date()) / (1000 * 60 * 60 * 24))
     : 30;
 
-  // Delta: rate of change of price with respect to outcome probability
-  const delta = marketProb;
-
-  // Gamma: rate of change of delta (highest near 50%)
-  const gamma = 4 * marketProb * (1 - marketProb);
-
-  // Theta: time decay (negative, accelerates near expiry)
-  const theta = -0.01 * (1 / Math.sqrt(daysToExpiry));
-
-  // Vega: sensitivity to volatility
-  const vega = Math.sqrt(marketProb * (1 - marketProb)) * 0.5;
-
-  // Rho: sensitivity to "risk-free rate" (minimal in prediction markets)
-  const rho = 0.01;
-
-  return { delta, gamma, theta, vega, rho };
+  return {
+    delta: marketProb,
+    gamma: 4 * marketProb * (1 - marketProb),
+    theta: -0.01 * (1 / Math.sqrt(daysToExpiry)),
+    vega: Math.sqrt(marketProb * (1 - marketProb)) * 0.5,
+    rho: 0.01,
+  };
 }
 
-// Transform orderbook to our format
+/**
+ * Transform orderbook to our format
+ */
 function transformOrderbook(data) {
-  const bids = (data.bids || []).slice(0, 15).map((bid, i) => ({
+  const bids = (data.bids || []).slice(0, 15).map((bid) => ({
     price: parseFloat(bid.price),
     size: parseFloat(bid.size) * 1000,
     cumulative: 0,
+    isReal: true,
   }));
 
-  const asks = (data.asks || []).slice(0, 15).map((ask, i) => ({
+  const asks = (data.asks || []).slice(0, 15).map((ask) => ({
     price: parseFloat(ask.price),
     size: parseFloat(ask.size) * 1000,
     cumulative: 0,
+    isReal: true,
   }));
 
-  // Calculate cumulative
   let bidCum = 0, askCum = 0;
   bids.forEach(b => { bidCum += b.size; b.cumulative = bidCum; });
   asks.forEach(a => { askCum += a.size; a.cumulative = askCum; });
@@ -516,62 +534,8 @@ function transformOrderbook(data) {
     bids,
     asks,
     imbalance: (totalBids - totalAsks) / (totalBids + totalAsks || 1),
+    isReal: true,
   };
-}
-
-// Fallback generators when API fails
-function generateFallbackPriceHistory(currentPrice, days) {
-  const history = [];
-  let price = currentPrice - (Math.random() * 0.12 - 0.04);
-  for (let i = days; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    price += (Math.random() - 0.48) * 0.015;
-    price = Math.max(0.05, Math.min(0.95, price));
-    history.push({
-      date: date.toISOString().split('T')[0],
-      time: date.getTime(),
-      price,
-      volume: Math.floor(Math.random() * 100000) + 50000,
-      high: Math.min(0.95, price + Math.random() * 0.02),
-      low: Math.max(0.05, price - Math.random() * 0.02),
-    });
-  }
-  history[history.length - 1].price = currentPrice;
-  return history;
-}
-
-function generateFallbackOrderbook(midPrice) {
-  const bids = [], asks = [];
-  let bidCumulative = 0, askCumulative = 0;
-  for (let i = 1; i <= 15; i++) {
-    const bidSize = Math.floor(Math.random() * 80000) + 20000;
-    const askSize = Math.floor(Math.random() * 80000) + 20000;
-    bidCumulative += bidSize;
-    askCumulative += askSize;
-    bids.push({
-      price: Math.max(0.01, midPrice - i * 0.005),
-      size: bidSize,
-      cumulative: bidCumulative,
-    });
-    asks.push({
-      price: Math.min(0.99, midPrice + i * 0.005),
-      size: askSize,
-      cumulative: askCumulative,
-    });
-  }
-  return {
-    bids,
-    asks,
-    imbalance: (bidCumulative - askCumulative) / (bidCumulative + askCumulative || 1),
-  };
-}
-
-// News fetching (placeholder - would connect to real news API)
-export async function fetchMarketNews(keywords) {
-  // In production, this would connect to a news aggregation API
-  // For now, return empty array - no fake news
-  return [];
 }
 
 export const PolymarketAPI = {
@@ -579,7 +543,6 @@ export const PolymarketAPI = {
   fetchOpenEvents,
   fetchPriceHistory,
   fetchOrderbook,
-  fetchMarketNews,
   extractEventSlug,
 };
 
