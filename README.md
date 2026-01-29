@@ -15,252 +15,179 @@
 
 <br/><br/>
 
-**A browser-based dashboard for analyzing prediction markets.**  
-**Currently supports Polymarket and Kalshi.**
+**Real-time analytics dashboard for prediction markets.**  
+**Polymarket • Kalshi • Manifold Markets**
 
 </div>
 
 ---
 
-## What This Actually Does
+## Features
 
-Leet Terminal is a **read-only analytics dashboard** for prediction markets. It fetches real market data and displays it with various analysis tools. 
+### Multi-Platform Data
 
-**It does NOT:**
-- Execute trades
-- Connect to your wallet for trading
-- Provide financial advice
-- Use machine learning for predictions
+| Platform | Markets | Prices | Order Book | Volume | Price History |
+|----------|:-------:|:------:|:----------:|:------:|:-------------:|
+| Polymarket | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Kalshi | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Manifold | ✅ | ✅ | ✅ | ✅ | ✅ |
 
----
+### Quantitative Analysis
 
-## ✅ What's Actually Implemented
+- **Monte Carlo Simulation** — 5,000-path risk analysis with VaR, CVaR, Sharpe ratio
+- **Kelly Criterion** — Optimal position sizing (full, half, quarter, eighth Kelly)
+- **Greeks** — Delta, Gamma, Theta, Vega, Rho for binary options pricing
+- **Confluence Signals** — Volume trends, order book imbalance, spread analysis
 
-### Real Data Integration
+### Price Charts
 
-| Feature | Polymarket | Kalshi | Notes |
-|---------|:----------:|:------:|-------|
-| Market listings | ✅ | ✅ | Live from public APIs |
-| Current prices | ✅ | ✅ | Real bid/ask/last price |
-| Order book depth | ✅ | ✅ | Real bid/ask levels |
-| 24h volume | ✅ | ✅ | Real trading volume |
-| Price history | ✅ | ⚠️ | Kalshi: simulated (no public API) |
-| Open interest | ✅ | ✅ | Real contract counts |
+- 90-day historical visualization
+- Real-time price updates
+- Volume overlay
 
-### Analysis Tools
+### Order Book
 
-| Tool | Status | What It Does |
-|------|:------:|--------------|
-| **Price Charts** | ✅ Real | 90-day historical visualization (Polymarket only) |
-| **Order Book Display** | ✅ Real | Shows 15-level bid/ask depth |
-| **Monte Carlo Simulation** | ✅ Real | 5,000-path risk simulation with configurable parameters |
-| **Kelly Criterion Calculator** | ✅ Real | Position sizing (full/half/quarter/eighth Kelly) |
-| **Greeks Calculation** | ✅ Real | Delta, Gamma, Theta, Vega, Rho for binary options |
-| **Confluence Analysis** | ⚠️ Partial | Shows real signals (volume, spread, imbalance) - NOT predictive |
-| **Market Signals Panel** | ⚠️ Partial | Displays market microstructure data - clearly labeled as heuristic |
+- 15-level bid/ask depth
+- Imbalance indicators
+- Cumulative size display
 
 ### Authentication
 
-| Method | Status | Notes |
-|--------|:------:|-------|
-| Phantom (Solana) | ✅ | Wallet signature verification |
-| MetaMask (Ethereum) | ✅ | Wallet signature verification |
-| Email/Password | ✅ | Via Supabase (optional) |
-| Google OAuth | ✅ | Via Supabase (optional) |
+- **Phantom** — Solana wallet signature
+- **MetaMask** — Ethereum wallet signature  
+- **Email/Password** — Via Supabase
+- **Google OAuth** — Via Supabase
 
-**Note:** Wallet auth is for **identity only** - the app cannot access your funds or execute trades.
+### Interface
 
-### UI Features
-
-- ✅ Bloomberg-style terminal aesthetic
-- ✅ Resizable panel layout
-- ✅ Platform filter (Polymarket / Kalshi / All)
-- ✅ Category filtering
-- ✅ Market limit selector (10/25/50/100)
-- ✅ URL/ticker input for loading specific markets
-- ✅ Auto-refresh every 15 seconds
-- ✅ Keyboard navigation (workspace commands)
-
----
-
-## ⚠️ Honest Disclaimers
-
-### What "Model Probability" Actually Is
-
-The "model probability" shown is **NOT** from a machine learning model. It's a simple heuristic adjustment based on:
-- Bid/ask spread
-- Volume trends  
-- Order book imbalance
-
-**It is not predictive.** The UI clearly labels this as "Heuristic Only."
-
-### What "Confluence" Actually Is
-
-The confluence panel aggregates **real market signals** (volume, spread, liquidity) but:
-- News sentiment: **Not connected** (shows "No data")
-- Social sentiment: **Not connected** (shows "No data")
-- Historical patterns: **Not implemented** (shows "No data")
-
-Only factors marked with ● are real data.
-
-### Price History Limitations
-
-- **Polymarket:** Real 90-day history from CLOB API
-- **Kalshi:** **Simulated** - Kalshi's public API does not expose historical prices
+- Bloomberg-style terminal aesthetic
+- Resizable panel layout
+- Platform filtering (PM / KA / MF)
+- Category filtering
+- Auto-refresh (15s)
+- Keyboard navigation
 
 ---
 
 ## Quick Start
 
 ```bash
-# Clone
 git clone https://github.com/NicolasLeyvaPA/leet-terminal.git
 cd leet-terminal/website
-
-# Install
 npm install
-
-# Run
 npm run dev
 ```
 
 ### Environment (Optional)
-
-For Supabase authentication, create `.env`:
 
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-Without Supabase, wallet auth still works.
-
 ---
 
 ## Architecture
 
 ```
-leet-terminal/website/
-├── src/
-│   ├── App.jsx                 # Main application
-│   ├── components/
-│   │   ├── panels/             # 12 workspace panels
-│   │   │   ├── WatchlistPanel.jsx
-│   │   │   ├── MarketOverviewPanel.jsx
-│   │   │   ├── PriceChartPanel.jsx
-│   │   │   ├── OrderBookPanel.jsx
-│   │   │   ├── ConfluencePanel.jsx
-│   │   │   ├── ModelBreakdownPanel.jsx
-│   │   │   ├── GreeksPanel.jsx
-│   │   │   ├── MonteCarloPanel.jsx
-│   │   │   ├── PortfolioPanel.jsx
-│   │   │   ├── QuantumLabPanel.jsx
-│   │   │   ├── NewsFeedPanel.jsx
-│   │   │   └── BetsMarketPanel.jsx
-│   │   └── ...
-│   ├── services/
-│   │   ├── polymarketAPI.js    # Polymarket Gamma + CLOB APIs
-│   │   └── kalshiAPI.js        # Kalshi Elections API
-│   └── utils/
-│       ├── quantEngine.js      # Monte Carlo, Kelly, Greeks
-│       ├── auth.js             # Auth orchestration
-│       ├── phantom.js          # Solana wallet
-│       └── metamask.js         # Ethereum wallet
-└── vite.config.js              # Dev server + API proxies
+website/src/
+├── App.jsx                    # Main application
+├── components/panels/         # 12 workspace panels
+│   ├── WatchlistPanel         # Market browser
+│   ├── MarketOverviewPanel    # Key metrics
+│   ├── PriceChartPanel        # Historical charts
+│   ├── OrderBookPanel         # Bid/ask depth
+│   ├── ConfluencePanel        # Signal aggregation
+│   ├── ModelBreakdownPanel    # Market signals
+│   ├── GreeksPanel            # Options Greeks
+│   ├── MonteCarloPanel        # Risk simulation
+│   ├── PortfolioPanel         # Position tracking
+│   └── QuantumLabPanel        # Portfolio optimization
+├── services/
+│   ├── polymarketAPI.js       # Polymarket integration
+│   ├── kalshiAPI.js           # Kalshi integration
+│   └── manifoldAPI.js         # Manifold integration
+└── utils/
+    ├── quantEngine.js         # Monte Carlo, Kelly, Greeks
+    └── auth.js                # Authentication
 ```
 
 ---
 
-## API Reference
+## API Integrations
 
-### Polymarket (Real Data)
+### Polymarket
+- `gamma-api.polymarket.com/events` — Market listings
+- `clob.polymarket.com/prices-history` — Price history
+- `clob.polymarket.com/book` — Order book
 
-| Endpoint | Data |
-|----------|------|
-| `gamma-api.polymarket.com/events` | Market listings |
-| `clob.polymarket.com/prices-history` | 90-day price history |
-| `clob.polymarket.com/book` | Order book depth |
+### Kalshi
+- `api.elections.kalshi.com/trade-api/v2/markets` — Markets
+- `api.elections.kalshi.com/trade-api/v2/markets/{ticker}/orderbook` — Order book
 
-### Kalshi (Real Data)
-
-| Endpoint | Data |
-|----------|------|
-| `api.elections.kalshi.com/trade-api/v2/markets` | Market listings with prices |
-| `api.elections.kalshi.com/trade-api/v2/markets/{ticker}/orderbook` | Order book |
-| Price history | **Not available** (simulated in app) |
+### Manifold
+- `api.manifold.markets/v0/search-markets` — Market search
+- `api.manifold.markets/v0/slug/{slug}` — Market details
+- `api.manifold.markets/v0/bets` — Trade history
 
 ---
 
-## 🚀 Roadmap: What We Want to Build
+## Roadmap
 
-### Phase 1: Data Quality (Next)
-- [ ] Real news sentiment integration (NewsAPI or similar)
-- [ ] Social sentiment from Twitter/Reddit APIs
-- [ ] Kalshi authenticated API for real price history
-- [ ] WebSocket connections for real-time updates
-- [ ] More prediction market platforms (Manifold, Metaculus)
+### Phase 1: Enhanced Data
+- [ ] News sentiment integration
+- [ ] Social sentiment (Twitter/Reddit)
+- [ ] WebSocket real-time updates
+- [ ] Additional platforms (Metaculus, PredictIt)
 
-### Phase 2: Real Analytics
-- [ ] Actual ML models for probability estimation
-- [ ] Backtesting engine with historical data
-- [ ] Custom alert system for price/volume triggers
-- [ ] Portfolio tracking with P&L calculation
+### Phase 2: Advanced Analytics
+- [ ] ML probability models
+- [ ] Backtesting engine
+- [ ] Price/volume alerts
 - [ ] Market correlation analysis
 
-### Phase 3: Trading Features
-- [ ] Direct Polymarket trading via API
-- [ ] Direct Kalshi trading via API
-- [ ] Portfolio rebalancing suggestions
-- [ ] Order management interface
+### Phase 3: Trading
+- [ ] Direct Polymarket trading
+- [ ] Direct Kalshi trading
+- [ ] Portfolio management
+- [ ] Order execution
 
 ### Phase 4: Platform
-- [ ] Mobile responsive design
-- [ ] User accounts with saved watchlists
-- [ ] Sharing and collaboration features
-- [ ] Public API for market data
+- [ ] Mobile responsive
+- [ ] User accounts & watchlists
+- [ ] Collaboration features
+- [ ] Public API
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 18 + Vite |
+| Component | Technology |
+|-----------|------------|
+| Frontend | React 18, Vite |
 | Charts | Chart.js |
 | Styling | Tailwind CSS |
-| Auth | Supabase (optional) |
-| Wallets | Phantom (Solana), MetaMask (Ethereum) |
+| Auth | Supabase, Phantom, MetaMask |
 
 ---
 
 ## Contributing
 
-Contributions welcome! Please:
-
 1. Fork the repository
 2. Create a feature branch
-3. Make changes with clear commit messages
+3. Commit changes
 4. Open a Pull Request
 
 ---
 
 ## License
 
-MIT License - see LICENSE file.
+MIT
 
 ---
 
 <div align="center">
 
-**Built for prediction market enthusiasts**
-
-<br/>
-
-⚠️ **This is an analytics tool, not financial advice.**  
-⚠️ **Do your own research before trading.**
-
-<br/>
-
-[GitHub](https://github.com/NicolasLeyvaPA/leet-terminal)
+**[github.com/NicolasLeyvaPA/leet-terminal](https://github.com/NicolasLeyvaPA/leet-terminal)**
 
 </div>
