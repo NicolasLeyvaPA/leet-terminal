@@ -1,17 +1,35 @@
 export const QuantEngine = {
+  // Safe Kelly calculation with edge case handling
+  _safeKelly: (modelProb, marketProb, fraction = 0.25) => {
+    // Guard against edge cases that cause division issues
+    if (marketProb <= 0.01 || marketProb >= 0.99) return 0;
+    if (modelProb <= 0 || modelProb >= 1) return 0;
+    if (modelProb <= marketProb) return 0; // No edge, no bet
+    
+    const odds = (1 / marketProb) - 1;
+    if (odds <= 0) return 0;
+    
+    const kelly = (odds * modelProb - (1 - modelProb)) / odds;
+    return Math.max(0, Math.min(kelly * fraction, 0.05)); // Cap at 5%
+  },
+
   monteCarlo: (marketProb, modelProb, config = {}) => {
     const { numSims = 5000, numTrades = 100, kellyFraction = 0.25, startingCapital = 10000 } = config;
+    
+    // Validate inputs
+    const safeMarketProb = Math.max(0.01, Math.min(0.99, marketProb || 0.5));
+    const safeModelProb = Math.max(0.01, Math.min(0.99, modelProb || 0.5));
+    
     const results = [];
     for (let sim = 0; sim < numSims; sim++) {
       let capital = startingCapital;
       const path = [capital];
       let wins = 0, losses = 0, maxCapital = capital, maxDrawdown = 0;
       for (let t = 0; t < numTrades && capital > 0; t++) {
-        const edge = modelProb - marketProb;
-        const odds = 1 / marketProb - 1;
-        const kelly = Math.max(0, (odds * modelProb - (1 - modelProb)) / (odds || 1)) * kellyFraction;
-        const betSize = capital * Math.min(kelly, 0.05);
-        if (Math.random() < modelProb) {
+        const odds = (1 / safeMarketProb) - 1;
+        const kelly = QuantEngine._safeKelly(safeModelProb, safeMarketProb, kellyFraction);
+        const betSize = capital * kelly;
+        if (Math.random() < safeModelProb) {
           capital += betSize * odds;
           wins++;
         } else {
@@ -66,23 +84,44 @@ export const QuantEngine = {
   },
 
   kelly: (modelProb, marketProb) => {
-    const odds = 1 / marketProb - 1;
-    const full = (odds * modelProb - (1 - modelProb)) / (odds || 1);
+    // Guard against edge cases
+    if (!marketProb || !modelProb || marketProb <= 0.01 || marketProb >= 0.99) {
+      return { full: 0, half: 0, quarter: 0, eighth: 0, optimal: 0 };
+    }
+    
+    const safeModelProb = Math.max(0.01, Math.min(0.99, modelProb));
+    const safeMarketProb = Math.max(0.01, Math.min(0.99, marketProb));
+    
+    const odds = (1 / safeMarketProb) - 1;
+    if (odds <= 0) {
+      return { full: 0, half: 0, quarter: 0, eighth: 0, optimal: 0 };
+    }
+    
+    const full = (odds * safeModelProb - (1 - safeModelProb)) / odds;
     const safe = Math.max(0, full);
+    
     return {
       full: safe,
       half: safe * 0.5,
       quarter: safe * 0.25,
       eighth: safe * 0.125,
-      optimal: Math.max(0, Math.min(safe * 0.25, 0.05)),
+      optimal: Math.max(0, Math.min(safe * 0.25, 0.05)), // Cap at 5%
     };
   },
 
   expectedValue: (modelProb, marketProb, stake = 1000) => {
-    const payout = stake / marketProb;
-    const ev = modelProb * (payout - stake) - (1 - modelProb) * stake;
+    // Guard against invalid inputs
+    if (!marketProb || !modelProb || marketProb <= 0 || marketProb >= 1) {
+      return { ev: 0, evPct: 0, payout: 0, stake, edgePct: 0 };
+    }
+    
+    const safeModelProb = Math.max(0.01, Math.min(0.99, modelProb));
+    const safeMarketProb = Math.max(0.01, Math.min(0.99, marketProb));
+    
+    const payout = stake / safeMarketProb;
+    const ev = safeModelProb * (payout - stake) - (1 - safeModelProb) * stake;
     const evPct = (ev / stake) * 100;
-    const edgePct = (modelProb - marketProb) * 100;
+    const edgePct = (safeModelProb - safeMarketProb) * 100;
     return { ev, evPct, payout, stake, edgePct };
   },
 
