@@ -22,12 +22,25 @@ export const getUsers = () => {
   }
 };
 
-// Save users to localStorage
+// Save users to localStorage with quota handling
 const saveUsers = (users) => {
   try {
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
   } catch (error) {
-    console.error('Failed to save users:', error);
+    // Handle quota exceeded error
+    if (error.name === 'QuotaExceededError' || error.code === 22) {
+      console.error('localStorage quota exceeded. Attempting cleanup...');
+      // Try to clean up old session data
+      try {
+        localStorage.removeItem(WALLET_SESSIONS_KEY);
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        console.log('Cleanup successful, users saved');
+      } catch (retryError) {
+        console.error('Failed to save users even after cleanup:', retryError);
+      }
+    } else {
+      console.error('Failed to save users:', error);
+    }
   }
 };
 
@@ -218,19 +231,41 @@ const getWalletSession = (walletType, address) => {
   }
 };
 
-// Save wallet session to local storage
+// Save wallet session to local storage with quota handling
 const saveWalletSession = (walletType, address, signatureHash, sessionToken) => {
   try {
     const sessions = JSON.parse(localStorage.getItem(WALLET_SESSIONS_KEY) || '{}');
     const key = `${walletType}:${address}`;
+    
+    // Clean up expired sessions before adding new one
+    const now = Date.now();
+    const SESSION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+    Object.keys(sessions).forEach(k => {
+      if (sessions[k].createdAt && now - sessions[k].createdAt > SESSION_EXPIRY) {
+        delete sessions[k];
+      }
+    });
+    
     sessions[key] = {
       signatureHash,
       sessionToken,
-      createdAt: Date.now(),
+      createdAt: now,
     };
     localStorage.setItem(WALLET_SESSIONS_KEY, JSON.stringify(sessions));
   } catch (error) {
-    console.error('Failed to save wallet session:', error);
+    // Handle quota exceeded
+    if (error.name === 'QuotaExceededError' || error.code === 22) {
+      console.warn('localStorage quota exceeded, clearing old sessions');
+      try {
+        localStorage.setItem(WALLET_SESSIONS_KEY, JSON.stringify({
+          [`${walletType}:${address}`]: { signatureHash, sessionToken, createdAt: Date.now() }
+        }));
+      } catch (retryError) {
+        console.error('Failed to save wallet session even after cleanup:', retryError);
+      }
+    } else {
+      console.error('Failed to save wallet session:', error);
+    }
   }
 };
 

@@ -1,13 +1,22 @@
 // Polymarket API Service - Real market data integration
+import { sanitizeText, sanitizeUrl } from '../utils/sanitize';
+
 const GAMMA_API = 'https://gamma-api.polymarket.com';
 const CLOB_API = 'https://clob.polymarket.com';
 
 // CORS proxy options (fallbacks if direct/vite proxy fails)
+// NOTE: These are public proxies and may be unreliable or rate-limited
+// For production, consider setting up your own proxy server
 const CORS_PROXIES = [
+  // corsproxy.io - generally reliable
   (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  // allorigins - alternative
   (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://cors-anywhere.herokuapp.com/${url}`,
 ];
+
+// Track proxy failures to avoid repeated attempts to dead proxies
+const proxyFailures = new Map();
+const PROXY_FAILURE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 // Helper to handle API calls with CORS fallback
 async function fetchWithFallback(url, options = {}) {
@@ -51,19 +60,38 @@ async function fetchWithFallback(url, options = {}) {
   }
 
   // Third try: CORS proxies as fallback
-  for (const makeProxyUrl of CORS_PROXIES) {
+  for (let i = 0; i < CORS_PROXIES.length; i++) {
+    const makeProxyUrl = CORS_PROXIES[i];
+    const proxyKey = `proxy_${i}`;
+    
+    // Skip proxies that have recently failed
+    const lastFailure = proxyFailures.get(proxyKey);
+    if (lastFailure && Date.now() - lastFailure < PROXY_FAILURE_TIMEOUT) {
+      console.warn(`Skipping proxy ${i} (recently failed)`);
+      continue;
+    }
+    
     try {
       const proxyUrl = makeProxyUrl(url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      
       const response = await fetch(proxyUrl, {
         ...options,
+        signal: controller.signal,
         headers: {
           'Accept': 'application/json',
           ...options.headers,
         },
       });
+      
+      clearTimeout(timeoutId);
+      
       if (response.ok) {
         const text = await response.text();
         try {
+          // Clear failure record on success
+          proxyFailures.delete(proxyKey);
           return JSON.parse(text);
         } catch {
           console.warn('Proxy returned non-JSON response');
@@ -71,7 +99,9 @@ async function fetchWithFallback(url, options = {}) {
         }
       }
     } catch (error) {
-      console.warn('CORS proxy failed:', error.message);
+      console.warn(`CORS proxy ${i} failed:`, error.message);
+      // Record failure
+      proxyFailures.set(proxyKey, Date.now());
       continue;
     }
   }
@@ -201,12 +231,13 @@ function transformEventToMarket(event) {
 
   return {
     id: event.id,
-    ticker: event.ticker || generateTicker(event.title),
+    // Sanitize all text fields to prevent XSS
+    ticker: sanitizeText(event.ticker || generateTicker(event.title), { maxLength: 20, allowNewlines: false }),
     platform: 'Polymarket',
-    question: event.title,
-    description: event.description,
-    category: event.tags?.[0]?.label || 'General',
-    subcategory: event.tags?.[1]?.label || '',
+    question: sanitizeText(event.title, { maxLength: 500 }),
+    description: sanitizeText(event.description, { maxLength: 2000 }),
+    category: sanitizeText(event.tags?.[0]?.label || 'General', { maxLength: 50, allowNewlines: false }),
+    subcategory: sanitizeText(event.tags?.[1]?.label || '', { maxLength: 50, allowNewlines: false }),
 
     // Core pricing
     market_prob: midPrice,
@@ -226,7 +257,7 @@ function transformEventToMarket(event) {
     // Dates
     end_date: event.endDate,
     created: event.createdAt,
-    resolution_source: event.resolutionSource || 'Polymarket resolution',
+    resolution_source: sanitizeText(event.resolutionSource || 'Polymarket resolution', { maxLength: 500 }),
 
     // Market IDs for API calls
     marketId: market.id,
