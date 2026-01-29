@@ -16,7 +16,7 @@
 <br/><br/>
 
 **A browser-based dashboard for analyzing prediction markets.**  
-**Currently supports Polymarket and Kalshi.**
+**Currently supports Polymarket, Kalshi, and Manifold Markets.**
 
 </div>
 
@@ -38,14 +38,14 @@ Leet Terminal is a **read-only analytics dashboard** for prediction markets. It 
 
 ### Real Data Integration
 
-| Feature | Polymarket | Kalshi | Notes |
-|---------|:----------:|:------:|-------|
-| Market listings | ✅ | ✅ | Live from public APIs |
-| Current prices | ✅ | ✅ | Real bid/ask/last price |
-| Order book depth | ✅ | ✅ | Real bid/ask levels |
-| 24h volume | ✅ | ✅ | Real trading volume |
-| Price history | ✅ | ⚠️ | Kalshi: simulated (no public API) |
-| Open interest | ✅ | ✅ | Real contract counts |
+| Feature | Polymarket | Kalshi | Manifold | Notes |
+|---------|:----------:|:------:|:--------:|-------|
+| Market listings | ✅ | ✅ | ✅ | Live from public APIs |
+| Current prices | ✅ | ✅ | ✅ | Real bid/ask/last price |
+| Order book depth | ✅ | ✅ | ⚠️ | Manifold: synthetic (uses AMM) |
+| 24h volume | ✅ | ✅ | ✅ | Real trading volume |
+| Price history | ✅ | ⚠️ | ✅ | Kalshi: simulated, Manifold: from bets |
+| Open interest | ✅ | ✅ | ✅ | Real contract/bettor counts |
 
 ### Analysis Tools
 
@@ -160,7 +160,8 @@ leet-terminal/website/
 │   │   └── ...
 │   ├── services/
 │   │   ├── polymarketAPI.js    # Polymarket Gamma + CLOB APIs
-│   │   └── kalshiAPI.js        # Kalshi Elections API
+│   │   ├── kalshiAPI.js        # Kalshi Elections API
+│   │   └── manifoldAPI.js      # Manifold Markets API
 │   └── utils/
 │       ├── quantEngine.js      # Monte Carlo, Kelly, Greeks
 │       ├── auth.js             # Auth orchestration
@@ -189,6 +190,15 @@ leet-terminal/website/
 | `api.elections.kalshi.com/trade-api/v2/markets/{ticker}/orderbook` | Order book |
 | Price history | **Not available** (simulated in app) |
 
+### Manifold Markets (Real Data)
+
+| Endpoint | Data |
+|----------|------|
+| `api.manifold.markets/v0/search-markets` | Market search with sorting |
+| `api.manifold.markets/v0/slug/{slug}` | Single market by slug |
+| `api.manifold.markets/v0/bets` | Bet history (used for price charts) |
+| Order book | **Synthetic** (Manifold uses AMM, not orderbook) |
+
 ---
 
 ## 🚀 Roadmap: What We Want to Build
@@ -198,7 +208,7 @@ leet-terminal/website/
 - [ ] Social sentiment from Twitter/Reddit APIs
 - [ ] Kalshi authenticated API for real price history
 - [ ] WebSocket connections for real-time updates
-- [ ] More prediction market platforms (Manifold, Metaculus)
+- [ ] More prediction market platforms (Metaculus, PredictIt)
 
 ### Phase 2: Real Analytics
 - [ ] Actual ML models for probability estimation
