@@ -1,0 +1,9 @@
+name = "leet-terminal-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Optional: Add your account_id here
+# account_id = "your-account-id"
+
+[vars]
+ENVIRONMENT = "production"

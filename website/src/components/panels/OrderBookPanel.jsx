@@ -49,7 +49,12 @@ export const OrderBookPanel = ({ market }) => {
         <div className="overflow-y-auto" style={{ maxHeight: 'calc(100% - 24px)' }}>
           {!hasOrderbook ? (
             <div className="px-2 py-4 text-center text-gray-500 text-xs">
-              Order book data unavailable
+              <div className="text-gray-500 mb-1">○ No Order Book</div>
+              <div className="text-gray-700 text-[10px]">
+                {market._ammBased || market.platform === 'Manifold' 
+                  ? 'AMM-based market (no orderbook)'
+                  : 'Data unavailable from API'}
+              </div>
             </div>
           ) : (
             bids.slice(0, 10).map((bid, i) => {

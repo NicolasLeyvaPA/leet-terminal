@@ -1,13 +1,31 @@
 // Manifold Markets API Service - Real market data integration
+// v2.0 - With caching, rate limiting, and honest data handling
 // Docs: https://docs.manifold.markets/api
 import { sanitizeText } from '../utils/sanitize';
+import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
 
 const MANIFOLD_API = 'https://api.manifold.markets/v0';
 
-// Simple fetch wrapper (Manifold has good CORS support)
+// Manifold has good CORS support, no proxy needed
+const CACHE_TTL = {
+  MARKETS: 30 * 1000,
+  PRICE_HISTORY: 60 * 1000,
+  MARKET: 60 * 1000,
+};
+
+/**
+ * Fetch from Manifold with caching
+ */
 async function fetchManifold(endpoint, options = {}) {
   const url = `${MANIFOLD_API}${endpoint}`;
-  
+  const cacheKey = `manifold:${endpoint}`;
+  const cacheTtl = options.cacheTtl || CACHE_TTL.MARKETS;
+
+  const cached = getCached(cacheKey);
+  if (cached !== null) return cached;
+
+  await waitForRateLimit('manifold', 200);
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -16,452 +34,381 @@ async function fetchManifold(endpoint, options = {}) {
         ...options.headers,
       },
     });
-    
+
     if (!response.ok) {
       throw new Error(`Manifold API error: ${response.status}`);
     }
-    
-    return await response.json();
+
+    const data = await response.json();
+    setCache(cacheKey, data, cacheTtl);
+    return data;
   } catch (error) {
     console.error('Manifold fetch failed:', error.message);
     throw error;
   }
 }
 
-// Check if URL/input is for Manifold
+/**
+ * Check if URL is for Manifold
+ */
 export function isManifoldUrl(input) {
   if (!input) return false;
-  const lower = input.toLowerCase().trim();
-  return lower.includes('manifold.markets');
+  return input.toLowerCase().includes('manifold.markets');
 }
 
-// Extract market slug from Manifold URL
+/**
+ * Extract market slug from Manifold URL
+ */
 export function extractManifoldSlug(url) {
   try {
     const urlObj = new URL(url);
-    // Manifold URLs: manifold.markets/username/market-slug
     const pathParts = urlObj.pathname.split('/').filter(Boolean);
     if (pathParts.length >= 2) {
-      return pathParts[pathParts.length - 1]; // The slug
+      return pathParts[pathParts.length - 1];
     }
     return null;
   } catch {
-    return url; // Assume it's already a slug or ID
+    return url;
   }
 }
 
-// Fetch open markets sorted by liquidity/volume
+/**
+ * Fetch open markets sorted by liquidity
+ */
 export async function fetchOpenMarkets(limit = 50) {
   try {
     const data = await fetchManifold(
-      `/search-markets?term=&sort=liquidity&filter=open&limit=${Math.min(limit, 100)}`
+      `/search-markets?term=&sort=liquidity&filter=open&limit=${Math.min(limit, 100)}`,
+      { cacheTtl: CACHE_TTL.MARKETS }
     );
-    
+
     if (!Array.isArray(data)) {
       console.warn('Unexpected Manifold response');
       return [];
     }
-    
-    // Filter to binary markets with activity
-    const markets = data
+
+    return data
       .filter(m => m.outcomeType === 'BINARY' && !m.isResolved && m.volume > 0)
       .slice(0, limit)
       .map(transformManifoldMarket)
       .filter(Boolean);
-    
-    return markets;
   } catch (error) {
-    console.error('Error loading Manifold markets:', error.message);
+    console.error('Manifold fetch failed:', error.message);
     return [];
   }
 }
 
-// Fetch market by slug (searches for it)
+/**
+ * Fetch market by slug
+ */
 export async function fetchMarketBySlug(slug) {
   const cleanSlug = extractManifoldSlug(slug);
-  
+
   try {
-    // Try direct slug lookup first
-    const data = await fetchManifold(`/slug/${cleanSlug}`);
-    
+    const data = await fetchManifold(`/slug/${cleanSlug}`, { cacheTtl: CACHE_TTL.MARKET });
+
     if (!data || !data.id) {
       throw new Error('Market not found');
     }
-    
+
     return transformManifoldMarket(data);
   } catch (error) {
-    console.error('Error loading Manifold market:', error.message);
+    console.error('Manifold market fetch failed:', error.message);
     throw error;
   }
 }
 
-// Fetch market by ID
+/**
+ * Fetch market by ID
+ */
 export async function fetchMarketById(id) {
   try {
-    const data = await fetchManifold(`/market/${id}`);
-    
+    const data = await fetchManifold(`/market/${id}`, { cacheTtl: CACHE_TTL.MARKET });
+
     if (!data || !data.id) {
       throw new Error('Market not found');
     }
-    
+
     return transformManifoldMarket(data);
   } catch (error) {
-    console.error('Error loading Manifold market by ID:', error.message);
+    console.error('Manifold market fetch failed:', error.message);
     throw error;
   }
 }
 
-// Fetch price history from bets
+/**
+ * Fetch price history (bets) - returns null if unavailable (NO FAKE DATA)
+ */
 export async function fetchPriceHistory(marketId, days = 90) {
+  if (!marketId) return null;
+
   try {
-    // Fetch recent bets to build price history
-    const bets = await fetchManifold(`/bets?contractId=${marketId}&limit=1000`);
-    
-    if (!Array.isArray(bets) || bets.length === 0) {
-      return generateFallbackHistory(0.5, days);
+    const data = await fetchManifold(
+      `/bets?contractId=${marketId}&limit=500`,
+      { cacheTtl: CACHE_TTL.PRICE_HISTORY }
+    );
+
+    if (!Array.isArray(data) || data.length === 0) {
+      return null; // NO FAKE DATA
     }
-    
-    // Convert bets to price history
-    // Sort by time ascending
-    const sortedBets = bets
-      .filter(b => b.probAfter !== undefined)
-      .sort((a, b) => a.createdTime - b.createdTime);
-    
-    if (sortedBets.length === 0) {
-      return generateFallbackHistory(0.5, days);
-    }
-    
-    // Group by day and get daily closing price
-    const dailyPrices = new Map();
-    const cutoffTime = Date.now() - (days * 24 * 60 * 60 * 1000);
-    
-    sortedBets.forEach(bet => {
-      if (bet.createdTime < cutoffTime) return;
+
+    // Group bets by day and calculate OHLC
+    const byDay = new Map();
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    for (const bet of data) {
+      if (bet.createdTime < cutoff) continue;
+
       const date = new Date(bet.createdTime).toISOString().split('T')[0];
-      dailyPrices.set(date, {
+      const prob = bet.probAfter || bet.probability;
+
+      if (!prob) continue;
+
+      if (!byDay.has(date)) {
+        byDay.set(date, { prices: [], volume: 0 });
+      }
+
+      byDay.get(date).prices.push(prob);
+      byDay.get(date).volume += Math.abs(bet.amount || 0);
+    }
+
+    if (byDay.size === 0) return null;
+
+    const history = [];
+    for (const [date, { prices, volume }] of byDay.entries()) {
+      if (prices.length === 0) continue;
+
+      history.push({
         date,
-        time: bet.createdTime,
-        price: bet.probAfter,
-        volume: (dailyPrices.get(date)?.volume || 0) + Math.abs(bet.amount || 0),
+        time: new Date(date).getTime(),
+        price: prices[prices.length - 1],
+        volume,
+        high: Math.max(...prices),
+        low: Math.min(...prices),
+        isReal: true,
       });
-    });
-    
-    // Convert to array and fill gaps
-    const history = Array.from(dailyPrices.values()).sort((a, b) => a.time - b.time);
-    
-    // Add high/low (approximated from price movement)
-    history.forEach((point, i) => {
-      const prevPrice = i > 0 ? history[i - 1].price : point.price;
-      point.high = Math.max(point.price, prevPrice) + 0.01;
-      point.low = Math.min(point.price, prevPrice) - 0.01;
-      point.high = Math.min(0.99, point.high);
-      point.low = Math.max(0.01, point.low);
-    });
-    
-    // Mark as real data
-    history._isReal = true;
-    return history;
+    }
+
+    return history.sort((a, b) => a.time - b.time);
   } catch (error) {
-    console.warn('Failed to fetch Manifold price history:', error);
-    return generateFallbackHistory(0.5, days);
+    console.warn('Manifold price history failed:', error.message);
+    return null;
   }
 }
 
-// Manifold doesn't have traditional orderbook - generate from pool
+/**
+ * Fetch orderbook (simulated from probability) - Manifold uses AMM
+ * Returns null since Manifold doesn't have a traditional orderbook
+ */
 export async function fetchOrderbook(market) {
-  // Manifold uses AMM (CPMM), not orderbook
-  // We'll generate a synthetic orderbook from the pool
-  const pool = market?.pool || market?._raw?.pool;
-  const prob = market?.market_prob || market?.probability || 0.5;
-  
-  if (!pool) {
-    return generateFallbackOrderbook(prob);
-  }
-  
-  const yesPool = pool.YES || 1000;
-  const noPool = pool.NO || 1000;
-  const totalLiquidity = yesPool + noPool;
-  
-  // Generate synthetic levels based on AMM curve
-  const bids = [];
-  const asks = [];
-  let bidCum = 0, askCum = 0;
-  
-  for (let i = 1; i <= 10; i++) {
-    // AMM impact calculation (simplified)
-    const priceImpact = i * 0.005;
-    const bidPrice = Math.max(0.01, prob - priceImpact);
-    const askPrice = Math.min(0.99, prob + priceImpact);
-    
-    // Size decreases with distance from mid
-    const sizeFactor = Math.max(0.1, 1 - (i * 0.08));
-    const baseSize = totalLiquidity * 0.02 * sizeFactor;
-    
-    bidCum += baseSize;
-    askCum += baseSize;
-    
-    bids.push({ price: bidPrice, size: baseSize, cumulative: bidCum });
-    asks.push({ price: askPrice, size: baseSize, cumulative: askCum });
-  }
-  
-  return {
-    bids,
-    asks,
-    imbalance: (yesPool - noPool) / totalLiquidity,
-    _synthetic: true,
-    _note: 'Manifold uses AMM - orderbook is synthetic',
-  };
+  // Manifold uses an AMM, not an orderbook
+  // Return null to indicate no orderbook data
+  return null;
 }
 
-// Transform Manifold market to our unified format
+/**
+ * Transform Manifold market to our format
+ */
 function transformManifoldMarket(market) {
-  if (!market) return null;
-  
-  // Only support binary markets for now
-  if (market.outcomeType !== 'BINARY') return null;
-  
-  const prob = market.probability || market.p || 0.5;
-  const pool = market.pool || {};
-  const yesPool = pool.YES || 0;
-  const noPool = pool.NO || 0;
-  const totalLiquidity = market.totalLiquidity || (yesPool + noPool);
-  
+  if (!market || !market.id) return null;
+
+  const prob = market.probability || 0.5;
+  const volume = market.volume || 0;
+  const volume24h = market.volume24Hours || volume * 0.1;
+  const liquidity = market.totalLiquidity || market.pool?.YES || 0;
+
+  const signalProb = calculateSignalProbability(prob, volume24h, liquidity, market);
+
   // Generate ticker from question
-  const ticker = generateTicker(market.question);
-  
-  // Calculate synthetic bid/ask from AMM
-  const spread = 0.02; // ~2% spread for AMM
-  const bestBid = Math.max(0.01, prob - spread / 2);
-  const bestAsk = Math.min(0.99, prob + spread / 2);
-  
-  // Heuristic probability (minimal adjustment for Manifold - markets are already efficient)
-  const modelProb = calculateHeuristicProbability(prob, market.volume24Hours, totalLiquidity);
-  
+  const ticker = generateTicker(market.question || market.slug);
+
   return {
-    id: market.id,
+    id: `manifold-${market.id}`,
     ticker: sanitizeText(ticker, { maxLength: 20, allowNewlines: false }),
     platform: 'Manifold',
+    _source: 'manifold',
     question: sanitizeText(market.question, { maxLength: 500 }),
-    description: sanitizeText(market.textDescription || '', { maxLength: 2000 }),
-    category: 'General', // Manifold doesn't have categories in API
-    
-    // Core pricing
+    title: sanitizeText(market.question, { maxLength: 500 }),
+    description: sanitizeText(market.description || market.textDescription || '', { maxLength: 2000 }),
+    category: sanitizeText(market.groupSlugs?.[0] || 'General', { maxLength: 50, allowNewlines: false }),
+    subcategory: sanitizeText(market.groupSlugs?.[1] || '', { maxLength: 50, allowNewlines: false }),
+
     market_prob: prob,
-    model_prob: modelProb,
-    prev_prob: null, // Would need historical lookup
-    
-    // Market metrics  
-    bestBid,
-    bestAsk,
-    spread: bestAsk - bestBid,
-    volume_24h: market.volume24Hours || 0,
-    volume_total: market.volume || 0,
-    liquidity: totalLiquidity,
-    open_interest: market.uniqueBettorCount || 0,
-    trades_24h: Math.floor((market.volume24Hours || 0) / 50),
-    
-    // Pool info (Manifold-specific)
-    pool: { yes: yesPool, no: noPool },
-    
-    // Dates
+    model_prob: signalProb,
+    signal_prob: signalProb,
+    prev_prob: market.prob24HoursAgo || null,
+
+    bestBid: prob - 0.02,
+    bestAsk: prob + 0.02,
+    spread: 0.04, // AMM spread
+    volume_24h: volume24h,
+    volume_total: volume,
+    liquidity,
+    open_interest: liquidity,
+    trades_24h: market.uniqueBettors24Hours || Math.floor(volume24h / 100),
+
     end_date: market.closeTime ? new Date(market.closeTime).toISOString() : null,
     created: market.createdTime ? new Date(market.createdTime).toISOString() : null,
-    resolution_source: 'Manifold Markets resolution',
-    
-    // IDs
+    resolution_source: 'Manifold community resolution',
+
     marketId: market.id,
     slug: market.slug,
-    url: market.url,
-    
-    // Outcomes
+    url: market.url || `https://manifold.markets/${market.creatorUsername}/${market.slug}`,
+
     outcomes: ['Yes', 'No'],
     outcomePrices: [prob, 1 - prob],
-    
-    // Creator info
-    creator: {
-      username: market.creatorUsername,
-      name: market.creatorName,
-      avatarUrl: market.creatorAvatarUrl,
-    },
-    
-    // Generated analysis
-    factors: generateFactors(prob, modelProb, market.volume24Hours, totalLiquidity, market),
+
+    factors: generateFactors(prob, signalProb, volume24h, liquidity),
+    signal_breakdown: generateSignalBreakdown(prob, volume24h, liquidity, market),
+    model_breakdown: generateSignalBreakdown(prob, volume24h, liquidity, market),
     greeks: calculateGreeks(prob, market.closeTime),
-    
-    // Status
-    isResolved: market.isResolved || false,
-    resolution: market.resolution,
-    
-    // Raw data
+
+    // Manifold-specific
+    uniqueBettors: market.uniqueBettorCount || 0,
+    creator: market.creatorUsername,
+
+    _isHeuristic: true,
+    _disclaimer: 'Signal probabilities are heuristics, not ML predictions',
+    _ammBased: true, // Flag that this uses AMM, not orderbook
     _raw: market,
-    _source: 'manifold',
   };
 }
 
-// Generate ticker from question
+/**
+ * Generate ticker from question
+ */
 function generateTicker(question) {
-  if (!question) return 'MKT';
-  
-  // Remove common words and take first letters
-  const stopWords = ['will', 'the', 'be', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'of', 'and', 'or', 'is', 'are', 'was', 'were', 'has', 'have', 'this', 'that', 'with', 'by'];
-  const words = question
-    .replace(/[^a-zA-Z0-9\s]/g, '')
-    .split(/\s+/)
-    .filter(w => w.length > 1 && !stopWords.includes(w.toLowerCase()))
-    .slice(0, 4);
-  
-  if (words.length === 0) return 'MKT';
-  
-  // Take first letter of each word, max 6 chars
-  return words.map(w => w[0]).join('').toUpperCase().slice(0, 6);
+  if (!question) return 'MF';
+  const words = question.split(' ')
+    .filter(w => w.length > 2 && !['will', 'the', 'and', 'for', 'are', 'was', 'has', 'have', 'does'].includes(w.toLowerCase()))
+    .slice(0, 3);
+  return words.map(w => w[0]).join('').toUpperCase() || 'MF';
 }
 
-// Calculate heuristic probability (minimal for Manifold - prediction markets are efficient)
-function calculateHeuristicProbability(marketProb, volume24h, liquidity) {
-  // Manifold markets tend to be well-calibrated
-  // Only small adjustments based on activity
-  let adjustment = 0;
-  
-  // Higher volume = more confidence in market price (smaller adjustment)
-  const volumeFactor = Math.min(volume24h / 10000, 1);
-  const liquidityFactor = Math.min(liquidity / 50000, 1);
-  const confidence = (volumeFactor + liquidityFactor) / 2;
-  
-  // Very small mean reversion toward 0.5 for low-activity markets
-  if (confidence < 0.3) {
-    adjustment = (0.5 - marketProb) * 0.02 * (1 - confidence);
-  }
-  
-  return Math.max(0.01, Math.min(0.99, marketProb + adjustment));
+/**
+ * Calculate signal probability (heuristic)
+ */
+function calculateSignalProbability(marketProb, volume24h, liquidity, market) {
+  let signalProb = marketProb;
+
+  // Volume factor
+  const volumeFactor = Math.min(volume24h / 10000, 0.03);
+
+  // Liquidity factor
+  const liqFactor = Math.min(liquidity / 50000, 0.02);
+
+  // Unique bettors factor (more bettors = more information)
+  const bettors = market.uniqueBettorCount || 0;
+  const bettorFactor = Math.min(bettors / 100, 0.02);
+
+  signalProb += volumeFactor + liqFactor + bettorFactor;
+
+  return Math.max(0.01, Math.min(0.99, signalProb));
 }
 
-// Generate factors from real data
-function generateFactors(marketProb, heuristicProb, volume24h, liquidity, market) {
-  const edge = heuristicProb - marketProb;
+/**
+ * Generate factors
+ */
+function generateFactors(marketProb, signalProb, volume24h, liquidity) {
+  const edge = signalProb - marketProb;
   const direction = edge > 0.02 ? 'bullish' : edge < -0.02 ? 'bearish' : 'neutral';
-  
-  const pool = market.pool || {};
-  const yesPool = pool.YES || 0;
-  const noPool = pool.NO || 0;
-  const hasPool = yesPool > 0 && noPool > 0;
-  
+  const volumeScore = Math.min(volume24h / 20000, 1);
+  const liqScore = Math.min(liquidity / 100000, 1);
+
   return {
-    pool_imbalance: {
-      value: hasPool ? yesPool / (yesPool + noPool) : null,
-      contribution: hasPool ? (yesPool / (yesPool + noPool) - 0.5) * 0.05 : 0,
-      direction: hasPool ? (yesPool > noPool ? 'bullish' : 'bearish') : 'neutral',
-      desc: hasPool ? `Pool: ${yesPool.toFixed(0)} YES / ${noPool.toFixed(0)} NO` : 'No pool data',
-      isReal: hasPool,
-    },
     volume_trend: {
-      value: Math.min((volume24h || 0) / 5000, 1),
-      contribution: Math.min((volume24h || 0) / 5000, 0.05),
-      direction: volume24h > 500 ? 'bullish' : volume24h < 50 ? 'bearish' : 'neutral',
-      desc: `24h volume: M$${(volume24h || 0).toFixed(0)}`,
+      value: volumeScore,
+      contribution: volumeScore * 0.08,
+      direction: volumeScore > 0.5 ? 'bullish' : 'neutral',
+      desc: `24h volume: M$${(volume24h / 1000).toFixed(1)}K`,
       isReal: true,
     },
     liquidity_score: {
-      value: Math.min(liquidity / 50000, 1),
-      contribution: Math.min(liquidity / 50000, 0.03),
-      direction: liquidity > 5000 ? 'bullish' : 'neutral',
-      desc: `Liquidity: M$${liquidity.toFixed(0)}`,
+      value: liqScore,
+      contribution: liqScore * 0.05,
+      direction: liqScore > 0.5 ? 'bullish' : 'neutral',
+      desc: `Liquidity: M$${(liquidity / 1000).toFixed(1)}K`,
       isReal: true,
     },
-    unique_bettors: {
-      value: market.uniqueBettorCount ? Math.min(market.uniqueBettorCount / 100, 1) : null,
-      contribution: market.uniqueBettorCount ? Math.min(market.uniqueBettorCount / 100, 0.03) : 0,
-      direction: market.uniqueBettorCount > 50 ? 'bullish' : 'neutral',
-      desc: market.uniqueBettorCount ? `${market.uniqueBettorCount} traders` : 'No data',
-      isReal: !!market.uniqueBettorCount,
-    },
-    news_sentiment: {
-      value: null,
+    amm_indicator: {
+      value: 1.0,
       contribution: 0,
-      direction: 'unknown',
-      desc: 'News API not connected',
-      isReal: false,
+      direction: 'neutral',
+      desc: 'AMM-based pricing (no orderbook)',
+      isReal: true,
+      isAMM: true,
     },
-    heuristic_edge: {
+    signal_edge: {
       value: 0.5 + edge,
-      contribution: edge * 0.1,
+      contribution: edge * 0.15,
       direction,
-      desc: `Edge: ${(edge * 100).toFixed(1)}%`,
+      desc: `Signal edge: ${(edge * 100).toFixed(1)}%`,
       isReal: false,
       isHeuristic: true,
     },
   };
 }
 
-// Calculate Greeks
+/**
+ * Generate signal breakdown
+ */
+function generateSignalBreakdown(marketProb, volume24h, liquidity, market) {
+  const volumeConfidence = Math.min(volume24h / 10000, 1);
+  const liqConfidence = Math.min(liquidity / 50000, 1);
+  const bettorConfidence = Math.min((market.uniqueBettorCount || 0) / 50, 1);
+
+  return {
+    market_consensus: {
+      prob: marketProb,
+      weight: 0.55,
+      confidence: 1.0,
+      label: 'AMM Price',
+      desc: 'Current probability (AMM)',
+      isReal: true,
+    },
+    volume_signal: {
+      prob: marketProb,
+      weight: 0.20,
+      confidence: volumeConfidence,
+      label: 'Volume Signal',
+      desc: volume24h > 1000 ? 'Active trading' : 'Low activity',
+      isReal: true,
+    },
+    liquidity_depth: {
+      prob: marketProb,
+      weight: 0.15,
+      confidence: liqConfidence,
+      label: 'Liquidity Pool',
+      desc: liquidity > 10000 ? 'Deep pool' : 'Shallow pool',
+      isReal: true,
+    },
+    bettor_diversity: {
+      prob: marketProb,
+      weight: 0.10,
+      confidence: bettorConfidence,
+      label: 'Unique Bettors',
+      desc: `${market.uniqueBettorCount || 0} traders`,
+      isReal: true,
+    },
+    _isHeuristic: true,
+    _disclaimer: 'Market signals from real data (AMM-based)',
+  };
+}
+
+/**
+ * Calculate Greeks
+ */
 function calculateGreeks(marketProb, closeTime) {
   const daysToExpiry = closeTime
     ? Math.max(1, (new Date(closeTime) - new Date()) / (1000 * 60 * 60 * 24))
-    : 365; // Manifold markets can be long-dated
-  
-  const delta = marketProb;
-  const gamma = 4 * marketProb * (1 - marketProb);
-  const theta = -0.01 * (1 / Math.sqrt(daysToExpiry));
-  const vega = Math.sqrt(marketProb * (1 - marketProb)) * 0.5;
-  const rho = 0.01;
-  
-  return { delta, gamma, theta, vega, rho };
-}
+    : 30;
 
-// Fallback price history generator
-function generateFallbackHistory(currentPrice, days) {
-  const history = [];
-  let price = currentPrice - (Math.random() * 0.08 - 0.02);
-  
-  for (let i = days; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    
-    const drift = (currentPrice - price) * 0.03;
-    price += drift + (Math.random() - 0.5) * 0.015;
-    price = Math.max(0.01, Math.min(0.99, price));
-    
-    history.push({
-      date: date.toISOString().split('T')[0],
-      time: date.getTime(),
-      price,
-      volume: Math.floor(Math.random() * 200) + 20,
-      high: Math.min(0.99, price + Math.random() * 0.02),
-      low: Math.max(0.01, price - Math.random() * 0.02),
-    });
-  }
-  
-  history[history.length - 1].price = currentPrice;
-  history._isSimulated = true;
-  return history;
-}
-
-// Fallback orderbook generator
-function generateFallbackOrderbook(midPrice) {
-  const bids = [], asks = [];
-  let bidCum = 0, askCum = 0;
-  
-  for (let i = 1; i <= 10; i++) {
-    const size = Math.floor(Math.random() * 500) + 100;
-    bidCum += size;
-    askCum += size;
-    
-    bids.push({
-      price: Math.max(0.01, midPrice - i * 0.01),
-      size,
-      cumulative: bidCum,
-    });
-    asks.push({
-      price: Math.min(0.99, midPrice + i * 0.01),
-      size,
-      cumulative: askCum,
-    });
-  }
-  
   return {
-    bids,
-    asks,
-    imbalance: 0,
-    _synthetic: true,
+    delta: marketProb,
+    gamma: 4 * marketProb * (1 - marketProb),
+    theta: -0.01 * (1 / Math.sqrt(daysToExpiry)),
+    vega: Math.sqrt(marketProb * (1 - marketProb)) * 0.5,
+    rho: 0.01,
   };
 }
 
