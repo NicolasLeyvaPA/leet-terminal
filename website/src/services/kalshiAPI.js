@@ -111,33 +111,30 @@ export function extractKalshiTicker(url) {
   }
 }
 
-// Fetch open events from Kalshi
+// Fetch open markets from Kalshi (more efficient than events endpoint)
+// Uses /markets directly which includes pricing data - avoids N+1 queries
 export async function fetchOpenEvents(limit = 50) {
-  const url = `${KALSHI_API}/trade-api/v2/events?status=open&limit=${limit}`;
+  const url = `${KALSHI_API}/trade-api/v2/markets?limit=${Math.min(limit, 100)}`;
   
   try {
     const data = await fetchWithFallback(url);
     
-    if (!data.events || !Array.isArray(data.events)) {
-      console.warn('Unexpected Kalshi events response');
+    if (!data.markets || !Array.isArray(data.markets)) {
+      console.warn('Unexpected Kalshi markets response');
       return [];
     }
     
-    // For each event, we need to fetch its markets to get pricing data
-    const eventsWithMarkets = await Promise.all(
-      data.events.slice(0, Math.min(limit, 20)).map(async (event) => {
-        try {
-          const eventData = await fetchEventByTicker(event.event_ticker);
-          return eventData;
-        } catch {
-          return null;
-        }
-      })
-    );
+    // Filter to active markets with actual trading activity
+    // Transform directly - no additional API calls needed
+    const transformedMarkets = data.markets
+      .filter(m => m.status === 'active' && (m.volume > 0 || m.liquidity > 0))
+      .slice(0, limit)
+      .map(transformKalshiMarket)
+      .filter(Boolean);
     
-    return eventsWithMarkets.filter(Boolean);
+    return transformedMarkets;
   } catch (error) {
-    console.error('Error loading Kalshi events:', error.message);
+    console.error('Error loading Kalshi markets:', error.message);
     return [];
   }
 }
@@ -234,18 +231,23 @@ export async function fetchOrderbook(ticker) {
   }
 }
 
-// Fetch candlestick/history data (Kalshi uses series_ticker for history)
+// Fetch price history for Kalshi market
+// NOTE: Kalshi's public API does not expose historical price data
+// This returns SIMULATED data based on current price for chart display
+// Real history would require authenticated API access
 export async function fetchPriceHistory(ticker, days = 90) {
-  // Kalshi doesn't have a public price history endpoint like Polymarket
-  // We'll generate simulated history based on current price
-  // In production, you'd use their candlestick endpoint (requires auth)
-  
   try {
     const market = await fetchMarketByTicker(ticker);
     const currentPrice = market?.market_prob || 0.5;
-    return generatePriceHistory(currentPrice, days);
+    const history = generatePriceHistory(currentPrice, days);
+    // Mark as simulated so UI can indicate this
+    history._isSimulated = true;
+    history._disclaimer = 'Simulated - Kalshi public API does not provide price history';
+    return history;
   } catch {
-    return generatePriceHistory(0.5, days);
+    const history = generatePriceHistory(0.5, days);
+    history._isSimulated = true;
+    return history;
   }
 }
 
@@ -592,12 +594,18 @@ function generateFallbackOrderbook(midPrice) {
 }
 
 // Check if a URL/ticker is for Kalshi
+// Kalshi tickers start with "KX" (e.g., KXELONMARS-99, KXWARMING-50)
 export function isKalshiUrl(input) {
   if (!input) return false;
-  const lower = input.toLowerCase();
-  return lower.includes('kalshi.com') || 
-         lower.startsWith('kx') || 
-         /^[A-Z]{2,}[\-\d]+/.test(input.toUpperCase());
+  const lower = input.toLowerCase().trim();
+  
+  // Check for kalshi.com URLs
+  if (lower.includes('kalshi.com')) return true;
+  
+  // Check for KX prefix (Kalshi ticker format)
+  if (lower.startsWith('kx')) return true;
+  
+  return false;
 }
 
 export const KalshiAPI = {
