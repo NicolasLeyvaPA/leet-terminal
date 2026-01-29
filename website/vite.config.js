@@ -55,6 +55,20 @@ export default defineConfig({
           });
         },
       },
+      '/api/manifold': {
+        target: 'https://api.manifold.markets',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/manifold/, ''),
+        secure: true,
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.warn('Manifold proxy error:', err.message);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            proxyReq.setHeader('Accept', 'application/json');
+          });
+        },
+      },
     },
   },
 })

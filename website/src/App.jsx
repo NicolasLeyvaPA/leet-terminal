@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { PORTFOLIO_POSITIONS } from './data/constants';
 import { PolymarketAPI } from './services/polymarketAPI';
 import { KalshiAPI } from './services/kalshiAPI';
+import { ManifoldAPI } from './services/manifoldAPI';
 import { WatchlistPanel } from './components/panels/WatchlistPanel';
 import { MarketOverviewPanel } from './components/panels/MarketOverviewPanel';
 import { PriceChartPanel } from './components/panels/PriceChartPanel';
@@ -52,23 +53,27 @@ const Terminal = ({ onLogout, authInfo }) => {
   const [lastRefresh, setLastRefresh] = useState(null);
   const dragStateRef = useRef({ type: null, startX: 0, startY: 0, startVal: 0 });
 
-  // Load markets from Polymarket AND Kalshi APIs with REAL data
+  // Load markets from Polymarket, Kalshi, AND Manifold APIs with REAL data
   const loadMarkets = useCallback(async (limit = marketLimit, isManual = false) => {
     try {
       if (isManual) setLoadingMarkets(true);
       setStatusMessage("Syncing...");
       
-      // Fetch from both platforms in parallel
-      const [polymarketData, kalshiData] = await Promise.all([
-        PolymarketAPI.fetchOpenEvents(Math.ceil(limit * 0.7)), // 70% from Polymarket
-        KalshiAPI.fetchOpenEvents(Math.ceil(limit * 0.3)).catch(err => {
+      // Fetch from all platforms in parallel
+      const [polymarketData, kalshiData, manifoldData] = await Promise.all([
+        PolymarketAPI.fetchOpenEvents(Math.ceil(limit * 0.5)), // 50% from Polymarket
+        KalshiAPI.fetchOpenEvents(Math.ceil(limit * 0.25)).catch(err => {
           console.warn('Kalshi fetch failed:', err.message);
           return []; // Don't fail if Kalshi fails
         }),
+        ManifoldAPI.fetchOpenMarkets(Math.ceil(limit * 0.25)).catch(err => {
+          console.warn('Manifold fetch failed:', err.message);
+          return []; // Don't fail if Manifold fails
+        }),
       ]);
 
-      // Combine markets from both platforms
-      const allMarkets = [...polymarketData, ...kalshiData];
+      // Combine markets from all platforms
+      const allMarkets = [...polymarketData, ...kalshiData, ...manifoldData];
 
       // Markets start without price_history/orderbook - will be fetched on selection
       // This avoids overwhelming the API with requests for all markets
@@ -90,7 +95,8 @@ const Terminal = ({ onLogout, authInfo }) => {
       // Show platform breakdown in status
       const polyCount = polymarketData.length;
       const kalshiCount = kalshiData.length;
-      setStatusMessage(`${enrichedMarkets.length} markets (P:${polyCount} K:${kalshiCount})`);
+      const manifoldCount = manifoldData.length;
+      setStatusMessage(`${enrichedMarkets.length} mkts (P:${polyCount} K:${kalshiCount} M:${manifoldCount})`);
       setTimeout(() => setStatusMessage(""), 3000);
     } catch (error) {
       console.error('Failed to load markets:', error);
@@ -114,12 +120,19 @@ const Terminal = ({ onLogout, authInfo }) => {
       
       // Use different APIs based on platform
       const isKalshi = market.platform === 'Kalshi' || market._source === 'kalshi';
+      const isManifold = market.platform === 'Manifold' || market._source === 'manifold';
       
       if (isKalshi) {
         // Fetch from Kalshi API
         [priceHistory, orderbook] = await Promise.all([
           market.marketId ? KalshiAPI.fetchPriceHistory(market.marketId, 90) : null,
           market.marketId ? KalshiAPI.fetchOrderbook(market.marketId) : null,
+        ]);
+      } else if (isManifold) {
+        // Fetch from Manifold API
+        [priceHistory, orderbook] = await Promise.all([
+          market.marketId ? ManifoldAPI.fetchPriceHistory(market.marketId, 90) : null,
+          ManifoldAPI.fetchOrderbook(market),
         ]);
       } else {
         // Fetch from Polymarket CLOB API
@@ -207,11 +220,16 @@ const Terminal = ({ onLogout, authInfo }) => {
 
       let market;
       const isKalshi = KalshiAPI.isKalshiUrl(url);
+      const isManifold = ManifoldAPI.isManifoldUrl(url);
       
       if (isKalshi) {
         // Load from Kalshi
         market = await KalshiAPI.fetchEventByTicker(url);
         setStatusMessage(`Kalshi: ${market.ticker}`);
+      } else if (isManifold) {
+        // Load from Manifold
+        market = await ManifoldAPI.fetchMarketBySlug(url);
+        setStatusMessage(`Manifold: ${market.ticker}`);
       } else {
         // Load from Polymarket
         market = await PolymarketAPI.fetchEventBySlug(url);
@@ -250,8 +268,8 @@ const Terminal = ({ onLogout, authInfo }) => {
     if (e.key === "Enter" && command) {
       const cmd = command.trim();
 
-      // Handle Polymarket or Kalshi URLs
-      if (cmd.includes('polymarket.com') || cmd.includes('kalshi.com')) {
+      // Handle Polymarket, Kalshi, or Manifold URLs
+      if (cmd.includes('polymarket.com') || cmd.includes('kalshi.com') || cmd.includes('manifold.markets')) {
         loadMarketFromUrl(cmd);
         setCommand("");
         return;
@@ -424,14 +442,21 @@ const Terminal = ({ onLogout, authInfo }) => {
       const edge = m.model_prob - m.market_prob;
       const change = m.market_prob - (m.prev_prob || m.market_prob);
       const isKalshi = m.platform === 'Kalshi';
+      const isManifold = m.platform === 'Manifold';
+      const platformColor = isKalshi 
+        ? 'bg-purple-500/30 text-purple-400' 
+        : isManifold 
+        ? 'bg-green-500/30 text-green-400'
+        : 'bg-blue-500/30 text-blue-400';
+      const platformLetter = isKalshi ? 'K' : isManifold ? 'M' : 'P';
       return (
         <span
           key={m.id}
           className="inline-flex items-center gap-1.5 mx-4 text-xs cursor-pointer hover:bg-gray-800/50 px-2 py-0.5 rounded"
           onClick={() => setSelectedMarket(m)}
         >
-          <span className={`text-[9px] px-1 rounded ${isKalshi ? 'bg-purple-500/30 text-purple-400' : 'bg-blue-500/30 text-blue-400'}`}>
-            {isKalshi ? 'K' : 'P'}
+          <span className={`text-[9px] px-1 rounded ${platformColor}`}>
+            {platformLetter}
           </span>
           <span className="text-orange-500 font-bold">{m.ticker}</span>
           <span className="text-white font-medium">{(m.market_prob * 100).toFixed(1)}¢</span>
@@ -608,9 +633,11 @@ const Terminal = ({ onLogout, authInfo }) => {
           {statusMessage && (
             <span className="text-orange-400 animate-pulse">{statusMessage}</span>
           )}
-          <span className="text-gray-600">POLYMARKET</span>
+          <span className="text-gray-600">PM</span>
           <span className="text-gray-700">|</span>
-          <span className="text-gray-600">KALSHI</span>
+          <span className="text-gray-600">KA</span>
+          <span className="text-gray-700">|</span>
+          <span className="text-gray-600">MF</span>
           <span className="mono text-orange-500 font-medium">{time.toLocaleTimeString()}</span>
           <button
             onClick={onLogout}
@@ -641,14 +668,14 @@ const Terminal = ({ onLogout, authInfo }) => {
           value={command}
           onChange={(e) => setCommand(e.target.value)}
           onKeyDown={handleCommand}
-          placeholder="Paste Polymarket/Kalshi URL or enter ticker (e.g., KXELONMARS-99)..."
+          placeholder="Paste URL (Polymarket/Kalshi/Manifold) or ticker..."
           className="flex-1 px-2 py-1 text-xs bg-transparent border-none outline-none text-gray-300 placeholder-gray-600"
         />
 
         {/* Platform Filter */}
         <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
           <span className="text-[10px] text-gray-500">SRC:</span>
-          {['all', 'polymarket', 'kalshi'].map(plat => (
+          {['all', 'polymarket', 'kalshi', 'manifold'].map(plat => (
             <button
               key={plat}
               onClick={() => setPlatformFilter(plat)}
@@ -658,7 +685,7 @@ const Terminal = ({ onLogout, authInfo }) => {
                   : 'text-gray-500 hover:text-gray-300'
               }`}
             >
-              {plat === 'all' ? 'ALL' : plat === 'polymarket' ? 'PM' : 'KA'}
+              {plat === 'all' ? 'ALL' : plat === 'polymarket' ? 'PM' : plat === 'kalshi' ? 'KA' : 'MF'}
             </button>
           ))}
         </div>
