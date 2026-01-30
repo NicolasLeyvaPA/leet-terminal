@@ -198,10 +198,7 @@ export const signMessage = async (message, address) => {
   }
 
   try {
-    // MetaMask requires the message to be prefixed with a specific string
-    const messageToSign = `\x19Ethereum Signed Message:\n${message.length}${message}`;
-    
-    // Use personal_sign method with MetaMask provider specifically
+    // Use personal_sign method - MetaMask automatically adds EIP-191 prefix
     const signature = await provider.request({
       method: 'personal_sign',
       params: [message, address],

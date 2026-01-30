@@ -163,6 +163,8 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
           console.log('ℹ️ MetaMask authenticated locally (no Supabase)');
         }
         
+        // Reset connecting ref on success
+        metamaskConnectingRef.current = false;
         onLogin();
       } else {
         // Check if error is related to Phantom interception
