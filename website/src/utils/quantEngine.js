@@ -126,6 +126,11 @@ export const QuantEngine = {
   },
 
   calculateConfluence: (factors) => {
+    // Guard against null/undefined input
+    if (!factors || typeof factors !== 'object') {
+      return { score: 0, bullishFactors: 0, bearishFactors: 0, agreement: 0 };
+    }
+    
     const weights = {
       orderbook_imbalance: 0.12,
       price_momentum: 0.1,
@@ -141,8 +146,12 @@ export const QuantEngine = {
     let totalScore = 0;
     let bullishCount = 0, bearishCount = 0;
     Object.entries(factors).forEach(([key, factor]) => {
+      // Skip null/undefined factors or those starting with underscore (metadata)
+      if (!factor || key.startsWith('_')) return;
+      
       const w = weights[key] ?? 0.1;
-      totalScore += factor.value * w;
+      const value = typeof factor.value === 'number' && !isNaN(factor.value) ? factor.value : 0;
+      totalScore += value * w;
       if (factor.direction === "bullish") bullishCount++;
       else if (factor.direction === "bearish") bearishCount++;
     });
