@@ -17,7 +17,9 @@ import { QuantumLabPanel } from './components/panels/QuantumLabPanel';
 import { NewsFeedPanel } from './components/panels/NewsFeedPanel';
 import { BetsMarketPanel } from './components/panels/BetsMarketPanel';
 import { ResearchPanel } from './components/panels/ResearchPanel';
+import { AlertsPanel } from './components/panels/AlertsPanel';
 import { MarketDetailDock } from './components/MarketDetailDock';
+import { alertsEngine } from './utils/alertsEngine';
 import { useWatchlist } from './utils/useWatchlist';
 import Login from './components/Login';
 import Signup from './components/Signup';
@@ -164,6 +166,9 @@ const Terminal = ({ onLogout, authInfo }) => {
         return enrichedMarkets.length > 0 ? enrichedMarkets[0] : null;
       });
       setLastRefresh(new Date());
+      
+      // Check alerts against updated markets
+      alertsEngine.checkAlerts(enrichedMarkets);
       
       // Show platform breakdown in status
       const polyCount = polymarketData.length;
@@ -655,6 +660,42 @@ const Terminal = ({ onLogout, authInfo }) => {
       );
     }
 
+    if (workspace === "alerts") {
+      return (
+        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
+          <div className="col-span-1 row-span-2 min-h-0 overflow-hidden">
+            <PanelErrorBoundary panelName="Alerts">
+              <AlertsPanel 
+                markets={markets} 
+                selectedMarket={selectedMarket} 
+                onSelectMarket={setSelectedMarket}
+              />
+            </PanelErrorBoundary>
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <PanelErrorBoundary panelName="Market Overview">
+              <MarketOverviewPanel market={selectedMarket} />
+            </PanelErrorBoundary>
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <PanelErrorBoundary panelName="Price Chart">
+              <PriceChartPanel market={selectedMarket} />
+            </PanelErrorBoundary>
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <PanelErrorBoundary panelName="Order Book">
+              <OrderBookPanel market={selectedMarket} />
+            </PanelErrorBoundary>
+          </div>
+          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
+            <PanelErrorBoundary panelName="Confluence">
+              <ConfluencePanel market={selectedMarket} />
+            </PanelErrorBoundary>
+          </div>
+        </div>
+      );
+    }
+
     // Default fallback - same as analysis
     return (
       <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
@@ -693,7 +734,7 @@ const Terminal = ({ onLogout, authInfo }) => {
           </div>
           <div className="h-4 w-px bg-gray-700" />
           <div className="flex">
-            {["analysis", "research", "portfolio", "lab", "news", "bets"].map((ws) => (
+            {["analysis", "research", "portfolio", "lab", "alerts", "news", "bets"].map((ws) => (
               <button
                 key={ws}
                 onClick={() => setWorkspace(ws)}
