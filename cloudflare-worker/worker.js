@@ -7,13 +7,21 @@
  * Usage: https://your-worker.your-subdomain.workers.dev/?url=https://api.example.com/endpoint
  */
 
-const ALLOWED_ORIGINS = [
+// Default origins - can be extended via ALLOWED_ORIGINS env var in wrangler.toml
+const DEFAULT_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://leet-terminal.vercel.app',
-  'https://leet-terminal.netlify.app',
-  // Add your production domain here
 ];
+
+function getAllowedOrigins(env) {
+  const origins = [...DEFAULT_ORIGINS];
+  // Add production origins from environment variable (comma-separated)
+  if (env?.ALLOWED_ORIGINS) {
+    const customOrigins = env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean);
+    origins.push(...customOrigins);
+  }
+  return origins;
+}
 
 const ALLOWED_API_HOSTS = [
   'gamma-api.polymarket.com',
@@ -55,8 +63,9 @@ function isRateLimited(ip) {
   return false;
 }
 
-function getCorsHeaders(origin) {
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+function getCorsHeaders(origin, env) {
+  const allowedOrigins = getAllowedOrigins(env);
+  const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -69,7 +78,7 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') || '';
-    const corsHeaders = getCorsHeaders(origin);
+    const corsHeaders = getCorsHeaders(origin, env);
     
     // Handle preflight
     if (request.method === 'OPTIONS') {
