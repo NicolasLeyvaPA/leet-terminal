@@ -7,3 +7,6 @@ compatibility_date = "2024-01-01"
 
 [vars]
 ENVIRONMENT = "production"
+# Comma-separated list of allowed origins for CORS
+# Add your production domains here
+ALLOWED_ORIGINS = "https://leet-terminal.vercel.app,https://leet-terminal.netlify.app"

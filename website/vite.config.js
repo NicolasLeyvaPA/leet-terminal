@@ -7,7 +7,6 @@ export default defineConfig({
   server: {
     host: true, // Listen on all addresses
     allowedHosts: [
-      '602bbd8f7052.ngrok-free.app',
       '.ngrok-free.app', // Allow all ngrok subdomains
       '.ngrok.io', // Allow legacy ngrok domains
       'localhost',
