@@ -1,130 +1,32 @@
-import { useState, useEffect, useMemo } from 'react';
 import { PanelHeader } from '../PanelHeader';
 import { Tag } from '../Tag';
 import { useWatchlist } from '../../utils/useWatchlist';
 
-// Storage key for expanded categories
-const EXPANDED_CATEGORIES_KEY = 'leet-terminal-expanded-categories';
-
-// Category display config with explicit Tailwind classes (required for JIT)
-const CATEGORY_CONFIG = {
-  'Politics': {
-    border: 'border-blue-500/60',
-    borderLight: 'border-blue-500/20',
-    bg: 'bg-blue-500/10',
-    text: 'text-blue-400',
-  },
-  'Crypto': {
-    border: 'border-yellow-500/60',
-    borderLight: 'border-yellow-500/20',
-    bg: 'bg-yellow-500/10',
-    text: 'text-yellow-400',
-  },
-  'Sports': {
-    border: 'border-green-500/60',
-    borderLight: 'border-green-500/20',
-    bg: 'bg-green-500/10',
-    text: 'text-green-400',
-  },
-  'Entertainment': {
-    border: 'border-purple-500/60',
-    borderLight: 'border-purple-500/20',
-    bg: 'bg-purple-500/10',
-    text: 'text-purple-400',
-  },
-  'Science': {
-    border: 'border-cyan-500/60',
-    borderLight: 'border-cyan-500/20',
-    bg: 'bg-cyan-500/10',
-    text: 'text-cyan-400',
-  },
-  'Economics': {
-    border: 'border-red-500/60',
-    borderLight: 'border-red-500/20',
-    bg: 'bg-red-500/10',
-    text: 'text-red-400',
-  },
-  'Tech': {
-    border: 'border-indigo-500/60',
-    borderLight: 'border-indigo-500/20',
-    bg: 'bg-indigo-500/10',
-    text: 'text-indigo-400',
-  },
-  'Pop Culture': {
-    border: 'border-pink-500/60',
-    borderLight: 'border-pink-500/20',
-    bg: 'bg-pink-500/10',
-    text: 'text-pink-400',
-  },
-  'Other': {
-    border: 'border-gray-500/60',
-    borderLight: 'border-gray-500/20',
-    bg: 'bg-gray-500/10',
-    text: 'text-gray-400',
-  },
+// Category colors for visual distinction
+const CATEGORY_COLORS = {
+  'Politics': 'border-blue-500/30 bg-blue-500/5',
+  'Crypto': 'border-yellow-500/30 bg-yellow-500/5',
+  'Sports': 'border-green-500/30 bg-green-500/5',
+  'Entertainment': 'border-purple-500/30 bg-purple-500/5',
+  'Science': 'border-cyan-500/30 bg-cyan-500/5',
+  'Economics': 'border-red-500/30 bg-red-500/5',
+  'Tech': 'border-indigo-500/30 bg-indigo-500/5',
+  'Other': 'border-gray-500/30 bg-gray-500/5',
 };
 
-const DEFAULT_CATEGORY_CONFIG = CATEGORY_CONFIG['Other'];
-
-// Load expanded state from localStorage
-const loadExpandedState = () => {
-  try {
-    const saved = localStorage.getItem(EXPANDED_CATEGORIES_KEY);
-    return saved ? JSON.parse(saved) : {};
-  } catch {
-    return {};
-  }
-};
-
-// Save expanded state to localStorage
-const saveExpandedState = (state) => {
-  try {
-    localStorage.setItem(EXPANDED_CATEGORIES_KEY, JSON.stringify(state));
-  } catch {
-    // Ignore storage errors
-  }
+const CATEGORY_HEADER_COLORS = {
+  'Politics': 'text-blue-400',
+  'Crypto': 'text-yellow-400',
+  'Sports': 'text-green-400',
+  'Entertainment': 'text-purple-400',
+  'Science': 'text-cyan-400',
+  'Economics': 'text-red-400',
+  'Tech': 'text-indigo-400',
+  'Other': 'text-gray-400',
 };
 
 export const WatchlistPanel = ({ markets, groupedMarkets, selectedId, onSelect, categoryFilter }) => {
   const { watchlist, removeFromWatchlist } = useWatchlist();
-  const [expandedCategories, setExpandedCategories] = useState(loadExpandedState);
-
-  // Save to localStorage when expanded state changes
-  useEffect(() => {
-    saveExpandedState(expandedCategories);
-  }, [expandedCategories]);
-
-  // Toggle category expansion
-  const toggleCategory = (category) => {
-    setExpandedCategories(prev => ({
-      ...prev,
-      [category]: !prev[category]
-    }));
-  };
-
-  // Expand/collapse all
-  const expandAll = () => {
-    if (!groupedMarkets) return;
-    const allExpanded = {};
-    Object.keys(groupedMarkets).forEach(cat => {
-      allExpanded[cat] = true;
-    });
-    setExpandedCategories(allExpanded);
-  };
-
-  const collapseAll = () => {
-    setExpandedCategories({});
-  };
-
-  // Calculate stats for a category
-  const getCategoryStats = (categoryMarkets) => {
-    const signals = categoryMarkets.filter(m =>
-      Math.abs((m.model_prob || 0) - (m.market_prob || 0)) > 0.03
-    ).length;
-    const totalLiquidity = categoryMarkets.reduce((sum, m) => sum + (m.liquidity || 0), 0);
-    const topMarket = categoryMarkets[0]; // Already sorted by edge
-    return { signals, totalLiquidity, topMarket };
-  };
 
   if (!markets || markets.length === 0) {
     return (
@@ -140,8 +42,8 @@ export const WatchlistPanel = ({ markets, groupedMarkets, selectedId, onSelect, 
     );
   }
 
-  // Render a single market item - compact version
-  const MarketItem = ({ m, isFirst }) => {
+  // Render a single market item
+  const MarketItem = ({ m }) => {
     const marketProb = m.market_prob || 0;
     const modelProb = m.model_prob || marketProb;
     const prevProb = m.prev_prob || marketProb;
@@ -153,51 +55,60 @@ export const WatchlistPanel = ({ markets, groupedMarkets, selectedId, onSelect, 
     return (
       <div
         onClick={() => onSelect(m)}
-        className={`px-3 py-2 cursor-pointer transition-all border-b border-gray-800/50 ${
+        className={`px-2 py-1.5 cursor-pointer transition-colors ${
           selectedId === m.id
-            ? "bg-orange-500/15 border-l-2 border-l-orange-500"
-            : "hover:bg-gray-800/50 border-l-2 border-l-transparent"
-        } ${isFirst ? '' : ''}`}
+            ? "bg-orange-500/10 border-l-2 border-l-orange-500"
+            : "hover:bg-gray-900/50 border-l-2 border-l-transparent"
+        }`}
       >
-        {/* Main row: Ticker, Price, Edge */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-[11px] font-bold text-orange-500 mono truncate max-w-[140px]">
-              {m.ticker || 'MKT'}
-            </span>
-            <Tag type={signal === 'BUY' ? 'buy' : signal === 'SELL' ? 'sell' : 'hold'} small>
-              {signal}
-            </Tag>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="text-sm text-white font-semibold mono">
-              {(marketProb * 100).toFixed(1)}¢
-            </span>
-            <span
-              className={`text-[10px] mono w-12 text-right ${
-                edge > 0.02 ? "text-green-400" : edge < -0.02 ? "text-red-400" : "text-gray-500"
-              }`}
-            >
-              {edge > 0 ? "+" : ""}{(edge * 100).toFixed(1)}%
-            </span>
-          </div>
+        {/* Ticker and Edge */}
+        <div className="flex items-center justify-between mb-0.5">
+          <span className="text-xs font-bold text-orange-500 mono">
+            {m.ticker || 'MKT'}
+          </span>
+          <span
+            className={`text-[10px] mono font-medium ${
+              edge > 0.02 ? "text-green-400" : edge < -0.02 ? "text-red-400" : "text-gray-500"
+            }`}
+          >
+            {edge > 0 ? "+" : ""}{(edge * 100).toFixed(1)}%
+          </span>
+        </div>
+
+        {/* Price and Change */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-white font-medium mono">
+            {(marketProb * 100).toFixed(1)}¢
+          </span>
+          <span
+            className={`text-[10px] ${
+              change > 0 ? "text-green-400" : change < 0 ? "text-red-400" : "text-gray-500"
+            }`}
+          >
+            {change > 0 ? "+" : ""}{(change * 100).toFixed(2)}
+          </span>
         </div>
 
         {/* Question preview */}
-        <div className="text-[10px] text-gray-500 mt-1 line-clamp-1 pr-4">
+        <div className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">
           {m.question}
         </div>
 
-        {/* Bottom row: Liquidity, Change, Actions */}
-        <div className="flex items-center justify-between mt-1.5 text-[9px]">
-          <span className="text-gray-600">
-            Liq: ${((m.liquidity || 0) / 1000).toFixed(1)}k
-          </span>
-          <div className="flex items-center gap-2">
-            <span
-              className={change > 0 ? "text-green-400" : change < 0 ? "text-red-400" : "text-gray-600"}
-            >
-              {change > 0 ? "▲" : change < 0 ? "▼" : "–"} {Math.abs(change * 100).toFixed(1)}%
+        {/* Tags and Actions */}
+        <div className="flex items-center justify-between mt-1">
+          <div className="flex items-center gap-1">
+            <Tag type={signal === 'BUY' ? 'buy' : signal === 'SELL' ? 'sell' : 'hold'}>
+              {signal}
+            </Tag>
+            {Math.abs(edge) > 0.05 && (
+              <span className={`text-[9px] font-bold ${edge > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                !
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] text-gray-600">
+              ${((m.liquidity || 0) / 1000).toFixed(0)}k
             </span>
             {isInUserWatchlist && (
               <button
@@ -205,10 +116,10 @@ export const WatchlistPanel = ({ markets, groupedMarkets, selectedId, onSelect, 
                   e.stopPropagation();
                   removeFromWatchlist(m.id);
                 }}
-                className="text-gray-600 hover:text-red-400 px-1"
+                className="text-gray-600 hover:text-red-400 text-xs px-1"
                 title="Remove from watchlist"
               >
-                ✕
+                ×
               </button>
             )}
           </div>
@@ -217,148 +128,75 @@ export const WatchlistPanel = ({ markets, groupedMarkets, selectedId, onSelect, 
     );
   };
 
-  // Category section component
-  const CategorySection = ({ category, categoryMarkets }) => {
-    const isExpanded = expandedCategories[category] || false;
-    const config = CATEGORY_CONFIG[category] || DEFAULT_CATEGORY_CONFIG;
-    const { signals, totalLiquidity, topMarket } = getCategoryStats(categoryMarkets);
-
-    return (
-      <div className="mb-1">
-        {/* Category Header - Always visible, clickable */}
-        <button
-          onClick={() => toggleCategory(category)}
-          className={`w-full px-3 py-2 flex items-center justify-between transition-all border-l-2 ${config.border} ${isExpanded ? config.bg : 'bg-gray-900/30 hover:bg-gray-800/50'}`}
-        >
-          <div className="flex items-center gap-2">
-            {/* Expand/Collapse indicator */}
-            <span className={`text-[10px] ${config.text} transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
-              ▶
-            </span>
-            {/* Category name */}
-            <span className={`text-[11px] font-bold ${config.text} uppercase tracking-wide`}>
-              {category}
-            </span>
-            {/* Count badge */}
-            <span className="text-[9px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">
-              {categoryMarkets.length}
-            </span>
-          </div>
-
-          {/* Right side stats */}
-          <div className="flex items-center gap-3 text-[9px]">
-            {signals > 0 && (
-              <span className="text-green-400 font-medium">
-                {signals} {signals === 1 ? 'signal' : 'signals'}
-              </span>
-            )}
-            <span className="text-gray-500">
-              ${(totalLiquidity / 1000).toFixed(0)}k
-            </span>
-          </div>
-        </button>
-
-        {/* Collapsed preview - show top market */}
-        {!isExpanded && topMarket && (
-          <div
-            onClick={() => onSelect(topMarket)}
-            className="px-3 py-1.5 bg-gray-900/20 border-l-2 border-gray-700 cursor-pointer hover:bg-gray-800/30 flex items-center justify-between"
-          >
-            <span className="text-[10px] text-gray-400 truncate max-w-[60%]">
-              Top: {topMarket.ticker}
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-white mono">
-                {((topMarket.market_prob || 0) * 100).toFixed(1)}¢
-              </span>
-              {(() => {
-                const edge = (topMarket.model_prob || 0) - (topMarket.market_prob || 0);
-                return (
-                  <span className={`text-[9px] mono ${edge > 0.02 ? 'text-green-400' : edge < -0.02 ? 'text-red-400' : 'text-gray-500'}`}>
-                    {edge > 0 ? '+' : ''}{(edge * 100).toFixed(1)}%
-                  </span>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-
-        {/* Expanded market list */}
-        {isExpanded && (
-          <div className={`border-l-2 ${config.borderLight}`}>
-            {categoryMarkets.map((m, idx) => (
-              <MarketItem key={m.id} m={m} isFirst={idx === 0} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   // If showing all categories, render grouped view
   if (categoryFilter === 'all' && groupedMarkets && Object.keys(groupedMarkets).length > 0) {
     const sortedCategories = Object.keys(groupedMarkets).sort((a, b) => {
-      // Sort by number of markets with signals, then by total markets
+      // Sort by number of markets with signals
       const aSignals = groupedMarkets[a].filter(m => Math.abs((m.model_prob || 0) - (m.market_prob || 0)) > 0.03).length;
       const bSignals = groupedMarkets[b].filter(m => Math.abs((m.model_prob || 0) - (m.market_prob || 0)) > 0.03).length;
-      if (bSignals !== aSignals) return bSignals - aSignals;
-      return groupedMarkets[b].length - groupedMarkets[a].length;
+      return bSignals - aSignals;
     });
 
-    const expandedCount = Object.values(expandedCategories).filter(Boolean).length;
-    const totalCategories = sortedCategories.length;
-
     return (
-      <div className="terminal-panel h-full flex flex-col">
-        <PanelHeader title="MARKETS" subtitle={`${markets.length} events`} />
+      <div className="terminal-panel h-full">
+        <PanelHeader title="MARKETS" subtitle={`${markets.length} live • by category`} />
+        <div className="panel-content">
+          {sortedCategories.map(category => {
+            const categoryMarkets = groupedMarkets[category];
+            const signals = categoryMarkets.filter(m => Math.abs((m.model_prob || 0) - (m.market_prob || 0)) > 0.03).length;
+            const headerColor = CATEGORY_HEADER_COLORS[category] || 'text-gray-400';
+            const bgColor = CATEGORY_COLORS[category] || 'border-gray-500/30 bg-gray-500/5';
 
-        {/* Controls bar */}
-        <div className="px-3 py-1.5 border-b border-gray-800 flex items-center justify-between bg-gray-900/50">
-          <span className="text-[9px] text-gray-500">
-            {totalCategories} categories
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={expandAll}
-              className="text-[9px] text-gray-500 hover:text-orange-400 transition-colors"
-              title="Expand all"
-            >
-              [+all]
-            </button>
-            <button
-              onClick={collapseAll}
-              className="text-[9px] text-gray-500 hover:text-orange-400 transition-colors"
-              title="Collapse all"
-            >
-              [-all]
-            </button>
-          </div>
-        </div>
+            return (
+              <div key={category} className="mb-2">
+                {/* Category Header */}
+                <div className={`sticky top-0 z-10 px-2 py-1.5 border-l-2 ${bgColor} backdrop-blur-sm`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[10px] font-bold ${headerColor}`}>
+                      {category.toUpperCase()}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-500">
+                        {categoryMarkets.length}
+                      </span>
+                      {signals > 0 && (
+                        <span className="text-[9px] text-green-400 font-medium">
+                          {signals} signals
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-        {/* Categories list */}
-        <div className="panel-content flex-1 overflow-y-auto">
-          {sortedCategories.map(category => (
-            <CategorySection
-              key={category}
-              category={category}
-              categoryMarkets={groupedMarkets[category]}
-            />
-          ))}
+                {/* Category Markets */}
+                <div className="border-l border-gray-800">
+                  {categoryMarkets.slice(0, 10).map((m) => (
+                    <MarketItem key={m.id} m={m} />
+                  ))}
+                  {categoryMarkets.length > 10 && (
+                    <div className="px-2 py-1 text-[9px] text-gray-600 text-center">
+                      +{categoryMarkets.length - 10} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
   }
 
-  // Flat view when filtering by specific category
+  // Flat view when filtering by category
   return (
-    <div className="terminal-panel h-full flex flex-col">
+    <div className="terminal-panel h-full">
       <PanelHeader
         title="MARKETS"
-        subtitle={`${markets.length} ${categoryFilter !== 'all' ? categoryFilter : 'events'}`}
+        subtitle={`${markets.length} ${categoryFilter !== 'all' ? categoryFilter : 'live'}`}
       />
-      <div className="panel-content flex-1 overflow-y-auto">
-        {markets.map((m, idx) => (
-          <MarketItem key={m.id} m={m} isFirst={idx === 0} />
+      <div className="panel-content">
+        {markets.map((m) => (
+          <MarketItem key={m.id} m={m} />
         ))}
       </div>
     </div>
