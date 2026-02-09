@@ -1,0 +1,425 @@
+Summary,Issue Type,Priority,Epic Name,Sprint,Assignee,Original Estimate,Labels,Description
+"Create database migrations",Story,Highest,Backend Infrastructure,Sprint 1,David H.,4h,critical-path,"Create all SQL migration files for: Users, ScrapeJobs, AnalysisJobs, PredictionJobs, Articles, NewsSources, AnalysisResults, Predictions, APIKeys, AuditLogs. Use TimescaleDB hypertables for time-series data.
+
+Files: /db/migrations/
+
+Acceptance Criteria:
+- All tables created with proper indexes
+- Foreign key constraints in place
+- Hypertables configured for Articles, AnalysisResults, Predictions
+- Migrations can be run and rolled back cleanly"
+"Implement User CRUD operations",Story,Highest,Backend Infrastructure,Sprint 1,David H.,6h,critical-path,"Implement CreateUser, GetUser, GetUserByEmail, UpdateUser, DeleteUser in storage/postgres.go
+
+Files: /app/internal/storage/postgres.go
+
+Acceptance Criteria:
+- All CRUD operations working
+- Password hashing with bcrypt
+- Email uniqueness enforced
+- Unit tests for each operation"
+"Wire /auth/register endpoint",Story,Highest,Backend Infrastructure,Sprint 1,David H.,2h,critical-path,"Connect the register handler to actually save users to the database instead of returning stub response.
+
+Files: /app/internal/api/handlers.go
+
+Acceptance Criteria:
+- User saved to database on registration
+- JWT token returned on success
+- Proper error handling for duplicate emails
+- Password validation (min length, complexity)"
+"Wire /auth/login endpoint",Story,Highest,Backend Infrastructure,Sprint 1,David H.,2h,critical-path,"Connect the login handler to verify credentials from database.
+
+Files: /app/internal/api/handlers.go
+
+Acceptance Criteria:
+- Password verified against bcrypt hash
+- JWT access + refresh tokens returned
+- Failed attempts logged
+- Proper error messages (not revealing if email exists)"
+"Implement Job CRUD operations",Story,Highest,Backend Infrastructure,Sprint 1,David H.,8h,critical-path,"Implement CRUD for ScrapeJobs, AnalysisJobs, and PredictionJobs in storage/postgres.go
+
+Files: /app/internal/storage/postgres.go
+
+Acceptance Criteria:
+- Create, Read, Update, Delete for all job types
+- Status tracking (pending, running, completed, failed)
+- User ownership enforced
+- Pagination support for list operations"
+"Wire job endpoints to return DB data",Story,Highest,Backend Infrastructure,Sprint 2,David H.,4h,critical-path,"Update all job GET endpoints to query actual data from database instead of returning empty arrays.
+
+Files: /app/internal/api/handlers.go
+
+Acceptance Criteria:
+- GET /scraper/jobs returns user's jobs
+- GET /analysis/jobs returns user's jobs
+- GET /predictions/jobs returns user's jobs
+- Pagination working
+- Filtering by status"
+"Implement article listing with pagination",Story,High,Backend Infrastructure,Sprint 2,David H.,3h,,"Implement GET /news/articles endpoint with proper pagination and filtering.
+
+Files: /app/internal/api/news_handlers.go
+
+Acceptance Criteria:
+- Pagination with limit/offset
+- Filter by source, date range, category
+- Sort by date, relevance
+- Returns article count in headers"
+"Complete WebSocket job status streaming",Story,High,Backend Infrastructure,Sprint 2,David H.,4h,integration,"Implement real WebSocket message routing for job status updates.
+
+Files: /app/internal/api/handlers.go
+
+Acceptance Criteria:
+- Client can subscribe to job updates
+- Status changes broadcast in real-time
+- Connection heartbeat/keepalive
+- Graceful disconnect handling"
+"Implement full-text search for articles",Story,High,Backend Infrastructure,Sprint 3,David H.,4h,,"Implement GET /news/articles/search with PostgreSQL full-text search.
+
+Files: /app/internal/api/news_handlers.go, /app/internal/storage/postgres.go
+
+Acceptance Criteria:
+- Full-text search across title, description, content
+- Relevance ranking
+- Highlighting of matched terms
+- Search suggestions"
+"Add API rate limiting per user",Story,High,Backend Infrastructure,Sprint 3,David H.,3h,,"Implement rate limiting middleware using Redis.
+
+Files: /app/internal/api/middleware.go, /app/internal/cache/redis.go
+
+Acceptance Criteria:
+- Configurable limits per endpoint
+- Per-user tracking via JWT
+- 429 response with retry-after header
+- Burst allowance"
+"Add Kalshi API proxy endpoints",Story,Medium,Backend Infrastructure,Sprint 3,David H.,4h,,"Add proxy endpoints for Kalshi API similar to Polymarket proxy.
+
+Files: /app/internal/api/handlers.go (new kalshi_handlers.go)
+
+Acceptance Criteria:
+- GET /kalshi/events proxied
+- GET /kalshi/markets proxied
+- Caching implemented
+- Error handling for Kalshi downtime"
+"Add Prometheus metrics endpoints",Story,Medium,Backend Infrastructure,Sprint 4,David H.,3h,,"Add /metrics endpoint for Prometheus scraping.
+
+Files: /app/cmd/api/main.go
+
+Acceptance Criteria:
+- Request count by endpoint
+- Response time histograms
+- Error rates
+- Active connections gauge"
+"Load testing and optimization",Story,High,Backend Infrastructure,Sprint 4,David H.,6h,,"Perform load testing and optimize bottlenecks.
+
+Acceptance Criteria:
+- Load test with 100 concurrent users
+- p95 response time < 200ms
+- Identify and fix bottlenecks
+- Document performance baselines"
+"Production deployment configuration",Story,Highest,Backend Infrastructure,Sprint 4,David H.,4h,critical-path,"Finalize Docker and deployment configs for production.
+
+Files: /deploy/docker-compose.yml, /deploy/docker-compose.prod.yml
+
+Acceptance Criteria:
+- Production docker-compose ready
+- Environment variables documented
+- Health checks configured
+- Logging to stdout/stderr"
+"Add loading skeleton components",Story,Highest,Frontend Development,Sprint 1,,4h,,"Create skeleton/shimmer loading states for all panels.
+
+Files: /website/src/components/panels/*.jsx
+
+Acceptance Criteria:
+- Skeleton component for each panel type
+- Smooth shimmer animation
+- Matches actual content layout
+- Accessible (aria-busy)"
+"Prepare auth service for backend integration",Story,Highest,Frontend Development,Sprint 1,,4h,critical-path,"Refactor auth.js to support backend API calls instead of localStorage.
+
+Files: /website/src/utils/auth.js
+
+Acceptance Criteria:
+- API client methods for login/register
+- Token storage in memory + httpOnly cookie
+- Refresh token logic prepared
+- Backward compatible with current flow"
+"Connect auth to backend API",Story,Highest,Frontend Development,Sprint 2,,6h,critical-path blocked,"Replace localStorage auth with actual backend API calls.
+
+Blocked by: BE-003, BE-004
+
+Files: /website/src/utils/auth.js, /website/src/components/Login.jsx, /website/src/components/Signup.jsx
+
+Acceptance Criteria:
+- Login calls backend /auth/login
+- Register calls backend /auth/register
+- Tokens stored securely
+- Auto-refresh before expiry"
+"Replace direct Polymarket API calls with backend proxy",Story,Highest,Frontend Development,Sprint 2,,4h,blocked,"Route all Polymarket API calls through our backend proxy.
+
+Blocked by: BE-008
+
+Files: /website/src/services/polymarketAPI.js
+
+Acceptance Criteria:
+- All calls go through /api/v1/polymarket/*
+- Fallback handling if backend unavailable
+- Caching headers respected
+- Error handling improved"
+"Implement job status polling/WebSocket listener",Story,High,Frontend Development,Sprint 2,,4h,integration blocked,"Add WebSocket connection for real-time job status updates.
+
+Blocked by: BE-008
+
+Files: /website/src/services/jobsAPI.js (new)
+
+Acceptance Criteria:
+- WebSocket connection established on login
+- Job status updates received in real-time
+- Fallback to polling if WS fails
+- UI updates on status change"
+"Complete BuySellPanel with order preview",Story,High,Frontend Development,Sprint 3,,6h,,"Finish implementing the buy/sell panel with order preview.
+
+Files: /website/src/components/panels/BuySellPanel.jsx
+
+Acceptance Criteria:
+- Order form with quantity, price inputs
+- Real-time cost calculation
+- Order preview before submission
+- Risk warnings displayed
+- (Note: Actual execution is post-MVP)"
+"Complete MarketTradesPanel with real data",Story,High,Frontend Development,Sprint 3,,4h,,"Implement real trade history display.
+
+Files: /website/src/components/panels/MarketTradesPanel.jsx
+
+Acceptance Criteria:
+- Recent trades displayed
+- Real-time updates via WebSocket
+- Trade direction color coding
+- Volume aggregation"
+"Complete MarketDetailDock chart modes",Story,Highest,Frontend Development,Sprint 3,,6h,,"Finish the WIP chart mode tabs in MarketDetailDock.
+
+Files: /website/src/components/MarketDetailDock.jsx
+
+Acceptance Criteria:
+- All chart modes functional (PRICE, KEY PTS, MONTE CARLO, LHS)
+- Smooth tab transitions
+- Data loads correctly for each mode
+- Responsive sizing"
+"Add error toast notifications",Story,High,Frontend Development,Sprint 3,,3h,,"Implement toast notification system for errors and success messages.
+
+Files: /website/src/components/Toast.jsx (new), /website/src/App.jsx
+
+Acceptance Criteria:
+- Toast component with variants (error, success, warning, info)
+- Auto-dismiss after timeout
+- Manual dismiss button
+- Queue multiple toasts
+- Accessible announcements"
+"Add unit tests with Jest/Vitest",Story,Medium,Frontend Development,Sprint 4,,8h,tech-debt,"Set up testing framework and write unit tests.
+
+Files: /website/src/**/*.test.jsx
+
+Acceptance Criteria:
+- Vitest configured with React Testing Library
+- Tests for auth utilities
+- Tests for quantEngine calculations
+- Tests for key components
+- 70% coverage target"
+"Mobile responsive layout",Story,Medium,Frontend Development,Sprint 4,,12h,,"Make the terminal responsive for tablet and mobile.
+
+Files: /website/src/App.jsx, /website/src/styles.css
+
+Acceptance Criteria:
+- Tablet breakpoint (768px)
+- Mobile breakpoint (480px)
+- Collapsible sidebar on mobile
+- Touch-friendly controls
+- Readable font sizes"
+"Accessibility improvements",Story,Medium,Frontend Development,Sprint 4,,6h,tech-debt,"Improve accessibility compliance.
+
+Files: /website/src/components/**/*.jsx
+
+Acceptance Criteria:
+- ARIA labels on interactive elements
+- Keyboard navigation working
+- Focus management on modals
+- Color contrast ratios met
+- Screen reader tested"
+"E2E tests with Playwright",Story,Medium,Frontend Development,Sprint 4,,8h,tech-debt,"Set up Playwright and write E2E tests.
+
+Files: /website/e2e/*.spec.ts
+
+Acceptance Criteria:
+- Playwright configured
+- Login flow test
+- Market selection flow test
+- Chart interaction test
+- CI integration"
+"Set up ML project structure",Story,Highest,Quant/ML Engine,Sprint 1,,4h,,"Create the ML project structure and dependencies.
+
+Files: /ml/ (new directory)
+
+Acceptance Criteria:
+- Python environment with requirements.txt
+- Directory structure (models/, training/, features/, evaluation/)
+- Basic pipeline scaffolding
+- Integration points with Go backend defined"
+"Implement real sentiment analysis",Story,Highest,Quant/ML Engine,Sprint 1,,12h,critical-path,"Replace keyword counting with real NLP sentiment analysis.
+
+Files: /ml/models/sentiment.py, /app/internal/analyzer/engine.go
+
+Acceptance Criteria:
+- VADER or TextBlob sentiment scoring
+- Confidence scores included
+- Batch processing support
+- >70% accuracy on test set
+- Integration with Go analyzer service"
+"Implement named entity recognition",Story,Highest,Quant/ML Engine,Sprint 2,,8h,,"Extract entities (people, orgs, events) from articles.
+
+Files: /ml/models/ner.py, /app/internal/analyzer/engine.go
+
+Acceptance Criteria:
+- spaCy NER integration
+- Extract: PERSON, ORG, EVENT, GPE, MONEY
+- Entity linking to markets
+- JSON output format"
+"Build basic price prediction model",Story,Highest,Quant/ML Engine,Sprint 2,,16h,critical-path,"Create first version of price prediction model.
+
+Files: /ml/models/price_predictor.py, /app/internal/modeler/engine.go
+
+Acceptance Criteria:
+- Features: price history, volume, sentiment, time to expiry
+- Model: Gradient Boosting or similar
+- Output: probability + confidence interval
+- >55% directional accuracy
+- Inference <100ms"
+"Market correlation matrix",Story,High,Quant/ML Engine,Sprint 3,,6h,,"Calculate correlations between markets.
+
+Files: /ml/features/correlation.py
+
+Acceptance Criteria:
+- Pearson correlation matrix
+- Rolling correlation (7d, 30d windows)
+- Significant correlations highlighted
+- Daily recalculation job"
+"Time series forecasting",Story,High,Quant/ML Engine,Sprint 3,,12h,,"Implement time series forecasting for prices.
+
+Files: /ml/models/timeseries.py
+
+Acceptance Criteria:
+- Prophet or ARIMA implementation
+- Forecast horizons: 1h, 4h, 24h, 7d
+- Confidence intervals
+- Backtesting results logged
+- Integration with modeler service"
+"Volatility estimation",Story,High,Quant/ML Engine,Sprint 3,,8h,,"Calculate realized and implied volatility.
+
+Files: /ml/features/volatility.py
+
+Acceptance Criteria:
+- Realized volatility (historical)
+- GARCH model for forecasting
+- Volatility surface if multi-strike
+- Integration with Greeks calculation"
+"Ensemble model combining signals",Story,Medium,Quant/ML Engine,Sprint 4,,8h,,"Combine multiple models into ensemble prediction.
+
+Files: /ml/models/ensemble.py
+
+Acceptance Criteria:
+- Weighted average of models
+- Dynamic weight adjustment based on recent performance
+- Confidence-weighted output
+- A/B testing framework"
+"Model evaluation and metrics dashboard",Story,High,Quant/ML Engine,Sprint 4,,4h,,"Create evaluation pipeline and metrics tracking.
+
+Files: /ml/evaluation/metrics.py
+
+Acceptance Criteria:
+- Accuracy, precision, recall, F1
+- Brier score for probabilities
+- Calibration plots
+- Daily evaluation job
+- Metrics exposed to monitoring"
+"Design TimescaleDB schema for price data",Story,Highest,Data & Visualization,Sprint 1,,4h,critical-path,"Design optimal schema for storing market price history.
+
+Files: /db/migrations/003_price_data.sql
+
+Acceptance Criteria:
+- Hypertable for price data
+- Efficient OHLC aggregation queries
+- Retention policy (90 days detailed, 1 year daily)
+- Indexes for common queries"
+"Build price ingestion pipeline",Story,Highest,Data & Visualization,Sprint 1,,8h,critical-path,"Create pipeline to ingest prices from Polymarket and Kalshi.
+
+Files: /data/pipelines/price_ingestion.py or Go equivalent
+
+Acceptance Criteria:
+- Fetch prices every 5 minutes
+- Store in TimescaleDB
+- Handle API rate limits
+- Retry logic for failures
+- Data quality checks"
+"Implement candlestick charts",Story,Highest,Data & Visualization,Sprint 2,,6h,,"Add OHLC candlestick chart visualization.
+
+Files: /website/src/components/CandlestickChart.jsx (new)
+
+Acceptance Criteria:
+- Candlestick rendering with Chart.js or lightweight-charts
+- Time aggregation (1m, 5m, 15m, 1h, 4h, 1d)
+- Volume bars below
+- Responsive sizing"
+"Add chart interactivity",Story,Highest,Data & Visualization,Sprint 2,,6h,,"Add zoom, pan, and tooltip interactions to charts.
+
+Files: /website/src/components/PriceChart.jsx, /website/src/components/CandlestickChart.jsx
+
+Acceptance Criteria:
+- Mouse wheel zoom
+- Click and drag pan
+- Tooltip on hover with OHLCV data
+- Reset zoom button
+- Touch support"
+"Volume profile / depth chart",Story,High,Data & Visualization,Sprint 3,,8h,,"Implement volume profile and order book depth visualization.
+
+Files: /website/src/components/DepthChart.jsx (new)
+
+Acceptance Criteria:
+- Bid/ask depth visualization
+- Volume at price histogram
+- Real-time updates
+- Imbalance indicators"
+"Heat map for market correlations",Story,High,Data & Visualization,Sprint 3,,6h,,"Visualize correlation matrix as interactive heatmap.
+
+Files: /website/src/components/CorrelationHeatmap.jsx (new)
+
+Acceptance Criteria:
+- Color scale for correlation strength
+- Click to see correlation details
+- Filter by category
+- Sort by correlation to selected market"
+"Add chart indicators (MA, RSI, Bollinger)",Story,High,Data & Visualization,Sprint 3,,10h,,"Implement technical indicators overlay on charts.
+
+Files: /website/src/utils/indicators.js (new), /website/src/components/PriceChart.jsx
+
+Acceptance Criteria:
+- Moving averages (SMA, EMA)
+- RSI with overbought/oversold zones
+- Bollinger Bands
+- Indicator toggle UI
+- Configurable parameters"
+"Real-time WebSocket for all watched markets",Story,High,Data & Visualization,Sprint 4,,8h,integration,"Extend WebSocket to stream prices for all markets in watchlist.
+
+Files: /website/src/services/polymarketWebSocket.js
+
+Acceptance Criteria:
+- Subscribe to multiple markets
+- Efficient message batching
+- Reconnection handling
+- Throttle UI updates (max 1/sec per market)"
+"Performance monitoring dashboard",Story,Medium,Data & Visualization,Sprint 4,,6h,,"Create dashboard to monitor system performance.
+
+Files: /website/src/components/panels/PerformanceDashboard.jsx (new)
+
+Acceptance Criteria:
+- API response times
+- WebSocket latency
+- Data freshness indicators
+- Error rate display
+- Frontend performance metrics"
