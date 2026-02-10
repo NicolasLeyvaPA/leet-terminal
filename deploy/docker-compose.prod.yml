@@ -18,13 +18,8 @@ services:
       file: docker-compose.base.yml
       service: app
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - DATABASE_URL=postgres://leet:leetpass@db:5432/leetdb
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./app:/app/app
-    command: npm run dev
     depends_on:
       - db
     networks:
@@ -35,19 +30,29 @@ services:
       file: docker-compose.base.yml
       service: web
     environment:
-      - NODE_ENV=development
-    ports:
-      - "5173:80"
-    volumes:
-      - ./web:/app/web
+      - NODE_ENV=production
     depends_on:
       - app
     networks:
       - leet-net
+
+  nginx:
+    extends:
+      file: docker-compose.base.yml
+      service: nginx
+    ports:
+      - "80:80"
+    environment:
+      - SERVER_NAME=${SERVER_NAME}
+    networks:
+      - leet-net
+      - proxy-net
 
 volumes:
   db_data:
 
 networks:
   leet-net:
+    external: true
+  proxy-net:
     external: true

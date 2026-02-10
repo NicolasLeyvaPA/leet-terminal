@@ -1,0 +1,32 @@
+# TimescaleDB Docker Compose Service
+version: '3.8'
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg14
+    container_name: timescaledb
+    environment:
+      POSTGRES_USER: timescale_user
+      POSTGRES_PASSWORD: timescale_pass
+      POSTGRES_DB: news_bets_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:14
+    container_name: postgres_users
+    environment:
+      POSTGRES_USER: user_admin
+      POSTGRES_PASSWORD: user_pass
+      POSTGRES_DB: users_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  timescale_data:
+  postgres_data:

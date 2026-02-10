@@ -1,0 +1,49 @@
+name: Deploy Service to Hetzner
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to deploy (db, app, web, all)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - db
+          - app
+          - web
+          - all
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
+
+      - name: Deploy selected service(s)
+        env:
+          SERVICE: ${{ github.event.inputs.service }}
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} "\
+            mkdir -p ~/leet-terminal && \
+            cd ~/leet-terminal && \
+            if [ ! -d .git ]; then \
+              git clone ${{ secrets.REPO_URL }} .; \
+            else \
+              git fetch --all && git reset --hard origin/${{ github.ref_name }}; \
+            fi && \
+            if [ \"$SERVICE\" = \"db\" ]; then \
+              docker-compose -f deploy/docker-compose.prod.yml up -d db; \
+            elif [ \"$SERVICE\" = \"app\" ]; then \
+              docker-compose -f deploy/docker-compose.prod.yml up -d app; \
+            elif [ \"$SERVICE\" = \"web\" ]; then \
+              docker-compose -f deploy/docker-compose.prod.yml up -d web; \
+            else \
+              docker-compose -f deploy/docker-compose.prod.yml up -d --build; \
+            fi"

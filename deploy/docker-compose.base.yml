@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=leet
+      - POSTGRES_PASSWORD=leetpass
+      - POSTGRES_DB=leetdb
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - leet-net
+
+  app:
+    image: leet-terminal-app:latest
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://leet:leetpass@db:5432/leetdb
+    depends_on:
+      - db
+    networks:
+      - leet-net
+
+  web:
+    image: leet-terminal-web:latest
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - app
+    networks:
+      - leet-net
+
+  nginx:
+    image: nginx:1.25-alpine
+    restart: unless-stopped
+    configs:
+      - source: nginx_conf
+        target: /etc/nginx/nginx.conf
+    depends_on:
+      - web
+    networks:
+      - leet-net
+      - proxy-net
+    expose:
+      - "80"
+
+configs:
+  nginx_conf:
+    file: ./deploy/docker/nginx.conf
+
+volumes:
+  db_data:
+
+networks:
+  leet-net:
+    driver: overlay
+  proxy-net:
+    external: true
