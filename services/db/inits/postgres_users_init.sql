@@ -1,4 +1,4 @@
--- PostgreSQL init: create users and wallets tables
+-- PostgreSQL init: create users tables
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,

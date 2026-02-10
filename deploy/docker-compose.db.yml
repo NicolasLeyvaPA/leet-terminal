@@ -12,6 +12,7 @@ services:
       - "5433:5432"
     volumes:
       - timescale_data:/var/lib/postgresql/data
+      - ../../services/db/migrations/timescaledb_migration_001.sql:/docker-entrypoint-initdb.d/01_timescaledb_migration.sql:ro
     restart: unless-stopped
 
   postgres:
@@ -25,6 +26,7 @@ services:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ../../services/db/migrations/postgres_users_migration_001.sql:/docker-entrypoint-initdb.d/01_postgres_migration.sql:ro
     restart: unless-stopped
 
 volumes:

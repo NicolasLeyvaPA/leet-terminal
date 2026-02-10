@@ -22,8 +22,8 @@ services:
       - DATABASE_URL=postgres://leet:leetpass@db:5432/leetdb
     ports:
       - "3000:3000"
-    volumes:
-      - ./app:/app/app
+    # app source mount removed; coordinator moved to services/
+    volumes: []
     command: npm run dev
     depends_on:
       - db

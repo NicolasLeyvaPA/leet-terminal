@@ -1,136 +1,68 @@
-type Wallet struct {
-	ID        int
-	UserID    int
-	Address   string
-	CreatedAt string
-}
-
-// --- CRUD for Wallet ---
-func (h *TimescaleHandler) CreateWallet(ctx context.Context, w *Wallet) error {
-	q := `INSERT INTO wallets (user_id, address) VALUES ($1, $2) RETURNING id, created_at`
-	return h.DB.QueryRowContext(ctx, q, w.UserID, w.Address).Scan(&w.ID, &w.CreatedAt)
-}
-
-func (h *TimescaleHandler) GetWalletByID(ctx context.Context, id int) (*Wallet, error) {
-	q := `SELECT id, user_id, address, created_at FROM wallets WHERE id = $1`
-	w := &Wallet{}
-	err := h.DB.QueryRowContext(ctx, q, id).Scan(&w.ID, &w.UserID, &w.Address, &w.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return w, nil
-}
-
-func (h *TimescaleHandler) UpdateWallet(ctx context.Context, w *Wallet) error {
-	q := `UPDATE wallets SET user_id=$1, address=$2 WHERE id=$3`
-	_, err := h.DB.ExecContext(ctx, q, w.UserID, w.Address, w.ID)
-	return err
-}
-
-func (h *TimescaleHandler) DeleteWallet(ctx context.Context, id int) error {
-	q := `DELETE FROM wallets WHERE id=$1`
-	_, err := h.DB.ExecContext(ctx, q, id)
-	return err
-}
 package storage
 
-import (
-	"context"
-	"database/sql"
+import "context"
 
-	_ "github.com/jackc/pgx/v4/stdlib"
-)
-
-// DB interface for abstraction and testability
-type DB interface {
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
-}
-
-type NewsArticle struct {
-	ID          int
-	Title       string
-	Content     string
-	Source      string
-	PublishedAt string
-	InsertedAt  string
-}
-
-type Bet struct {
-	ID            int
-	UserID        int
-	ArticleID     sql.NullInt64
-	Amount        float64
-	PlacedAt      string
-	WalletAddress sql.NullString
-	InsertedAt    string
-}
+// Note: low-level SQL implementations live in `services/db`.
+// `NewsRepo`, `BetRepo`, and `WalletRepo` are storage-facing interfaces; concrete SQL repos
+// implement these interfaces in package `db`.
 
 type TimescaleHandler struct {
-	DB DB
+	NewsRepo   NewsRepo
+	BetRepo    BetRepo
+	WalletRepo WalletRepo
 }
 
-func NewTimescaleHandler(dsn string) (*TimescaleHandler, error) {
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		return nil, err
-	}
-	return &TimescaleHandler{DB: db}, nil
+func NewTimescaleHandler(n NewsRepo, b BetRepo, w WalletRepo) *TimescaleHandler {
+	return &TimescaleHandler{NewsRepo: n, BetRepo: b, WalletRepo: w}
 }
 
-// --- CRUD for NewsArticle ---
+// News
 func (h *TimescaleHandler) CreateNews(ctx context.Context, n *NewsArticle) error {
-	q := `INSERT INTO news_articles (title, content, source, published_at) VALUES ($1, $2, $3, $4) RETURNING id, inserted_at`
-	return h.DB.QueryRowContext(ctx, q, n.Title, n.Content, n.Source, n.PublishedAt).Scan(&n.ID, &n.InsertedAt)
+	return h.NewsRepo.CreateNews(ctx, n)
 }
 
 func (h *TimescaleHandler) GetNewsByID(ctx context.Context, id int) (*NewsArticle, error) {
-	q := `SELECT id, title, content, source, published_at, inserted_at FROM news_articles WHERE id = $1`
-	n := &NewsArticle{}
-	err := h.DB.QueryRowContext(ctx, q, id).Scan(&n.ID, &n.Title, &n.Content, &n.Source, &n.PublishedAt, &n.InsertedAt)
-	if err != nil {
-		return nil, err
-	}
-	return n, nil
+	return h.NewsRepo.GetNewsByID(ctx, id)
 }
 
 func (h *TimescaleHandler) UpdateNews(ctx context.Context, n *NewsArticle) error {
-	q := `UPDATE news_articles SET title=$1, content=$2, source=$3, published_at=$4 WHERE id=$5`
-	_, err := h.DB.ExecContext(ctx, q, n.Title, n.Content, n.Source, n.PublishedAt, n.ID)
-	return err
+	return h.NewsRepo.UpdateNews(ctx, n)
 }
 
 func (h *TimescaleHandler) DeleteNews(ctx context.Context, id int) error {
-	q := `DELETE FROM news_articles WHERE id=$1`
-	_, err := h.DB.ExecContext(ctx, q, id)
-	return err
+	return h.NewsRepo.DeleteNews(ctx, id)
 }
 
-// --- CRUD for Bet ---
+// Bet
 func (h *TimescaleHandler) CreateBet(ctx context.Context, b *Bet) error {
-	q := `INSERT INTO bets (user_id, article_id, amount, placed_at, wallet_address) VALUES ($1, $2, $3, $4, $5) RETURNING id, inserted_at`
-	return h.DB.QueryRowContext(ctx, q, b.UserID, b.ArticleID, b.Amount, b.PlacedAt, b.WalletAddress).Scan(&b.ID, &b.InsertedAt)
+	return h.BetRepo.CreateBet(ctx, b)
 }
 
 func (h *TimescaleHandler) GetBetByID(ctx context.Context, id int) (*Bet, error) {
-	q := `SELECT id, user_id, article_id, amount, placed_at, wallet_address, inserted_at FROM bets WHERE id = $1`
-	b := &Bet{}
-	err := h.DB.QueryRowContext(ctx, q, id).Scan(&b.ID, &b.UserID, &b.ArticleID, &b.Amount, &b.PlacedAt, &b.WalletAddress, &b.InsertedAt)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
+	return h.BetRepo.GetBetByID(ctx, id)
 }
 
 func (h *TimescaleHandler) UpdateBet(ctx context.Context, b *Bet) error {
-	q := `UPDATE bets SET user_id=$1, article_id=$2, amount=$3, placed_at=$4, wallet_address=$5 WHERE id=$6`
-	_, err := h.DB.ExecContext(ctx, q, b.UserID, b.ArticleID, b.Amount, b.PlacedAt, b.WalletAddress, b.ID)
-	return err
+	return h.BetRepo.UpdateBet(ctx, b)
 }
 
 func (h *TimescaleHandler) DeleteBet(ctx context.Context, id int) error {
-	q := `DELETE FROM bets WHERE id=$1`
-	_, err := h.DB.ExecContext(ctx, q, id)
-	return err
+	return h.BetRepo.DeleteBet(ctx, id)
+}
+
+// Wallet
+func (h *TimescaleHandler) CreateWallet(ctx context.Context, w *Wallet) error {
+	return h.WalletRepo.CreateWallet(ctx, w)
+}
+
+func (h *TimescaleHandler) GetWalletByID(ctx context.Context, id int) (*Wallet, error) {
+	return h.WalletRepo.GetWalletByID(ctx, id)
+}
+
+func (h *TimescaleHandler) UpdateWallet(ctx context.Context, w *Wallet) error {
+	return h.WalletRepo.UpdateWallet(ctx, w)
+}
+
+func (h *TimescaleHandler) DeleteWallet(ctx context.Context, id int) error {
+	return h.WalletRepo.DeleteWallet(ctx, id)
 }
