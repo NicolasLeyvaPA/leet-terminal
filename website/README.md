@@ -1,4 +1,4 @@
-# Leet Quantum Terminal Pro
+# Leet Terminal
 
 A React-based prediction markets analytics terminal, converted from a single HTML file to a modular React application.
 

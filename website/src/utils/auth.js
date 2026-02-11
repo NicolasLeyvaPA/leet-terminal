@@ -343,7 +343,7 @@ export const authenticateWithPhantom = async () => {
     const timestamp = Date.now();
     
     // Sign a message to prove wallet ownership
-    const message = `Sign in to Leet Quantum Terminal\n\nWallet: ${publicKey}\nChallenge: ${challenge}\nTimestamp: ${timestamp}`;
+    const message = `Sign in to Leet Terminal\n\nWallet: ${publicKey}\nChallenge: ${challenge}\nTimestamp: ${timestamp}`;
     const signResult = await signPhantomMessage(message);
     
     if (!signResult.success) {
@@ -588,7 +588,7 @@ export const authenticateWithMetaMask = async () => {
     const timestamp = Date.now();
     
     // Sign a message to prove wallet ownership
-    const message = `Sign in to Leet Quantum Terminal\n\nWallet: ${address}\nChallenge: ${challenge}\nTimestamp: ${timestamp}`;
+    const message = `Sign in to Leet Terminal\n\nWallet: ${address}\nChallenge: ${challenge}\nTimestamp: ${timestamp}`;
     const signResult = await signMetaMaskMessage(message, address);
     
     if (!signResult.success) {

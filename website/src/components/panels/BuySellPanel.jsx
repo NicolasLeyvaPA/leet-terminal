@@ -43,7 +43,7 @@ export const BuySellPanel = ({ market }) => {
 
   return (
     <div className="terminal-panel h-full flex flex-col">
-      <PanelHeader title="SIMULATOR" subtitle="LEET QUANTUM" />
+      <PanelHeader title="SIMULATOR" subtitle="LEET TERMINAL" />
       <div className="panel-content p-2 text-xs flex-1 flex flex-col">
         {/* Side Selection */}
         <div className="flex gap-1 mb-2">

@@ -29,7 +29,7 @@ export const NewsFeedPanel = ({ news, onNewsClick, fullPage = false, loading = f
         <div className="terminal-panel h-full">
           <PanelHeader
             title="NEWS & MARKET INTELLIGENCE"
-            subtitle="LEET QUANTUM TERMINAL"
+            subtitle="LEET TERMINAL"
           />
           <div className="panel-content p-4">
             <div className="grid grid-cols-3 gap-4 h-full">
