@@ -36,6 +36,7 @@ This is not a dashboard. This is a weapon.
 
 ## Access
 
+Invite Only.
 Wallet-based and credential-based authentication. Multi-chain support.
 
 ---
@@ -62,7 +63,7 @@ Wallet-based and credential-based authentication. Multi-chain support.
 ---
 
 ## License
-
+Proprietary
 MIT
 
 ---
