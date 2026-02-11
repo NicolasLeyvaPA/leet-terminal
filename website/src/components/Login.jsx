@@ -199,8 +199,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
       <div className="terminal-panel" style={{ width: '400px', padding: '40px' }}>
         <div className="text-center mb-8">
           <h1 className="text-orange-500 font-bold text-2xl tracking-wide mb-2">
-            LEET<span className="text-white ml-0.5">QUANTUM</span>
-            <span className="text-orange-400 ml-0.5">TERMINAL</span>
+            LEET<span className="text-orange-400 ml-0.5">TERMINAL</span>
           </h1>
           <p className="text-gray-500 text-sm">Enter your credentials to access</p>
         </div>

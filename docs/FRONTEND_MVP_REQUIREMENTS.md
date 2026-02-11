@@ -1,6 +1,6 @@
 # Frontend MVP Requirements Document
 
-## Leet Quantum Terminal Pro - Frontend & PM Guide
+## Leet Terminal - Frontend & PM Guide
 
 **Version:** 1.0.0
 **Last Updated:** January 2026

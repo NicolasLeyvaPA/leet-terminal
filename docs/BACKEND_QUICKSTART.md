@@ -1,6 +1,6 @@
 # Backend Engineer Quick Start Guide
 
-Welcome to the Leet Quantum Terminal Pro backend team! This guide will get you up to speed quickly.
+Welcome to the Leet Terminal backend team! This guide will get you up to speed quickly.
 
 ---
 

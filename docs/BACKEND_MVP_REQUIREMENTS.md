@@ -1,6 +1,6 @@
 # Backend MVP Requirements Document
 
-## Leet Quantum Terminal Pro - Backend Architecture
+## Leet Terminal - Backend Architecture
 
 **Version:** 1.0.0
 **Last Updated:** January 2026
@@ -28,7 +28,7 @@
 ## Executive Summary
 
 ### Project Vision
-Leet Quantum Terminal Pro is a professional-grade prediction market analytics platform. The backend MVP must transform the current client-side-only application into a full-stack platform capable of:
+Leet Terminal is a professional-grade prediction market analytics platform. The backend MVP must transform the current client-side-only application into a full-stack platform capable of:
 
 - **Persistent user data** (portfolios, watchlists, preferences)
 - **Real-time market data aggregation** (Polymarket + Kalshi)
