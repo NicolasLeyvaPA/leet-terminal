@@ -1,21 +1,15 @@
 /**
- * Parallel.ai Deep Research API Service
- * 
- * Provides deep web research capabilities for prediction market analysis.
- * Docs: https://docs.parallel.ai
- * 
- * Features:
- * - Market research and due diligence
- * - Event verification and fact-checking
- * - News aggregation with citations
- * - Structured output with confidence scores
+ * Leet Terminal — Deep Research Engine
+ *
+ * Proprietary research layer for prediction market intelligence.
+ * Performs deep web research, fact-checking, and structured analysis.
  */
 
 import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
 import { sanitizeText } from '../utils/sanitize';
 
-const PARALLEL_API = 'https://api.parallel.ai/v1';
-const API_KEY = import.meta.env.VITE_PARALLEL_API_KEY || '';
+const RESEARCH_API = 'https://api.parallel.ai/v1';
+const API_KEY = import.meta.env.VITE_RESEARCH_API_KEY || import.meta.env.VITE_PARALLEL_API_KEY || '';
 
 // Cache TTLs
 const CACHE_TTL = {
@@ -23,47 +17,47 @@ const CACHE_TTL = {
   QUICK: 5 * 60 * 1000,      // 5 minutes for quick queries
 };
 
-// Processors (compute budget levels)
-const PROCESSORS = {
-  QUICK: 'base',           // Fast, lower cost
-  STANDARD: 'standard',    // Balanced
-  DEEP: 'deep',            // Most thorough, higher cost
+// Research depth levels
+const DEPTH = {
+  QUICK: 'base',
+  STANDARD: 'standard',
+  DEEP: 'deep',
 };
 
 /**
- * Check if Parallel API is configured
+ * Check if the research engine is configured
  */
-export function isParallelConfigured() {
+export function isResearchConfigured() {
   return !!API_KEY;
 }
 
 /**
- * Run a research task on Parallel API
+ * Execute a research task
  * @param {string} input - The research query/task
  * @param {object} options - Configuration options
  * @returns {Promise<object>} Research results with citations
  */
 async function runTask(input, options = {}) {
   if (!API_KEY) {
-    throw new Error('Parallel API key not configured. Add VITE_PARALLEL_API_KEY to .env');
+    throw new Error('Research engine not configured. Add VITE_RESEARCH_API_KEY to .env');
   }
 
   const {
-    processor = PROCESSORS.STANDARD,
+    processor = DEPTH.STANDARD,
     outputSchema = null,
     cacheKey = null,
     cacheTtl = CACHE_TTL.RESEARCH,
   } = options;
 
   // Check cache
-  const fullCacheKey = cacheKey || `parallel:${processor}:${input.slice(0, 100)}`;
+  const fullCacheKey = cacheKey || `research:${processor}:${input.slice(0, 100)}`;
   const cached = getCached(fullCacheKey);
   if (cached !== null) {
     return { ...cached, _cached: true };
   }
 
   // Rate limit
-  await waitForRateLimit('parallel', 1000);
+  await waitForRateLimit('research', 1000);
 
   // Build request body
   const body = {
@@ -81,7 +75,7 @@ async function runTask(input, options = {}) {
   }
 
   try {
-    const response = await fetch(`${PARALLEL_API}/tasks/runs`, {
+    const response = await fetch(`${RESEARCH_API}/tasks/runs`, {
       method: 'POST',
       headers: {
         'x-api-key': API_KEY,
@@ -92,7 +86,7 @@ async function runTask(input, options = {}) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Parallel API error ${response.status}: ${errorText}`);
+      throw new Error(`Research engine error ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
@@ -113,7 +107,7 @@ async function runTask(input, options = {}) {
 
     return result;
   } catch (error) {
-    console.error('Parallel API error:', error.message);
+    console.error('Research engine error:', error.message);
     throw error;
   }
 }
@@ -196,9 +190,9 @@ ${market.resolution_source ? `Resolution source: ${market.resolution_source}` : 
   };
 
   const result = await runTask(input, {
-    processor: PROCESSORS.DEEP,
+    processor: DEPTH.DEEP,
     outputSchema,
-    cacheKey: `parallel:market:${market.id}`,
+    cacheKey: `research:market:${market.id}`,
     cacheTtl: CACHE_TTL.RESEARCH,
   });
 
@@ -258,7 +252,7 @@ Provide:
   };
 
   return runTask(input, {
-    processor: PROCESSORS.STANDARD,
+    processor: DEPTH.STANDARD,
     outputSchema,
     cacheTtl: CACHE_TTL.QUICK,
   });
@@ -312,9 +306,9 @@ For each news item provide:
   };
 
   return runTask(input, {
-    processor: PROCESSORS.STANDARD,
+    processor: DEPTH.STANDARD,
     outputSchema,
-    cacheKey: `parallel:news:${topic.slice(0, 50)}:${days}d`,
+    cacheKey: `research:news:${topic.slice(0, 50)}:${days}d`,
     cacheTtl: CACHE_TTL.QUICK,
   });
 }
@@ -377,9 +371,9 @@ Provide:
   };
 
   return runTask(input, {
-    processor: PROCESSORS.DEEP,
+    processor: DEPTH.DEEP,
     outputSchema,
-    cacheKey: `parallel:entity:${entityName.toLowerCase().replace(/\s+/g, '_')}`,
+    cacheKey: `research:entity:${entityName.toLowerCase().replace(/\s+/g, '_')}`,
     cacheTtl: CACHE_TTL.RESEARCH,
   });
 }
@@ -431,7 +425,7 @@ For each outcome, provide:
   };
 
   return runTask(input, {
-    processor: PROCESSORS.DEEP,
+    processor: DEPTH.DEEP,
     outputSchema,
     cacheTtl: CACHE_TTL.RESEARCH,
   });
@@ -440,32 +434,35 @@ For each outcome, provide:
 /**
  * Custom research query
  * @param {string} query - Free-form research query
- * @param {string} processor - Processor level (quick/standard/deep)
+ * @param {string} depth - Depth level (quick/standard/deep)
  * @returns {Promise<object>} Research results
  */
-export async function customResearch(query, processor = 'standard') {
-  const processorMap = {
-    quick: PROCESSORS.QUICK,
-    standard: PROCESSORS.STANDARD,
-    deep: PROCESSORS.DEEP,
+export async function customResearch(query, depth = 'standard') {
+  const depthMap = {
+    quick: DEPTH.QUICK,
+    standard: DEPTH.STANDARD,
+    deep: DEPTH.DEEP,
   };
 
   return runTask(query, {
-    processor: processorMap[processor] || PROCESSORS.STANDARD,
-    cacheTtl: processor === 'deep' ? CACHE_TTL.RESEARCH : CACHE_TTL.QUICK,
+    processor: depthMap[depth] || DEPTH.STANDARD,
+    cacheTtl: depth === 'deep' ? CACHE_TTL.RESEARCH : CACHE_TTL.QUICK,
   });
 }
 
-// Export the API
-export const ParallelAPI = {
-  isConfigured: isParallelConfigured,
+// Export as Leet Research Engine
+export const ResearchEngine = {
+  isConfigured: isResearchConfigured,
   researchMarket,
   factCheck,
   getLatestNews,
   researchEntity,
   compareOutcomes,
   customResearch,
-  PROCESSORS,
+  DEPTH,
 };
 
-export default ParallelAPI;
+// Backwards compatibility
+export const ParallelAPI = ResearchEngine;
+
+export default ResearchEngine;

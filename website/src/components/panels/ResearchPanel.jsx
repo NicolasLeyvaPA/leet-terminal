@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { PanelHeader } from '../PanelHeader';
-import { ParallelAPI } from '../../services/parallelAPI';
+import { ResearchEngine } from '../../services/parallelAPI';
 
 export const ResearchPanel = ({ market, onResearchComplete }) => {
   const [loading, setLoading] = useState(false);
@@ -8,8 +8,9 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
   const [research, setResearch] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [customQuery, setCustomQuery] = useState('');
+  const [depth, setDepth] = useState('deep');
 
-  const isConfigured = ParallelAPI.isConfigured();
+  const isConfigured = ResearchEngine.isConfigured();
 
   // Run deep research on the market
   const runResearch = useCallback(async () => {
@@ -19,7 +20,7 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
     setError(null);
 
     try {
-      const result = await ParallelAPI.researchMarket(market);
+      const result = await ResearchEngine.researchMarket(market);
       setResearch(result);
       if (onResearchComplete) onResearchComplete(result);
     } catch (err) {
@@ -37,74 +38,34 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
     setError(null);
 
     try {
-      const result = await ParallelAPI.customResearch(customQuery, 'standard');
+      const result = await ResearchEngine.customResearch(customQuery, depth);
       setResearch(result);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [customQuery]);
+  }, [customQuery, depth]);
 
   // Not configured state
   if (!isConfigured) {
     return (
       <div className="terminal-panel h-full">
-        <PanelHeader title="DEEP RESEARCH" subtitle="Parallel.ai" />
+        <PanelHeader title="DEEP RESEARCH" subtitle="LEET TERMINAL" />
         <div className="panel-content flex flex-col items-center justify-center h-full p-4">
           <div className="text-center max-w-md">
-            <div className="text-orange-500 text-lg mb-3">🔬 Deep Research</div>
+            <div className="text-orange-500 text-lg mb-3">RESEARCH ENGINE</div>
             <div className="text-gray-400 text-sm mb-4">
-              Enable AI-powered deep research for prediction markets using Parallel.ai
+              Deep research intelligence is available but not configured for this instance.
             </div>
             <div className="bg-gray-900 rounded p-4 text-left mb-4">
               <div className="text-gray-500 text-xs mb-2">Add to your .env file:</div>
-              <code className="text-cyan-400 text-xs">VITE_PARALLEL_API_KEY=your_key</code>
+              <code className="text-cyan-400 text-xs">VITE_RESEARCH_API_KEY=your_key</code>
             </div>
             <div className="text-gray-600 text-xs">
-              Get an API key at{' '}
-              <a 
-                href="https://parallel.ai" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-orange-400 hover:underline"
-              >
-                parallel.ai
-              </a>
+              Contact admin for API credentials.
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // No market selected
-  if (!market) {
-    return (
-      <div className="terminal-panel h-full">
-        <PanelHeader title="DEEP RESEARCH" subtitle="Parallel.ai" />
-        <div className="panel-content flex flex-col h-full p-4">
-          <div className="text-gray-500 text-sm mb-4">
-            Select a market to research, or enter a custom query:
-          </div>
-          <div className="flex gap-2 mb-4">
-            <input
-              type="text"
-              value={customQuery}
-              onChange={(e) => setCustomQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && runCustomResearch()}
-              placeholder="Enter research query..."
-              className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600 outline-none focus:border-orange-500"
-            />
-            <button
-              onClick={runCustomResearch}
-              disabled={loading || !customQuery.trim()}
-              className="px-4 py-2 bg-orange-500 text-black text-sm font-bold rounded hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? '...' : 'RESEARCH'}
-            </button>
-          </div>
-          {renderResults()}
         </div>
       </div>
     );
@@ -115,8 +76,8 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
     if (loading) {
       return (
         <div className="flex-1 flex flex-col items-center justify-center">
-          <div className="text-orange-500 animate-pulse mb-2">Researching...</div>
-          <div className="text-gray-600 text-xs">This may take 10-30 seconds</div>
+          <div className="text-orange-500 animate-pulse mb-2">Running deep analysis...</div>
+          <div className="text-gray-600 text-xs">Scanning sources — this may take 10-30 seconds</div>
         </div>
       );
     }
@@ -124,10 +85,10 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
     if (error) {
       return (
         <div className="flex-1 flex flex-col items-center justify-center">
-          <div className="text-red-500 mb-2">Research Failed</div>
+          <div className="text-red-500 mb-2">Analysis Failed</div>
           <div className="text-gray-500 text-xs max-w-sm text-center">{error}</div>
           <button
-            onClick={runResearch}
+            onClick={market ? runResearch : runCustomResearch}
             className="mt-4 px-4 py-2 bg-gray-800 text-gray-300 text-sm rounded hover:bg-gray-700"
           >
             Retry
@@ -140,15 +101,14 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
       return (
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="text-gray-500 text-sm mb-4">No research results yet</div>
-          <button
-            onClick={runResearch}
-            className="px-6 py-3 bg-orange-500 text-black font-bold rounded hover:bg-orange-400"
-          >
-            🔬 Run Deep Research
-          </button>
-          <div className="text-gray-600 text-xs mt-2">
-            Powered by Parallel.ai
-          </div>
+          {market && (
+            <button
+              onClick={runResearch}
+              className="px-6 py-3 bg-orange-500 text-black font-bold rounded hover:bg-orange-400"
+            >
+              Run Deep Research
+            </button>
+          )}
         </div>
       );
     }
@@ -179,7 +139,6 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
         <div className="flex-1 overflow-y-auto">
           {activeTab === 'overview' && (
             <div className="space-y-4">
-              {/* Summary */}
               {output.summary && (
                 <div className="bg-gray-900/50 rounded p-3">
                   <div className="text-orange-500 text-xs font-bold mb-2">SUMMARY</div>
@@ -189,7 +148,6 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
                 </div>
               )}
 
-              {/* Current Status */}
               {output.current_status && (
                 <div className="bg-gray-900/50 rounded p-3">
                   <div className="text-cyan-500 text-xs font-bold mb-2">CURRENT STATUS</div>
@@ -199,7 +157,6 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
                 </div>
               )}
 
-              {/* Probability Assessment */}
               {output.probability_assessment && (
                 <div className="bg-gray-900/50 rounded p-3">
                   <div className="text-green-500 text-xs font-bold mb-2">PROBABILITY ASSESSMENT</div>
@@ -223,10 +180,9 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
                 </div>
               )}
 
-              {/* Cached indicator */}
               {research._cached && (
                 <div className="text-gray-600 text-xs text-center">
-                  ⚡ Cached result • Refresh for new research
+                  Cached result — refresh for new analysis
                 </div>
               )}
             </div>
@@ -234,7 +190,6 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
 
           {activeTab === 'factors' && (
             <div className="space-y-4">
-              {/* Key Factors */}
               {output.key_factors?.length > 0 && (
                 <div className="bg-gray-900/50 rounded p-3">
                   <div className="text-orange-500 text-xs font-bold mb-2">KEY FACTORS</div>
@@ -249,14 +204,13 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
                 </div>
               )}
 
-              {/* Risk Factors */}
               {output.risk_factors?.length > 0 && (
                 <div className="bg-gray-900/50 rounded p-3">
                   <div className="text-red-500 text-xs font-bold mb-2">RISK FACTORS</div>
                   <ul className="space-y-2">
                     {output.risk_factors.map((risk, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                        <span className="text-red-400 mt-1">⚠</span>
+                        <span className="text-red-400 mt-1">!</span>
                         <span>{risk}</span>
                       </li>
                     ))}
@@ -326,22 +280,69 @@ export const ResearchPanel = ({ market, onResearchComplete }) => {
         {/* Refresh button */}
         <div className="pt-3 border-t border-gray-800 mt-3">
           <button
-            onClick={runResearch}
+            onClick={market ? runResearch : runCustomResearch}
             disabled={loading}
             className="w-full py-2 bg-gray-800 text-gray-300 text-xs rounded hover:bg-gray-700 disabled:opacity-50"
           >
-            {loading ? 'Researching...' : '🔄 Refresh Research'}
+            {loading ? 'Analyzing...' : 'Refresh Analysis'}
           </button>
         </div>
       </div>
     );
   };
 
+  // No market selected — show custom query input
+  if (!market) {
+    return (
+      <div className="terminal-panel h-full">
+        <PanelHeader title="DEEP RESEARCH" subtitle="LEET TERMINAL" />
+        <div className="panel-content flex flex-col h-full p-4">
+          <div className="text-gray-500 text-sm mb-4">
+            Select a market to research, or enter a custom query:
+          </div>
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              value={customQuery}
+              onChange={(e) => setCustomQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && runCustomResearch()}
+              placeholder="Enter research query..."
+              className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600 outline-none focus:border-orange-500"
+            />
+            <button
+              onClick={runCustomResearch}
+              disabled={loading || !customQuery.trim()}
+              className="px-4 py-2 bg-orange-500 text-black text-sm font-bold rounded hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? '...' : 'RESEARCH'}
+            </button>
+          </div>
+          <div className="flex gap-1 mb-4">
+            {['quick', 'standard', 'deep'].map((d) => (
+              <button
+                key={d}
+                onClick={() => setDepth(d)}
+                className={`px-2 py-1 text-xs rounded transition-colors ${
+                  depth === d
+                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                    : 'text-gray-600 hover:text-gray-400'
+                }`}
+              >
+                {d.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          {renderResults()}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="terminal-panel h-full flex flex-col">
-      <PanelHeader 
-        title="DEEP RESEARCH" 
-        subtitle={market?.ticker ? `${market.ticker} • Parallel.ai` : 'Parallel.ai'} 
+      <PanelHeader
+        title="DEEP RESEARCH"
+        subtitle={market?.ticker || 'LEET TERMINAL'}
       />
       <div className="panel-content flex-1 flex flex-col overflow-hidden p-3">
         {/* Market Question */}
