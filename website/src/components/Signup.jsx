@@ -166,9 +166,11 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
     <div className="h-screen flex items-center justify-center bg-[#0a0a0a]">
       <div className="terminal-panel" style={{ width: '400px', padding: '40px' }}>
         <div className="text-center mb-8">
-          <h1 className="text-orange-500 font-bold text-2xl tracking-wide mb-2">
-            LEET<span className="text-orange-400 ml-0.5">TERMINAL</span>
+          <h1 className="mb-3">
+            <span className="text-orange-500 font-black text-3xl tracking-tight brand-glow">LEET</span>
+            <span className="text-white font-black text-3xl tracking-tight ml-0.5">TERMINAL</span>
           </h1>
+          <div className="text-gray-600 text-[10px] tracking-widest uppercase mb-3">Prediction Markets Analytics</div>
           <p className="text-gray-500 text-sm">Create a new account</p>
         </div>
 

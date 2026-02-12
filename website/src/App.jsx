@@ -729,10 +729,9 @@ const Terminal = ({ onLogout, authInfo }) => {
       <div className="h-8 bg-gradient-to-r from-[#0a0a0a] to-[#111] border-b border-orange-500/30 flex items-center justify-between px-3 flex-shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center">
-            <span className="text-orange-500 font-black text-lg tracking-tight">LEET</span>
-            <span className="text-white font-bold text-lg">QUANTUM</span>
-            <span className="text-orange-400 font-bold text-lg ml-1">TERMINAL</span>
-            <span className="bg-orange-500 text-black text-[8px] px-1.5 py-0.5 rounded ml-2 font-black">PRO</span>
+            <span className="text-orange-500 font-black text-xl tracking-tight brand-glow">LEET</span>
+            <span className="text-white font-black text-xl tracking-tight ml-0.5">TERMINAL</span>
+            <span className="bg-orange-500 text-black text-[8px] px-1.5 py-0.5 rounded ml-2 font-black tracking-wider">PRO</span>
           </div>
           <div className="h-4 w-px bg-gray-700" />
           <div className="flex">
@@ -923,7 +922,8 @@ const Terminal = ({ onLogout, authInfo }) => {
           )}
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-orange-500/70 font-medium">LEET TERMINAL</span>
+          <span className="text-orange-500 font-bold tracking-wide brand-glow">LEET TERMINAL</span>
+          <span className="text-gray-600 mx-1">|</span>
           <span className="text-yellow-500/80">ANALYSIS ONLY</span>
           <span className="text-gray-600">v4.0.0</span>
         </div>
@@ -1034,8 +1034,15 @@ const App = () => {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#0a0a0a]">
-        <div className="text-orange-500 text-lg">Loading...</div>
+      <div className="h-screen flex flex-col items-center justify-center bg-[#0a0a0a]">
+        <div className="flex items-center mb-4">
+          <span className="text-orange-500 font-black text-3xl tracking-tight brand-glow">LEET</span>
+          <span className="text-white font-black text-3xl tracking-tight ml-1">TERMINAL</span>
+        </div>
+        <div className="text-gray-600 text-xs tracking-widest uppercase">Prediction Markets Analytics</div>
+        <div className="mt-6 w-32 h-0.5 bg-gray-800 rounded-full overflow-hidden">
+          <div className="h-full bg-orange-500 rounded-full brand-load-bar" />
+        </div>
       </div>
     );
   }

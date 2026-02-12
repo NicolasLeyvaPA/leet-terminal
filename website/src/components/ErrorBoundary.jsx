@@ -47,6 +47,10 @@ class ErrorBoundary extends Component {
       return (
         <div className="h-full flex items-center justify-center bg-[#0a0a0a] p-4">
           <div className="terminal-panel max-w-lg w-full p-6">
+            <div className="mb-4">
+              <span className="text-orange-500 font-black text-lg tracking-tight">LEET</span>
+              <span className="text-white font-black text-lg tracking-tight ml-0.5">TERMINAL</span>
+            </div>
             <div className="flex items-center gap-3 mb-4">
               <span className="text-red-500 text-2xl">⚠️</span>
               <h2 className="text-orange-500 font-bold text-lg">Something went wrong</h2>
