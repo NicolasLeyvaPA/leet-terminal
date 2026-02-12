@@ -8,6 +8,7 @@
 import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
 import { sanitizeText } from '../utils/sanitize';
 import logger from '../utils/logger';
+import scrapeology from '../config/scrapeology';
 
 // API Keys (set in .env or configure via environment)
 const NEWS_API_KEY = import.meta.env.VITE_NEWS_API_KEY || '';
@@ -284,13 +285,49 @@ function calculateRelevance(article) {
  */
 export async function fetchMarketNews(options = {}) {
   const { limit = 20, category = null } = options;
-  
+
+  // Prefer Scrapeology backend when available (20+ RSS feeds, no API key needed)
+  if (scrapeology.isConfigured()) {
+    try {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (category) params.set('category', category);
+      const cacheKey = `scrapeology-news:${category || 'all'}:${limit}`;
+      const cached = getCached(cacheKey);
+      if (cached) return cached;
+
+      const response = await fetch(scrapeology.endpoint(`/news/articles?${params}`), {
+        headers: { 'Accept': 'application/json' },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const articles = (data.articles || data || []).map(a => ({
+          id: `scrapeology-${a.id}`,
+          title: sanitizeText(a.title || ''),
+          description: sanitizeText(a.summary || a.description || ''),
+          source: a.source_name || a.source || 'Unknown',
+          url: a.url,
+          imageUrl: a.image_url || null,
+          publishedAt: a.published_at,
+          timestamp: new Date(a.published_at).getTime(),
+          category: a.category || detectCategory(a.title || ''),
+          sentiment: analyzeSentiment((a.title || '') + ' ' + (a.summary || '')),
+          relevance: a.relevance || calculateRelevance(a),
+          provider: 'scrapeology',
+        }));
+        setCache(cacheKey, articles, 5 * 60 * 1000);
+        return articles;
+      }
+    } catch (error) {
+      logger.warn('Scrapeology news failed, falling back to APIs:', error.message);
+    }
+  }
+
   // Build query
   let query = 'prediction market OR polymarket OR kalshi';
   if (category && CATEGORY_KEYWORDS[category]) {
     query = CATEGORY_KEYWORDS[category].slice(0, 3).join(' OR ');
   }
-  
+
   // Fetch from both sources in parallel
   const [newsApiArticles, gNewsArticles] = await Promise.all([
     fetchFromNewsAPI(query, { limit: Math.ceil(limit / 2) }),
@@ -362,7 +399,7 @@ export function matchNewsToMarkets(news, markets) {
  * Check if news APIs are configured
  */
 export function isNewsConfigured() {
-  return !!(NEWS_API_KEY || GNEWS_API_KEY);
+  return !!(NEWS_API_KEY || GNEWS_API_KEY || scrapeology.isConfigured());
 }
 
 // Export the NewsAPI service

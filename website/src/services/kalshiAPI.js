@@ -3,6 +3,7 @@
 import { sanitizeText } from '../utils/sanitize';
 import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
 import logger from '../utils/logger';
+import scrapeology from '../config/scrapeology';
 
 const KALSHI_API = 'https://api.elections.kalshi.com';
 
@@ -36,6 +37,25 @@ async function fetchWithFallback(url, options = {}) {
   if (cached !== null) return cached;
 
   await waitForRateLimit('kalshi', 300);
+
+  // Scrapeology backend — preferred when available
+  if (scrapeology.isConfigured()) {
+    try {
+      const scrapePath = url.startsWith(KALSHI_API)
+        ? scrapeology.endpoint(`/kalshi${url.slice(KALSHI_API.length)}`)
+        : url;
+      const response = await fetch(scrapePath, {
+        headers: { 'Accept': 'application/json' },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCache(cacheKey, data, cacheTtl);
+        return data;
+      }
+    } catch (error) {
+      logger.warn('Scrapeology Kalshi backend failed, falling back:', error.message);
+    }
+  }
 
   const getProxyUrl = (targetUrl) => {
     if (CORS_PROXY) {

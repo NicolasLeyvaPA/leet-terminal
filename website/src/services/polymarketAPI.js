@@ -3,6 +3,7 @@
 import { sanitizeText, sanitizeUrl } from '../utils/sanitize';
 import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
 import logger from '../utils/logger';
+import scrapeology from '../config/scrapeology';
 
 const GAMMA_API = 'https://gamma-api.polymarket.com';
 const CLOB_API = 'https://clob.polymarket.com';
@@ -43,6 +44,29 @@ async function fetchWithFallback(url, options = {}) {
 
   // Rate limit
   await waitForRateLimit('polymarket', 300);
+
+  // Scrapeology backend — preferred when available (no CORS, cached in TimescaleDB)
+  if (scrapeology.isConfigured()) {
+    try {
+      // Map Gamma/CLOB URLs to Scrapeology endpoints
+      let scrapePath = url;
+      if (url.startsWith(GAMMA_API)) {
+        scrapePath = scrapeology.endpoint(`/polymarket${url.slice(GAMMA_API.length)}`);
+      } else if (url.startsWith(CLOB_API)) {
+        scrapePath = scrapeology.endpoint(`/polymarket/clob${url.slice(CLOB_API.length)}`);
+      }
+      const response = await fetch(scrapePath, {
+        headers: { 'Accept': 'application/json' },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCache(cacheKey, data, cacheTtl);
+        return data;
+      }
+    } catch (error) {
+      logger.warn('Scrapeology backend failed, falling back:', error.message);
+    }
+  }
 
   // Build proxy URL if using custom proxy
   const getProxyUrl = (targetUrl) => {

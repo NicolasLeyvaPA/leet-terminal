@@ -86,15 +86,17 @@ const Terminal = ({ onLogout, authInfo }) => {
     // Subscribe to real-time updates
     const unsubscribe = polymarketWS.subscribe(tokenId, (data) => {
       if (data.type === 'price' || data.type === 'trade') {
+        const price = parseFloat(data.price);
+        if (isNaN(price) || price < 0 || price > 1) return; // Validate price
         // Update market price in real-time
-        setMarkets(prev => prev.map(m => 
-          m.id === selectedMarket.id 
-            ? { ...m, market_prob: data.price, _wsUpdated: Date.now() }
+        setMarkets(prev => prev.map(m =>
+          m.id === selectedMarket.id
+            ? { ...m, market_prob: price, _wsUpdated: Date.now() }
             : m
         ));
-        setSelectedMarket(prev => 
+        setSelectedMarket(prev =>
           prev?.id === selectedMarket.id
-            ? { ...prev, market_prob: data.price, _wsUpdated: Date.now() }
+            ? { ...prev, market_prob: price, _wsUpdated: Date.now() }
             : prev
         );
       }
@@ -131,7 +133,7 @@ const Terminal = ({ onLogout, authInfo }) => {
     // Refresh news every 5 minutes
     const interval = setInterval(loadNews, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [markets.length > 0 ? 'loaded' : 'empty']); // Re-run when markets are loaded
+  }, [markets.length]); // Re-run when market count changes
 
   // Load markets from Polymarket and Kalshi APIs with REAL data
   const loadMarkets = useCallback(async (limit = marketLimit, isManual = false) => {
@@ -275,10 +277,9 @@ const Terminal = ({ onLogout, authInfo }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Handle market limit change
+  // Handle market limit change — just update state; useEffect handles the refetch
   const handleLimitChange = (newLimit) => {
     setMarketLimit(newLimit);
-    loadMarkets(newLimit, true);
   };
 
   // Handle loading market from URL (supports both Polymarket and Kalshi)
@@ -936,6 +937,7 @@ const App = () => {
   const [showSignup, setShowSignup] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authInfo, setAuthInfo] = useState(null);
+  const authCheckInProgress = useRef(false);
 
   // Check authentication status on mount
   useEffect(() => {
@@ -969,29 +971,29 @@ const App = () => {
     checkAuth();
   }, []);
 
-  // Handle OAuth callback
+  // Handle OAuth callback (guarded against double-fire)
   useEffect(() => {
+    if (authCheckInProgress.current) return;
     if (isSupabaseConfigured() && window.location.hash) {
-      // Check if this is an OAuth callback
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       if (hashParams.get('access_token')) {
-        // OAuth callback detected, session will be set by Supabase
+        authCheckInProgress.current = true;
         getSession().then(async ({ session, isValid }) => {
           if (session && isValid) {
-            // Verify authentication is valid
             const verification = await verifyAuthentication();
             if (verification.isValid) {
               setIsAuthenticated(true);
               setAuthInfo(verification);
               localStorage.setItem('isAuthenticated', 'true');
               logger.log('OAuth callback verified:', verification.authType);
-              // Clean up URL
               window.history.replaceState({}, document.title, window.location.pathname);
             } else {
               logger.error('OAuth callback verification failed:', verification.reason);
               setIsAuthenticated(false);
             }
           }
+        }).finally(() => {
+          authCheckInProgress.current = false;
         });
       }
     }
