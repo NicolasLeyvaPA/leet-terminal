@@ -13,6 +13,7 @@ import { ModelBreakdownPanel } from './components/panels/ModelBreakdownPanel';
 import { GreeksPanel } from './components/panels/GreeksPanel';
 import { MonteCarloPanel } from './components/panels/MonteCarloPanel';
 import { PortfolioPanel } from './components/panels/PortfolioPanel';
+import { PortfolioPage } from './components/portfolio/PortfolioPage';
 import { QuantumLabPanel } from './components/panels/QuantumLabPanel';
 import { NewsFeedPanel } from './components/panels/NewsFeedPanel';
 import { BetsMarketPanel } from './components/panels/BetsMarketPanel';
@@ -604,23 +605,9 @@ const Terminal = ({ onLogout, authInfo }) => {
 
     if (workspace === "portfolio") {
       return (
-        <div className="h-full grid grid-cols-3 grid-rows-2 gap-1.5 overflow-hidden">
-          <div className="col-span-1 row-span-2 min-h-0 overflow-hidden">
-            <PortfolioPanel positions={PORTFOLIO_POSITIONS} markets={markets} />
-          </div>
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <PriceChartPanel market={selectedMarket} />
-          </div>
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <OrderBookPanel market={selectedMarket} />
-          </div>
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <MonteCarloPanel market={selectedMarket} />
-          </div>
-          <div className="col-span-1 row-span-1 min-h-0 overflow-hidden">
-            <GreeksPanel market={selectedMarket} />
-          </div>
-        </div>
+        <PanelErrorBoundary panelName="Portfolio">
+          <PortfolioPage positions={PORTFOLIO_POSITIONS} markets={markets} />
+        </PanelErrorBoundary>
       );
     }
 
