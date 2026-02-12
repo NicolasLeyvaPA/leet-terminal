@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
+import logger from '../utils/logger';
 
 export const MonteCarloChart = ({ paths }) => {
   const canvasRef = useRef(null);
@@ -92,7 +93,7 @@ export const MonteCarloChart = ({ paths }) => {
       });
       setError(null);
     } catch (err) {
-      console.warn('Monte Carlo chart initialization failed:', err);
+      logger.warn('Monte Carlo chart initialization failed:', err);
       setError('Chart failed to load');
     }
 

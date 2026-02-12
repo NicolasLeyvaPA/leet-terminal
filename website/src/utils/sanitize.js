@@ -3,6 +3,8 @@
  * Used for any user-generated or external API content
  */
 
+import logger from './logger';
+
 // HTML entities to escape
 const HTML_ENTITIES = {
   '&': '&amp;',
@@ -86,7 +88,7 @@ export function sanitizeUrl(url) {
     trimmed.startsWith('data:') ||
     trimmed.startsWith('vbscript:')
   ) {
-    console.warn('Blocked dangerous URL:', url.slice(0, 50));
+    logger.warn('Blocked dangerous URL:', url.slice(0, 50));
     return null;
   }
 
@@ -101,7 +103,7 @@ export function sanitizeUrl(url) {
     return url;
   }
 
-  console.warn('Blocked unknown protocol URL:', url.slice(0, 50));
+  logger.warn('Blocked unknown protocol URL:', url.slice(0, 50));
   return null;
 }
 

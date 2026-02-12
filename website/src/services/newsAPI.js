@@ -7,6 +7,7 @@
 
 import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
 import { sanitizeText } from '../utils/sanitize';
+import logger from '../utils/logger';
 
 // API Keys (set in .env or configure via environment)
 const NEWS_API_KEY = import.meta.env.VITE_NEWS_API_KEY || '';
@@ -54,7 +55,7 @@ function proxyUrl(url) {
  */
 async function fetchFromNewsAPI(query, options = {}) {
   if (!NEWS_API_KEY) {
-    console.warn('NewsAPI key not configured');
+    logger.warn('NewsAPI key not configured');
     return [];
   }
 
@@ -95,7 +96,7 @@ async function fetchFromNewsAPI(query, options = {}) {
     
     return articles;
   } catch (error) {
-    console.error('NewsAPI fetch failed:', error.message);
+    logger.error('NewsAPI fetch failed:', error.message);
     return [];
   }
 }
@@ -105,7 +106,7 @@ async function fetchFromNewsAPI(query, options = {}) {
  */
 async function fetchFromGNews(query, options = {}) {
   if (!GNEWS_API_KEY) {
-    console.warn('GNews API key not configured');
+    logger.warn('GNews API key not configured');
     return [];
   }
 
@@ -145,7 +146,7 @@ async function fetchFromGNews(query, options = {}) {
     
     return articles;
   } catch (error) {
-    console.error('GNews fetch failed:', error.message);
+    logger.error('GNews fetch failed:', error.message);
     return [];
   }
 }

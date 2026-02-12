@@ -1,5 +1,7 @@
 // MetaMask wallet utility for Ethereum wallet authentication
 
+import logger from './logger';
+
 export const isMetaMaskInstalled = () => {
   if (typeof window === 'undefined') return false;
   
@@ -52,7 +54,7 @@ export const getMetaMaskProvider = () => {
   if (window.ethereum?.isMetaMask) {
     // Double-check it's not Phantom masquerading as MetaMask
     if (window.ethereum.isPhantom || window.ethereum._phantom) {
-      console.warn('⚠️ Phantom detected masquerading as Ethereum provider');
+      logger.warn('⚠️ Phantom detected masquerading as Ethereum provider');
       return null;
     }
     return window.ethereum;
@@ -64,7 +66,7 @@ export const getMetaMaskProvider = () => {
 export const connectMetaMask = async () => {
   // CRITICAL: Ensure Phantom is NOT being used
   if (typeof window !== 'undefined' && window.solana?.isPhantom) {
-    console.log('🔵 MetaMask: Phantom detected, ensuring we use Ethereum provider only');
+    logger.log('🔵 MetaMask: Phantom detected, ensuring we use Ethereum provider only');
   }
 
   if (!isMetaMaskInstalled()) {
@@ -91,7 +93,7 @@ export const connectMetaMask = async () => {
   }
 
   // Verify we have the right provider
-  console.log('🔵 MetaMask: Using provider:', {
+  logger.log('🔵 MetaMask: Using provider:', {
     isMetaMask: provider.isMetaMask,
     isPhantom: provider.isPhantom || provider._phantom,
     providerName: provider.constructor?.name,
@@ -99,12 +101,12 @@ export const connectMetaMask = async () => {
 
   try {
     // Request account access from MetaMask specifically
-    console.log('🔵 MetaMask: Requesting accounts...');
+    logger.log('🔵 MetaMask: Requesting accounts...');
     const accounts = await provider.request({
       method: 'eth_requestAccounts',
     });
     
-    console.log('🔵 MetaMask: Received accounts:', accounts);
+    logger.log('🔵 MetaMask: Received accounts:', accounts);
 
     if (!accounts || accounts.length === 0) {
       return {
@@ -117,14 +119,14 @@ export const connectMetaMask = async () => {
     
     // CRITICAL: Verify this is an Ethereum address, not Solana
     if (!address || !address.startsWith('0x') || address.length !== 42) {
-      console.error('❌ Invalid Ethereum address format:', address);
+      logger.error('❌ Invalid Ethereum address format:', address);
       return {
         success: false,
         error: 'Invalid address format. Expected Ethereum address (0x...).',
       };
     }
     
-    console.log('✅ MetaMask: Valid Ethereum address confirmed:', address);
+    logger.log('✅ MetaMask: Valid Ethereum address confirmed:', address);
     
     return {
       success: true,

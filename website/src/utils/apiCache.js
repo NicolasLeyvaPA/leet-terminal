@@ -1,9 +1,11 @@
 /**
  * API Cache and Rate Limiting Utilities
- * 
+ *
  * Provides in-memory caching with TTL and request throttling
  * to improve performance and prevent rate limit issues.
  */
+
+import logger from './logger';
 
 // Cache storage
 const cache = new Map();
@@ -196,7 +198,7 @@ export async function fetchBatch(urls, options = {}, cacheTtl = DEFAULT_TTL) {
           const data = await fetchWithCache(url, options, cacheTtl);
           results.set(url, data);
         } catch (error) {
-          console.warn(`Batch fetch failed for ${url}:`, error.message);
+          logger.warn(`Batch fetch failed for ${url}:`, error.message);
           results.set(url, null);
         }
       });

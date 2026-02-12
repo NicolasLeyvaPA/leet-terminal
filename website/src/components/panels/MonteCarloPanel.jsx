@@ -3,6 +3,7 @@ import { PanelHeader } from '../PanelHeader';
 import { DataRow } from '../DataRow';
 import { MonteCarloChart } from '../MonteCarloChart';
 import { QuantEngine } from '../../utils/quantEngine';
+import logger from '../../utils/logger';
 
 // Validate probability is a valid number between 0 and 1
 const isValidProbability = (prob) => {
@@ -43,7 +44,7 @@ export const MonteCarloPanel = ({ market }) => {
       setSimulation(result);
       setError(null);
     } catch (err) {
-      console.warn('Monte Carlo simulation failed:', err);
+      logger.warn('Monte Carlo simulation failed:', err);
       setError('Simulation error');
       setSimulation(null);
     }

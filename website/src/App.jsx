@@ -26,6 +26,7 @@ import Signup from './components/Signup';
 import ErrorBoundary, { PanelErrorBoundary } from './components/ErrorBoundary';
 import { getSession, signOut, verifyAuthentication } from './utils/auth';
 import { isSupabaseConfigured } from './utils/supabase';
+import logger from './utils/logger';
 
 // Layout constants (moved from magic numbers)
 const MIN_LEFT_PANEL_WIDTH = 140;
@@ -120,7 +121,7 @@ const Terminal = ({ onLogout, authInfo }) => {
         const matchedNews = NewsAPI.matchNewsToMarkets(articles, markets);
         setNews(matchedNews);
       } catch (error) {
-        console.warn('Failed to load news:', error.message);
+        logger.warn('Failed to load news:', error.message);
       } finally {
         setNewsLoading(false);
       }
@@ -142,7 +143,7 @@ const Terminal = ({ onLogout, authInfo }) => {
       const [polymarketData, kalshiData] = await Promise.all([
         PolymarketAPI.fetchOpenEvents(Math.ceil(limit * 0.7)), // 70% from Polymarket
         KalshiAPI.fetchOpenEvents(Math.ceil(limit * 0.3)).catch(err => {
-          console.warn('Kalshi fetch failed:', err.message);
+          logger.warn('Kalshi fetch failed:', err.message);
           return []; // Don't fail if Kalshi fails
         }),
       ]);
@@ -176,7 +177,7 @@ const Terminal = ({ onLogout, authInfo }) => {
       setStatusMessage(`${enrichedMarkets.length} mkts (PM:${polyCount} KA:${kalshiCount})`);
       setTimeout(() => setStatusMessage(""), 3000);
     } catch (error) {
-      console.error('Failed to load markets:', error);
+      logger.error('Failed to load markets:', error);
       setStatusMessage("Sync failed");
     } finally {
       setLoadingMarkets(false);
@@ -248,7 +249,7 @@ const Terminal = ({ onLogout, authInfo }) => {
           : prev
       );
     } catch (error) {
-      console.error('Failed to fetch market data:', error);
+      logger.error('Failed to fetch market data:', error);
       setMarkets(prev => prev.map(m => 
         m.id === market.id ? { ...m, dataStatus: 'error' } : m
       ));
@@ -321,7 +322,7 @@ const Terminal = ({ onLogout, authInfo }) => {
       // This will trigger fetchMarketData via useEffect
       setTimeout(() => setStatusMessage(""), 2000);
     } catch (error) {
-      console.error('Failed to load market from URL:', error);
+      logger.error('Failed to load market from URL:', error);
       setStatusMessage("Failed - check URL/ticker");
       setTimeout(() => setStatusMessage(""), 3000);
     } finally {
@@ -948,7 +949,7 @@ const App = () => {
         localStorage.setItem('isAuthenticated', 'true');
 
         // Log auth info for debugging
-        console.log('Authentication verified:', {
+        logger.log('Authentication verified:', {
           type: verification.authType,
           hasJWT: !!verification.user?.jwtToken || !!verification.session?.access_token,
           user: verification.user?.publicKey || verification.user?.address || verification.user?.email,
@@ -959,7 +960,7 @@ const App = () => {
         localStorage.removeItem('isAuthenticated');
 
         // Log why auth failed
-        console.warn('Authentication failed:', verification.reason || 'Unknown reason');
+        logger.warn('Authentication failed:', verification.reason || 'Unknown reason');
       }
 
       setLoading(false);
@@ -983,11 +984,11 @@ const App = () => {
               setIsAuthenticated(true);
               setAuthInfo(verification);
               localStorage.setItem('isAuthenticated', 'true');
-              console.log('OAuth callback verified:', verification.authType);
+              logger.log('OAuth callback verified:', verification.authType);
               // Clean up URL
               window.history.replaceState({}, document.title, window.location.pathname);
             } else {
-              console.error('OAuth callback verification failed:', verification.reason);
+              logger.error('OAuth callback verification failed:', verification.reason);
               setIsAuthenticated(false);
             }
           }
@@ -1003,9 +1004,9 @@ const App = () => {
       setIsAuthenticated(true);
       setAuthInfo(verification);
       localStorage.setItem('isAuthenticated', 'true');
-      console.log('Login verified:', verification.authType);
+      logger.log('Login verified:', verification.authType);
     } else {
-      console.error('Login verification failed:', verification.reason);
+      logger.error('Login verification failed:', verification.reason);
       // Don't set authenticated if verification fails
     }
   };
@@ -1017,9 +1018,9 @@ const App = () => {
       setIsAuthenticated(true);
       setAuthInfo(verification);
       localStorage.setItem('isAuthenticated', 'true');
-      console.log('Signup verified:', verification.authType);
+      logger.log('Signup verified:', verification.authType);
     } else {
-      console.error('Signup verification failed:', verification.reason);
+      logger.error('Signup verification failed:', verification.reason);
       // Don't set authenticated if verification fails
     }
   };

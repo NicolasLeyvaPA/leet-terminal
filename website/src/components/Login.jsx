@@ -4,6 +4,7 @@ import { isSupabaseConfigured } from '../utils/supabase';
 import { isPhantomInstalled } from '../utils/phantom';
 import { isMetaMaskInstalled } from '../utils/metamask';
 import MetamaskIcon from '../assets/Metamask_icon.svg';
+import logger from '../utils/logger';
 
 const Login = ({ onLogin, onSwitchToSignup }) => {
   const [username, setUsername] = useState('');
@@ -71,11 +72,11 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
       if (result.success) {
         // Verify JWT was created if Supabase is configured
         if (result.user?.jwtToken) {
-          console.log('✅ Phantom authenticated with JWT');
+          logger.log('✅ Phantom authenticated with JWT');
         } else if (result.user?.linkedToSupabase) {
-          console.log('⚠️ Phantom linked to Supabase but no JWT (check email confirmation settings)');
+          logger.log('⚠️ Phantom linked to Supabase but no JWT (check email confirmation settings)');
         } else {
-          console.log('ℹ️ Phantom authenticated locally (no Supabase)');
+          logger.log('ℹ️ Phantom authenticated locally (no Supabase)');
         }
         onLogin();
       } else {
@@ -108,7 +109,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
     try {
       // CRITICAL: Explicitly check we're NOT using Phantom
       if (typeof window !== 'undefined' && window.solana?.isPhantom) {
-        console.log('⚠️ Phantom detected - ensuring MetaMask is used, not Phantom');
+        logger.log('⚠️ Phantom detected - ensuring MetaMask is used, not Phantom');
       }
 
       // Double-check we're using MetaMask, not Phantom
@@ -127,11 +128,11 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
         }
       }
 
-      console.log('🔵 Connecting to MetaMask (NOT Phantom)...');
+      logger.log('🔵 Connecting to MetaMask (NOT Phantom)...');
       
       // Debug: Log what providers are available
       if (typeof window !== 'undefined' && window.ethereum) {
-        console.log('🔍 Available Ethereum providers:', {
+        logger.log('🔍 Available Ethereum providers:', {
           isMetaMask: window.ethereum.isMetaMask,
           isPhantom: window.ethereum.isPhantom || window.ethereum._phantom,
           hasProviders: !!window.ethereum.providers,
@@ -145,22 +146,22 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
         // CRITICAL: Verify we got an Ethereum address (0x...), not Solana (base58)
         if (result.address) {
           if (!result.address.startsWith('0x') || result.address.length !== 42) {
-            console.error('❌ Invalid address format - got:', result.address, 'Expected Ethereum 0x... format');
+            logger.error('❌ Invalid address format - got:', result.address, 'Expected Ethereum 0x... format');
             setError('Phantom intercepted the request. Please disable Phantom\'s Ethereum compatibility mode in Phantom settings, or use MetaMask in an incognito window.');
             setOauthLoading(null);
             return;
           }
           
-          console.log('✅ MetaMask address confirmed (Ethereum format):', result.address);
+          logger.log('✅ MetaMask address confirmed (Ethereum format):', result.address);
         }
         
         // Verify JWT was created if Supabase is configured
         if (result.user?.jwtToken) {
-          console.log('✅ MetaMask authenticated with JWT');
+          logger.log('✅ MetaMask authenticated with JWT');
         } else if (result.user?.linkedToSupabase) {
-          console.log('⚠️ MetaMask linked to Supabase but no JWT (check email confirmation settings)');
+          logger.log('⚠️ MetaMask linked to Supabase but no JWT (check email confirmation settings)');
         } else {
-          console.log('ℹ️ MetaMask authenticated locally (no Supabase)');
+          logger.log('ℹ️ MetaMask authenticated locally (no Supabase)');
         }
         
         // Reset connecting ref on success
@@ -179,7 +180,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
         metamaskConnectingRef.current = false;
       }
     } catch (err) {
-      console.error('MetaMask login error:', err);
+      logger.error('MetaMask login error:', err);
       
       // Check if Phantom intercepted
       if (err.message?.includes('Phantom') || err.message?.includes('Solana')) {

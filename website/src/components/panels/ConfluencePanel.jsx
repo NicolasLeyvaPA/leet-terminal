@@ -1,5 +1,6 @@
 import { PanelHeader } from '../PanelHeader';
 import { QuantEngine } from '../../utils/quantEngine';
+import logger from '../../utils/logger';
 
 export const ConfluencePanel = ({ market }) => {
   if (!market)
@@ -36,7 +37,7 @@ export const ConfluencePanel = ({ market }) => {
       }
     }
   } catch {
-    console.warn('Failed to calculate confluence');
+    logger.warn('Failed to calculate confluence');
   }
 
   // Sort factors: real data first, then by contribution magnitude

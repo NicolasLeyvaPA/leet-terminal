@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import logger from './logger';
 
 const STORAGE_KEY = 'leet_terminal_research_history';
 const MAX_SESSIONS = 50;
@@ -31,7 +32,7 @@ class ResearchHistory {
         }
       }
     } catch (e) {
-      console.error('Failed to load research history:', e);
+      logger.error('Failed to load research history:', e);
       this.sessions = [];
     }
   }
@@ -43,7 +44,7 @@ class ResearchHistory {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.sessions));
     } catch (e) {
-      console.error('Failed to save research history:', e);
+      logger.error('Failed to save research history:', e);
     }
   }
 
@@ -139,7 +140,7 @@ class ResearchHistory {
       try {
         callback(this.getAll());
       } catch (e) {
-        console.error('Research history listener error:', e);
+        logger.error('Research history listener error:', e);
       }
     }
   }

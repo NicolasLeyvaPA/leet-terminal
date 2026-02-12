@@ -3,6 +3,7 @@ import { PanelHeader } from '../PanelHeader';
 import { DataRow } from '../DataRow';
 import { Tag } from '../Tag';
 import { useWatchlist } from '../../utils/useWatchlist';
+import { PolymarketAPI } from '../../services/polymarketAPI';
 
 // Storage key for expanded categories
 const BETS_EXPANDED_KEY = 'leet-terminal-bets-expanded';
@@ -53,26 +54,9 @@ export const BetsMarketPanel = () => {
       try {
         setLoading(true);
         setError(null);
-
-        const apiUrl = import.meta.env.DEV
-          ? '/api/polymarket/events?order=id&ascending=false&closed=false&limit=100'
-          : 'https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=100';
-
-        let response;
-        try {
-          response = await fetch(apiUrl);
-        } catch (corsError) {
-          console.warn('Direct fetch failed, trying CORS proxy:', corsError);
-          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://gamma-api.polymarket.com/events?order=id&ascending=false&closed=false&limit=100')}`;
-          response = await fetch(proxyUrl);
-        }
-
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        if (!Array.isArray(data)) throw new Error('Invalid response format');
+        const data = await PolymarketAPI.fetchRawEvents(100);
         setEvents(data);
       } catch (err) {
-        console.error('Failed to fetch markets:', err);
         setError(err.message);
       } finally {
         setLoading(false);

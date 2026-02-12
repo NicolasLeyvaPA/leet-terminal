@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import logger from './logger';
 
 const WATCHLIST_STORAGE_KEY = 'leet-terminal-watchlist';
 
@@ -16,7 +17,7 @@ export const useWatchlist = () => {
     try {
       localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(watchlist));
     } catch (err) {
-      console.error('Failed to save watchlist:', err);
+      logger.error('Failed to save watchlist:', err);
     }
   }, [watchlist]);
 
