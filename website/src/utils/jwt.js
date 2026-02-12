@@ -1,6 +1,7 @@
 // JWT Token Utilities
 
 import { supabase, isSupabaseConfigured } from './supabase';
+import logger from './logger';
 
 // Get current JWT token (for Google OAuth users)
 export const getJWTToken = async () => {
@@ -12,7 +13,7 @@ export const getJWTToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token || null;
   } catch (error) {
-    console.error('Failed to get JWT token:', error);
+    logger.error('Failed to get JWT token:', error);
     return null;
   }
 };
@@ -36,7 +37,7 @@ export const getJWTPayload = async () => {
     const decoded = JSON.parse(atob(payload));
     return decoded;
   } catch (error) {
-    console.error('Failed to decode JWT:', error);
+    logger.error('Failed to decode JWT:', error);
     return null;
   }
 };
@@ -51,7 +52,7 @@ export const getCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     return user;
   } catch (error) {
-    console.error('Failed to get current user:', error);
+    logger.error('Failed to get current user:', error);
     return null;
   }
 };

@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { connectPhantom, signMessage as signPhantomMessage, disconnectPhantom } from './phantom';
 import { connectMetaMask, signMessage as signMetaMaskMessage, disconnectMetaMask } from './metamask';
 import { hashPassword, verifyPassword, hashSignature, generateSecureToken } from './crypto';
+import logger from './logger';
 
 // Simple user management using localStorage
 const USERS_KEY = 'leet_terminal_users';
@@ -29,17 +30,17 @@ const saveUsers = (users) => {
   } catch (error) {
     // Handle quota exceeded error
     if (error.name === 'QuotaExceededError' || error.code === 22) {
-      console.error('localStorage quota exceeded. Attempting cleanup...');
+      logger.error('localStorage quota exceeded. Attempting cleanup...');
       // Try to clean up old session data
       try {
         localStorage.removeItem(WALLET_SESSIONS_KEY);
         localStorage.setItem(USERS_KEY, JSON.stringify(users));
-        console.log('Cleanup successful, users saved');
+        logger.log('Cleanup successful, users saved');
       } catch (retryError) {
-        console.error('Failed to save users even after cleanup:', retryError);
+        logger.error('Failed to save users even after cleanup:', retryError);
       }
     } else {
-      console.error('Failed to save users:', error);
+      logger.error('Failed to save users:', error);
     }
   }
 };
@@ -78,7 +79,7 @@ export const createUser = async (username, password) => {
     saveUsers(users);
     return { success: true };
   } catch (error) {
-    console.error('Failed to create user:', error);
+    logger.error('Failed to create user:', error);
     return { success: false, error: 'Failed to create user' };
   }
 };
@@ -98,7 +99,7 @@ export const authenticateUser = async (username, password) => {
       }
       // Fall through to local auth if Supabase fails
     } catch (err) {
-      console.warn('Supabase auth failed, trying local:', err.message);
+      logger.warn('Supabase auth failed, trying local:', err.message);
     }
   }
   
@@ -123,9 +124,9 @@ export const authenticateUser = async (username, password) => {
         user.passwordSalt = salt;
         delete user.password; // Remove plain text
         saveUsers(users);
-        console.log('Migrated user to hashed password:', user.username);
+        logger.log('Migrated user to hashed password:', user.username);
       } catch (err) {
-        console.warn('Failed to migrate user password:', err);
+        logger.warn('Failed to migrate user password:', err);
       }
       return { success: true, user };
     }
@@ -195,7 +196,7 @@ export const getSession = async () => {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error) {
-      console.error('Session error:', error);
+      logger.error('Session error:', error);
       return { session: null, user: null, isValid: false, error };
     }
     return { 
@@ -204,7 +205,7 @@ export const getSession = async () => {
       isValid: !!session && !!session.access_token 
     };
   } catch (error) {
-    console.error('Failed to get session:', error);
+    logger.error('Failed to get session:', error);
     return { session: null, user: null, isValid: false, error };
   }
 };
@@ -255,16 +256,16 @@ const saveWalletSession = (walletType, address, signatureHash, sessionToken) => 
   } catch (error) {
     // Handle quota exceeded
     if (error.name === 'QuotaExceededError' || error.code === 22) {
-      console.warn('localStorage quota exceeded, clearing old sessions');
+      logger.warn('localStorage quota exceeded, clearing old sessions');
       try {
         localStorage.setItem(WALLET_SESSIONS_KEY, JSON.stringify({
           [`${walletType}:${address}`]: { signatureHash, sessionToken, createdAt: Date.now() }
         }));
       } catch (retryError) {
-        console.error('Failed to save wallet session even after cleanup:', retryError);
+        logger.error('Failed to save wallet session even after cleanup:', retryError);
       }
     } else {
-      console.error('Failed to save wallet session:', error);
+      logger.error('Failed to save wallet session:', error);
     }
   }
 };
@@ -276,7 +277,7 @@ const clearWalletSession = (walletType, address) => {
     delete sessions[`${walletType}:${address}`];
     localStorage.setItem(WALLET_SESSIONS_KEY, JSON.stringify(sessions));
   } catch (error) {
-    console.error('Failed to clear wallet session:', error);
+    logger.error('Failed to clear wallet session:', error);
   }
 };
 
@@ -469,7 +470,7 @@ export const authenticateWithPhantom = async () => {
           if (newUser) walletUserId = newUser.id;
         }
       } catch (supabaseError) {
-        console.warn('Supabase wallet linking failed:', supabaseError);
+        logger.warn('Supabase wallet linking failed:', supabaseError);
       }
     }
 
@@ -523,13 +524,13 @@ export const signOut = async () => {
   try {
     await disconnectPhantom();
   } catch (error) {
-    console.error('Phantom disconnect error:', error);
+    logger.error('Phantom disconnect error:', error);
   }
 
   try {
     await disconnectMetaMask();
   } catch (error) {
-    console.error('MetaMask disconnect error:', error);
+    logger.error('MetaMask disconnect error:', error);
   }
 
   // Sign out from Supabase if configured
@@ -537,7 +538,7 @@ export const signOut = async () => {
     try {
       await supabase.auth.signOut();
     } catch (error) {
-      console.error('Sign out error:', error);
+      logger.error('Sign out error:', error);
     }
   }
   
@@ -687,7 +688,7 @@ export const authenticateWithMetaMask = async () => {
           if (newUser) walletUserId = newUser.id;
         }
       } catch (supabaseError) {
-        console.warn('Supabase wallet linking failed:', supabaseError);
+        logger.warn('Supabase wallet linking failed:', supabaseError);
       }
     }
 
@@ -765,7 +766,7 @@ export const getWalletUserPreferences = async (walletUserId) => {
 
     return preferences;
   } catch (error) {
-    console.error('Failed to get user preferences:', error);
+    logger.error('Failed to get user preferences:', error);
     return null;
   }
 };
@@ -791,7 +792,7 @@ export const setWalletUserPreference = async (walletUserId, key, value) => {
     if (error) throw error;
     return { success: true };
   } catch (error) {
-    console.error('Failed to set user preference:', error);
+    logger.error('Failed to set user preference:', error);
     return { success: false, error: error.message };
   }
 };

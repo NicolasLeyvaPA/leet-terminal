@@ -2,6 +2,8 @@
 // v2.0 - With caching, rate limiting, and honest data handling
 import { sanitizeText } from '../utils/sanitize';
 import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
+import logger from '../utils/logger';
+import scrapeology from '../config/scrapeology';
 
 const KALSHI_API = 'https://api.elections.kalshi.com';
 
@@ -36,6 +38,25 @@ async function fetchWithFallback(url, options = {}) {
 
   await waitForRateLimit('kalshi', 300);
 
+  // Scrapeology backend — preferred when available
+  if (scrapeology.isConfigured()) {
+    try {
+      const scrapePath = url.startsWith(KALSHI_API)
+        ? scrapeology.endpoint(`/kalshi${url.slice(KALSHI_API.length)}`)
+        : url;
+      const response = await fetch(scrapePath, {
+        headers: { 'Accept': 'application/json' },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCache(cacheKey, data, cacheTtl);
+        return data;
+      }
+    } catch (error) {
+      logger.warn('Scrapeology Kalshi backend failed, falling back:', error.message);
+    }
+  }
+
   const getProxyUrl = (targetUrl) => {
     if (CORS_PROXY) {
       return `${CORS_PROXY}?url=${encodeURIComponent(targetUrl)}`;
@@ -57,7 +78,7 @@ async function fetchWithFallback(url, options = {}) {
         return data;
       }
     } catch (error) {
-      console.warn('Kalshi proxy failed:', error.message);
+      logger.warn('Kalshi proxy failed:', error.message);
     }
   }
 
@@ -73,7 +94,7 @@ async function fetchWithFallback(url, options = {}) {
       return data;
     }
   } catch (error) {
-    console.warn('Direct fetch failed:', error.message);
+    logger.warn('Direct fetch failed:', error.message);
   }
 
   // Fallback proxies
@@ -165,7 +186,7 @@ export async function fetchOpenEvents(limit = 50) {
       .filter(Boolean)
       .slice(0, limit);
   } catch (error) {
-    console.error('Kalshi fetch failed:', error.message);
+    logger.error('Kalshi fetch failed:', error.message);
     return [];
   }
 }
@@ -188,7 +209,7 @@ export async function fetchEventByTicker(tickerOrUrl) {
 
     return transformKalshiEvent(data.event);
   } catch (error) {
-    console.error('Kalshi event fetch failed:', error.message);
+    logger.error('Kalshi event fetch failed:', error.message);
     throw error;
   }
 }
@@ -220,7 +241,7 @@ export async function fetchPriceHistory(marketId, days = 90) {
 
     return null; // NO FAKE DATA
   } catch (error) {
-    console.warn('Kalshi price history failed:', error.message);
+    logger.warn('Kalshi price history failed:', error.message);
     return null;
   }
 }
@@ -241,7 +262,7 @@ export async function fetchOrderbook(marketId) {
 
     return null; // NO FAKE DATA
   } catch (error) {
-    console.warn('Kalshi orderbook failed:', error.message);
+    logger.warn('Kalshi orderbook failed:', error.message);
     return null;
   }
 }

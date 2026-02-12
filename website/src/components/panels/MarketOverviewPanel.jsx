@@ -2,6 +2,7 @@ import { PanelHeader } from '../PanelHeader';
 import { DataRow } from '../DataRow';
 import { Tag } from '../Tag';
 import { QuantEngine } from '../../utils/quantEngine';
+import logger from '../../utils/logger';
 
 // Validate probability is a valid number between 0 and 1
 const isValidProbability = (prob) => {
@@ -60,7 +61,7 @@ export const MarketOverviewPanel = ({ market }) => {
       kelly = QuantEngine.kelly(modelProb, marketProb) || { quarter: 0, half: 0, full: 0 };
       ev = QuantEngine.expectedValue(modelProb, marketProb) || { ev: 0, evPct: 0 };
     } catch {
-      console.warn('Failed to calculate kelly/ev');
+      logger.warn('Failed to calculate kelly/ev');
     }
   }
 

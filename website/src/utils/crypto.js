@@ -1,6 +1,8 @@
 // Secure password hashing using Web Crypto API
 // Uses PBKDF2 with SHA-256, 100k iterations
 
+import logger from './logger';
+
 const ITERATIONS = 100000;
 const KEY_LENGTH = 256;
 const SALT_LENGTH = 16;
@@ -85,7 +87,7 @@ export async function verifyPassword(password, storedHash, storedSalt) {
     const { hash } = await hashPassword(password, salt);
     return hash === storedHash;
   } catch (error) {
-    console.error('Password verification error:', error);
+    logger.error('Password verification error:', error);
     return false;
   }
 }

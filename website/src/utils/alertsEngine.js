@@ -1,9 +1,11 @@
 /**
  * Alerts Engine
- * 
+ *
  * Price and volume alerts for prediction markets.
  * Persists to localStorage, triggers browser notifications.
  */
+
+import logger from './logger';
 
 const STORAGE_KEY = 'leet_terminal_alerts';
 const TRIGGERED_KEY = 'leet_terminal_triggered_alerts';
@@ -64,7 +66,7 @@ class AlertsEngine {
         }
       }
     } catch (e) {
-      console.error('Failed to load alerts:', e);
+      logger.error('Failed to load alerts:', e);
       this.alerts = [];
       this.triggeredAlerts = [];
     }
@@ -78,7 +80,7 @@ class AlertsEngine {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.alerts));
       localStorage.setItem(TRIGGERED_KEY, JSON.stringify(this.triggeredAlerts));
     } catch (e) {
-      console.error('Failed to save alerts:', e);
+      logger.error('Failed to save alerts:', e);
     }
   }
 
@@ -87,7 +89,7 @@ class AlertsEngine {
    */
   async requestNotificationPermission() {
     if (!('Notification' in window)) {
-      console.warn('Browser does not support notifications');
+      logger.warn('Browser does not support notifications');
       return;
     }
     
@@ -98,7 +100,7 @@ class AlertsEngine {
         const permission = await Notification.requestPermission();
         this.notificationPermission = permission;
       } catch (e) {
-        console.error('Failed to request notification permission:', e);
+        logger.error('Failed to request notification permission:', e);
       }
     }
   }
@@ -281,7 +283,7 @@ class AlertsEngine {
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.3);
     } catch (e) {
-      console.warn('Failed to play alert sound:', e);
+      logger.warn('Failed to play alert sound:', e);
     }
   }
 
@@ -360,7 +362,7 @@ class AlertsEngine {
       try {
         callback(this.alerts, this.triggeredAlerts);
       } catch (e) {
-        console.error('Alert listener error:', e);
+        logger.error('Alert listener error:', e);
       }
     }
   }

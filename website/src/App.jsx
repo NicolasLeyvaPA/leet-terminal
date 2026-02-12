@@ -26,6 +26,7 @@ import Signup from './components/Signup';
 import ErrorBoundary, { PanelErrorBoundary } from './components/ErrorBoundary';
 import { getSession, signOut, verifyAuthentication } from './utils/auth';
 import { isSupabaseConfigured } from './utils/supabase';
+import logger from './utils/logger';
 
 // Layout constants (moved from magic numbers)
 const MIN_LEFT_PANEL_WIDTH = 140;
@@ -85,15 +86,17 @@ const Terminal = ({ onLogout, authInfo }) => {
     // Subscribe to real-time updates
     const unsubscribe = polymarketWS.subscribe(tokenId, (data) => {
       if (data.type === 'price' || data.type === 'trade') {
+        const price = parseFloat(data.price);
+        if (isNaN(price) || price < 0 || price > 1) return; // Validate price
         // Update market price in real-time
-        setMarkets(prev => prev.map(m => 
-          m.id === selectedMarket.id 
-            ? { ...m, market_prob: data.price, _wsUpdated: Date.now() }
+        setMarkets(prev => prev.map(m =>
+          m.id === selectedMarket.id
+            ? { ...m, market_prob: price, _wsUpdated: Date.now() }
             : m
         ));
-        setSelectedMarket(prev => 
+        setSelectedMarket(prev =>
           prev?.id === selectedMarket.id
-            ? { ...prev, market_prob: data.price, _wsUpdated: Date.now() }
+            ? { ...prev, market_prob: price, _wsUpdated: Date.now() }
             : prev
         );
       }
@@ -120,7 +123,7 @@ const Terminal = ({ onLogout, authInfo }) => {
         const matchedNews = NewsAPI.matchNewsToMarkets(articles, markets);
         setNews(matchedNews);
       } catch (error) {
-        console.warn('Failed to load news:', error.message);
+        logger.warn('Failed to load news:', error.message);
       } finally {
         setNewsLoading(false);
       }
@@ -130,7 +133,7 @@ const Terminal = ({ onLogout, authInfo }) => {
     // Refresh news every 5 minutes
     const interval = setInterval(loadNews, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [markets.length > 0 ? 'loaded' : 'empty']); // Re-run when markets are loaded
+  }, [markets.length]); // Re-run when market count changes
 
   // Load markets from Polymarket and Kalshi APIs with REAL data
   const loadMarkets = useCallback(async (limit = marketLimit, isManual = false) => {
@@ -142,7 +145,7 @@ const Terminal = ({ onLogout, authInfo }) => {
       const [polymarketData, kalshiData] = await Promise.all([
         PolymarketAPI.fetchOpenEvents(Math.ceil(limit * 0.7)), // 70% from Polymarket
         KalshiAPI.fetchOpenEvents(Math.ceil(limit * 0.3)).catch(err => {
-          console.warn('Kalshi fetch failed:', err.message);
+          logger.warn('Kalshi fetch failed:', err.message);
           return []; // Don't fail if Kalshi fails
         }),
       ]);
@@ -176,7 +179,7 @@ const Terminal = ({ onLogout, authInfo }) => {
       setStatusMessage(`${enrichedMarkets.length} mkts (PM:${polyCount} KA:${kalshiCount})`);
       setTimeout(() => setStatusMessage(""), 3000);
     } catch (error) {
-      console.error('Failed to load markets:', error);
+      logger.error('Failed to load markets:', error);
       setStatusMessage("Sync failed");
     } finally {
       setLoadingMarkets(false);
@@ -248,7 +251,7 @@ const Terminal = ({ onLogout, authInfo }) => {
           : prev
       );
     } catch (error) {
-      console.error('Failed to fetch market data:', error);
+      logger.error('Failed to fetch market data:', error);
       setMarkets(prev => prev.map(m => 
         m.id === market.id ? { ...m, dataStatus: 'error' } : m
       ));
@@ -274,10 +277,9 @@ const Terminal = ({ onLogout, authInfo }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Handle market limit change
+  // Handle market limit change — just update state; useEffect handles the refetch
   const handleLimitChange = (newLimit) => {
     setMarketLimit(newLimit);
-    loadMarkets(newLimit, true);
   };
 
   // Handle loading market from URL (supports both Polymarket and Kalshi)
@@ -321,7 +323,7 @@ const Terminal = ({ onLogout, authInfo }) => {
       // This will trigger fetchMarketData via useEffect
       setTimeout(() => setStatusMessage(""), 2000);
     } catch (error) {
-      console.error('Failed to load market from URL:', error);
+      logger.error('Failed to load market from URL:', error);
       setStatusMessage("Failed - check URL/ticker");
       setTimeout(() => setStatusMessage(""), 3000);
     } finally {
@@ -727,10 +729,9 @@ const Terminal = ({ onLogout, authInfo }) => {
       <div className="h-8 bg-gradient-to-r from-[#0a0a0a] to-[#111] border-b border-orange-500/30 flex items-center justify-between px-3 flex-shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center">
-            <span className="text-orange-500 font-black text-lg tracking-tight">LEET</span>
-            <span className="text-white font-bold text-lg">QUANTUM</span>
-            <span className="text-orange-400 font-bold text-lg ml-1">TERMINAL</span>
-            <span className="bg-orange-500 text-black text-[8px] px-1.5 py-0.5 rounded ml-2 font-black">PRO</span>
+            <span className="text-orange-500 font-black text-xl tracking-tight brand-glow">LEET</span>
+            <span className="text-white font-black text-xl tracking-tight ml-0.5">TERMINAL</span>
+            <span className="bg-orange-500 text-black text-[8px] px-1.5 py-0.5 rounded ml-2 font-black tracking-wider">PRO</span>
           </div>
           <div className="h-4 w-px bg-gray-700" />
           <div className="flex">
@@ -921,7 +922,8 @@ const Terminal = ({ onLogout, authInfo }) => {
           )}
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-orange-500/70 font-medium">LEET TERMINAL</span>
+          <span className="text-orange-500 font-bold tracking-wide brand-glow">LEET TERMINAL</span>
+          <span className="text-gray-600 mx-1">|</span>
           <span className="text-yellow-500/80">ANALYSIS ONLY</span>
           <span className="text-gray-600">v4.0.0</span>
         </div>
@@ -935,6 +937,7 @@ const App = () => {
   const [showSignup, setShowSignup] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authInfo, setAuthInfo] = useState(null);
+  const authCheckInProgress = useRef(false);
 
   // Check authentication status on mount
   useEffect(() => {
@@ -948,7 +951,7 @@ const App = () => {
         localStorage.setItem('isAuthenticated', 'true');
 
         // Log auth info for debugging
-        console.log('Authentication verified:', {
+        logger.log('Authentication verified:', {
           type: verification.authType,
           hasJWT: !!verification.user?.jwtToken || !!verification.session?.access_token,
           user: verification.user?.publicKey || verification.user?.address || verification.user?.email,
@@ -959,7 +962,7 @@ const App = () => {
         localStorage.removeItem('isAuthenticated');
 
         // Log why auth failed
-        console.warn('Authentication failed:', verification.reason || 'Unknown reason');
+        logger.warn('Authentication failed:', verification.reason || 'Unknown reason');
       }
 
       setLoading(false);
@@ -968,29 +971,29 @@ const App = () => {
     checkAuth();
   }, []);
 
-  // Handle OAuth callback
+  // Handle OAuth callback (guarded against double-fire)
   useEffect(() => {
+    if (authCheckInProgress.current) return;
     if (isSupabaseConfigured() && window.location.hash) {
-      // Check if this is an OAuth callback
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       if (hashParams.get('access_token')) {
-        // OAuth callback detected, session will be set by Supabase
+        authCheckInProgress.current = true;
         getSession().then(async ({ session, isValid }) => {
           if (session && isValid) {
-            // Verify authentication is valid
             const verification = await verifyAuthentication();
             if (verification.isValid) {
               setIsAuthenticated(true);
               setAuthInfo(verification);
               localStorage.setItem('isAuthenticated', 'true');
-              console.log('OAuth callback verified:', verification.authType);
-              // Clean up URL
+              logger.log('OAuth callback verified:', verification.authType);
               window.history.replaceState({}, document.title, window.location.pathname);
             } else {
-              console.error('OAuth callback verification failed:', verification.reason);
+              logger.error('OAuth callback verification failed:', verification.reason);
               setIsAuthenticated(false);
             }
           }
+        }).finally(() => {
+          authCheckInProgress.current = false;
         });
       }
     }
@@ -1003,9 +1006,9 @@ const App = () => {
       setIsAuthenticated(true);
       setAuthInfo(verification);
       localStorage.setItem('isAuthenticated', 'true');
-      console.log('Login verified:', verification.authType);
+      logger.log('Login verified:', verification.authType);
     } else {
-      console.error('Login verification failed:', verification.reason);
+      logger.error('Login verification failed:', verification.reason);
       // Don't set authenticated if verification fails
     }
   };
@@ -1017,9 +1020,9 @@ const App = () => {
       setIsAuthenticated(true);
       setAuthInfo(verification);
       localStorage.setItem('isAuthenticated', 'true');
-      console.log('Signup verified:', verification.authType);
+      logger.log('Signup verified:', verification.authType);
     } else {
-      console.error('Signup verification failed:', verification.reason);
+      logger.error('Signup verification failed:', verification.reason);
       // Don't set authenticated if verification fails
     }
   };
@@ -1031,8 +1034,15 @@ const App = () => {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#0a0a0a]">
-        <div className="text-orange-500 text-lg">Loading...</div>
+      <div className="h-screen flex flex-col items-center justify-center bg-[#0a0a0a]">
+        <div className="flex items-center mb-4">
+          <span className="text-orange-500 font-black text-3xl tracking-tight brand-glow">LEET</span>
+          <span className="text-white font-black text-3xl tracking-tight ml-1">TERMINAL</span>
+        </div>
+        <div className="text-gray-600 text-xs tracking-widest uppercase">Prediction Markets Analytics</div>
+        <div className="mt-6 w-32 h-0.5 bg-gray-800 rounded-full overflow-hidden">
+          <div className="h-full bg-orange-500 rounded-full brand-load-bar" />
+        </div>
       </div>
     );
   }

@@ -7,6 +7,7 @@
 
 import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
 import { sanitizeText } from '../utils/sanitize';
+import logger from '../utils/logger';
 
 const RESEARCH_API = 'https://api.parallel.ai/v1';
 const API_KEY = import.meta.env.VITE_RESEARCH_API_KEY || import.meta.env.VITE_PARALLEL_API_KEY || '';
@@ -107,7 +108,7 @@ async function runTask(input, options = {}) {
 
     return result;
   } catch (error) {
-    console.error('Research engine error:', error.message);
+    logger.error('Research engine error:', error.message);
     throw error;
   }
 }

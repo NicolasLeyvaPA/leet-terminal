@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
+import logger from '../utils/logger';
 
 export const PriceChart = ({ data }) => {
   const canvasRef = useRef(null);
@@ -75,7 +76,7 @@ export const PriceChart = ({ data }) => {
       });
       setError(null);
     } catch (err) {
-      console.warn('Chart initialization failed:', err);
+      logger.warn('Chart initialization failed:', err);
       setError('Chart failed to load');
     }
 

@@ -9,7 +9,7 @@ export const ModelBreakdownPanel = ({ market }) => {
     );
 
   // Calculate signals from REAL market data
-  const hasOrderbook = market.bestBid > 0 && market.bestAsk > 0;
+  const hasOrderbook = (market.bestBid ?? 0) > 0 && (market.bestAsk ?? 0) > 0;
   const hasVolume = (market.volume_24h || 0) > 0;
   const hasLiquidity = (market.liquidity || 0) > 0;
   const edge = (market.model_prob || 0) - (market.market_prob || 0);

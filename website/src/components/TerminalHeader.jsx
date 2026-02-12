@@ -5,8 +5,9 @@ export function TerminalHeader({ workspace, onWorkspaceChange, statusMessage, ti
     <div className="h-8 bg-gradient-to-r from-[#0a0a0a] to-[#111] border-b border-orange-500/30 flex items-center justify-between px-3 flex-shrink-0">
       <div className="flex items-center gap-4">
         <div className="flex items-center">
-          <span className="text-orange-500 font-black text-lg tracking-tight">LEET</span>
-          <span className="text-orange-400 font-bold text-lg ml-1">TERMINAL</span>
+          <span className="text-orange-500 font-black text-xl tracking-tight brand-glow">LEET</span>
+          <span className="text-white font-black text-xl tracking-tight ml-0.5">TERMINAL</span>
+          <span className="bg-orange-500 text-black text-[8px] px-1.5 py-0.5 rounded ml-2 font-black tracking-wider">PRO</span>
         </div>
         <div className="h-4 w-px bg-gray-700" />
         <div className="flex">

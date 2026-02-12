@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import logger from '../utils/logger';
 
 const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 
@@ -39,7 +40,7 @@ class PolymarketWebSocket {
         this.ws = new WebSocket(WS_URL);
 
         this.ws.onopen = () => {
-          console.log('[WS] Connected to Polymarket');
+          logger.log('[WS] Connected to Polymarket');
           this.isConnecting = false;
           this.reconnectAttempts = 0;
           this.setStatus('connected');
@@ -63,12 +64,12 @@ class PolymarketWebSocket {
         };
 
         this.ws.onerror = (error) => {
-          console.error('[WS] Error:', error);
+          logger.error('[WS] Error:', error);
           this.isConnecting = false;
         };
 
         this.ws.onclose = (event) => {
-          console.log('[WS] Disconnected:', event.code, event.reason);
+          logger.log('[WS] Disconnected:', event.code, event.reason);
           this.isConnecting = false;
           this.setStatus('disconnected');
           this.attemptReconnect();
@@ -100,10 +101,10 @@ class PolymarketWebSocket {
         this.handleLastTradePrice(message);
       } else {
         // Log unknown message types for debugging
-        console.debug('[WS] Unknown message type:', message);
+        logger.debug('[WS] Unknown message type:', message);
       }
     } catch (error) {
-      console.warn('[WS] Failed to parse message:', error);
+      logger.warn('[WS] Failed to parse message:', error);
     }
   }
 
@@ -272,7 +273,7 @@ class PolymarketWebSocket {
         try {
           callback(data);
         } catch (error) {
-          console.error('[WS] Callback error:', error);
+          logger.error('[WS] Callback error:', error);
         }
       }
     }
@@ -290,7 +291,7 @@ class PolymarketWebSocket {
    */
   attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.warn('[WS] Max reconnection attempts reached');
+      logger.warn('[WS] Max reconnection attempts reached');
       this.setStatus('failed');
       return;
     }
@@ -298,7 +299,7 @@ class PolymarketWebSocket {
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
     
-    console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    logger.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
     this.setStatus('reconnecting');
     
     setTimeout(() => {
@@ -317,7 +318,7 @@ class PolymarketWebSocket {
       try {
         listener(status);
       } catch (error) {
-        console.error('[WS] Status listener error:', error);
+        logger.error('[WS] Status listener error:', error);
       }
     }
   }

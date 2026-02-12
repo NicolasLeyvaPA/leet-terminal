@@ -2,6 +2,8 @@
 // v2.0 - With caching, rate limiting, and honest data handling
 import { sanitizeText, sanitizeUrl } from '../utils/sanitize';
 import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
+import logger from '../utils/logger';
+import scrapeology from '../config/scrapeology';
 
 const GAMMA_API = 'https://gamma-api.polymarket.com';
 const CLOB_API = 'https://clob.polymarket.com';
@@ -43,6 +45,29 @@ async function fetchWithFallback(url, options = {}) {
   // Rate limit
   await waitForRateLimit('polymarket', 300);
 
+  // Scrapeology backend — preferred when available (no CORS, cached in TimescaleDB)
+  if (scrapeology.isConfigured()) {
+    try {
+      // Map Gamma/CLOB URLs to Scrapeology endpoints
+      let scrapePath = url;
+      if (url.startsWith(GAMMA_API)) {
+        scrapePath = scrapeology.endpoint(`/polymarket${url.slice(GAMMA_API.length)}`);
+      } else if (url.startsWith(CLOB_API)) {
+        scrapePath = scrapeology.endpoint(`/polymarket/clob${url.slice(CLOB_API.length)}`);
+      }
+      const response = await fetch(scrapePath, {
+        headers: { 'Accept': 'application/json' },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCache(cacheKey, data, cacheTtl);
+        return data;
+      }
+    } catch (error) {
+      logger.warn('Scrapeology backend failed, falling back:', error.message);
+    }
+  }
+
   // Build proxy URL if using custom proxy
   const getProxyUrl = (targetUrl) => {
     if (CORS_PROXY) {
@@ -71,7 +96,7 @@ async function fetchWithFallback(url, options = {}) {
         return data;
       }
     } catch (error) {
-      console.warn('Primary proxy failed:', error.message);
+      logger.warn('Primary proxy failed:', error.message);
     }
   }
 
@@ -90,7 +115,7 @@ async function fetchWithFallback(url, options = {}) {
       return data;
     }
   } catch (error) {
-    console.warn('Direct fetch failed:', error.message);
+    logger.warn('Direct fetch failed:', error.message);
   }
 
   // Third try: Fallback CORS proxies
@@ -131,7 +156,7 @@ async function fetchWithFallback(url, options = {}) {
         }
       }
     } catch (error) {
-      console.warn(`CORS proxy ${i} failed:`, error.message);
+      logger.warn(`CORS proxy ${i} failed:`, error.message);
       proxyFailures.set(proxyKey, Date.now());
     }
   }
@@ -181,12 +206,12 @@ export async function fetchOpenEvents(limit = 50) {
     const data = await fetchWithFallback(url, { cacheTtl: CACHE_TTL.MARKETS });
 
     if (!Array.isArray(data)) {
-      console.warn('Unexpected response format');
+      logger.warn('Unexpected response format');
       return [];
     }
     return data.map(transformEventToMarket).filter(Boolean);
   } catch (error) {
-    console.error('Error loading markets:', error.message);
+    logger.error('Error loading markets:', error.message);
     return [];
   }
 }
@@ -220,7 +245,7 @@ export async function fetchPriceHistory(marketId, days = 90) {
     // NO FAKE DATA - return null if unavailable
     return null;
   } catch (error) {
-    console.warn('Failed to fetch price history:', error.message);
+    logger.warn('Failed to fetch price history:', error.message);
     return null;
   }
 }
@@ -243,7 +268,7 @@ export async function fetchOrderbook(tokenId) {
     // NO FAKE DATA - return null if unavailable
     return null;
   } catch (error) {
-    console.warn('Failed to fetch orderbook:', error.message);
+    logger.warn('Failed to fetch orderbook:', error.message);
     return null;
   }
 }
@@ -538,9 +563,23 @@ function transformOrderbook(data) {
   };
 }
 
+/**
+ * Fetch raw events (untransformed) for panels that need the original format
+ */
+export async function fetchRawEvents(limit = 100) {
+  const url = `${GAMMA_API}/events?order=id&ascending=false&closed=false&limit=${limit}`;
+  const data = await fetchWithFallback(url, { cacheTtl: CACHE_TTL.MARKETS });
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  return data;
+}
+
 export const PolymarketAPI = {
   fetchEventBySlug,
   fetchOpenEvents,
+  fetchRawEvents,
   fetchPriceHistory,
   fetchOrderbook,
   extractEventSlug,
