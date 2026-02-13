@@ -240,7 +240,7 @@ class AlertsEngine {
    * Fire browser notifications and sounds for triggered alerts
    */
   fireNotifications(triggered) {
-    for (const { alert, market, currentPrice } of triggered) {
+    for (const { alert, market: _market, currentPrice } of triggered) {
       // Browser notification
       if (this.notificationPermission === 'granted') {
         const priceStr = (currentPrice * 100).toFixed(1);

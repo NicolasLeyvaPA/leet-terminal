@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { Chart } from 'chart.js/auto';
 
-export const PortfolioValueChart = ({ positions, markets }) => {
+export const PortfolioValueChart = ({ positions }) => {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
 
@@ -24,7 +24,7 @@ export const PortfolioValueChart = ({ positions, markets }) => {
     }
 
     return { labels, valueData, costData };
-  }, [positions, markets]);
+  }, [positions]);
 
   useEffect(() => {
     if (!canvasRef.current) return;

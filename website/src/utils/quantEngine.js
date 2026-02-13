@@ -163,7 +163,7 @@ export const QuantEngine = {
     };
   },
 
-  quantumOptimize: (markets, capital = 10000) => {
+  quantumOptimize: (markets, _capital = 10000) => {
     const iterations = 1000;
     let bestAllocation = {};
     let bestScore = -Infinity;

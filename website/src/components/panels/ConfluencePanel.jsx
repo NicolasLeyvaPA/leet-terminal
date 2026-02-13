@@ -1,5 +1,4 @@
 import { PanelHeader } from '../PanelHeader';
-import { QuantEngine } from '../../utils/quantEngine';
 import logger from '../../utils/logger';
 
 export const ConfluencePanel = ({ market }) => {
@@ -15,7 +14,7 @@ export const ConfluencePanel = ({ market }) => {
   const hasFactors = Object.keys(factors).length > 0;
 
   // Safely calculate confluence with fallback - only count REAL factors
-  let confluence = { score: 0, bullishFactors: 0, bearishFactors: 0, realFactors: 0, totalFactors: 0 };
+  const confluence = { score: 0, bullishFactors: 0, bearishFactors: 0, realFactors: 0, totalFactors: 0 };
   try {
     if (hasFactors) {
       const realFactors = Object.entries(factors).filter(([, f]) => f && f.isReal);

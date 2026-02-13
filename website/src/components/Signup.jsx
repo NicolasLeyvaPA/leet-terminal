@@ -83,7 +83,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
           setError(result.error || 'Failed to create account');
         }
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -103,7 +103,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         setError(result.error || `Failed to sign up with ${provider}`);
         setOauthLoading(null);
       }
-    } catch (err) {
+    } catch {
       setError(`Failed to sign up with ${provider}`);
       setOauthLoading(null);
     }
@@ -121,7 +121,7 @@ const Signup = ({ onSignup, onSwitchToLogin }) => {
         setError(result.error || 'Failed to connect to Phantom wallet');
         setOauthLoading(null);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to connect to Phantom wallet');
       setOauthLoading(null);
     }

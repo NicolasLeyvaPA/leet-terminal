@@ -12,7 +12,6 @@ import { ConfluencePanel } from './components/panels/ConfluencePanel';
 import { ModelBreakdownPanel } from './components/panels/ModelBreakdownPanel';
 import { GreeksPanel } from './components/panels/GreeksPanel';
 import { MonteCarloPanel } from './components/panels/MonteCarloPanel';
-import { PortfolioPanel } from './components/panels/PortfolioPanel';
 import { PortfolioPage } from './components/portfolio/PortfolioPage';
 import { QuantumLabPanel } from './components/panels/QuantumLabPanel';
 import { NewsFeedPanel } from './components/panels/NewsFeedPanel';
@@ -29,18 +28,13 @@ import { getSession, signOut, verifyAuthentication } from './utils/auth';
 import { isSupabaseConfigured } from './utils/supabase';
 import logger from './utils/logger';
 
-// Layout constants (moved from magic numbers)
-const MIN_LEFT_PANEL_WIDTH = 140;
-const MIN_DETAIL_HEIGHT = 80;
-const MIN_ANALYTICS_WIDTH = 260;
-const MAX_WIDTH_OFFSET = 260;
-const MAX_HEIGHT_OFFSET = 160;
+// Layout constants live inside the drag handler (see useEffect below)
 
 // Market limit options
 const MARKET_LIMITS = [10, 25, 50, 100];
 const REFRESH_INTERVAL = 15000; // 15 seconds
 
-const Terminal = ({ onLogout, authInfo }) => {
+const Terminal = ({ onLogout, authInfo: _authInfo }) => {
   const { watchlist } = useWatchlist();
   const [markets, setMarkets] = useState([]);
   const [loadingMarkets, setLoadingMarkets] = useState(true);
@@ -56,7 +50,7 @@ const Terminal = ({ onLogout, authInfo }) => {
   const [analyticsWidth, setAnalyticsWidth] = useState(420);
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
-  const [lastRefresh, setLastRefresh] = useState(null);
+  const [, setLastRefresh] = useState(null);
   const [wsStatus, setWsStatus] = useState('disconnected');
   const [news, setNews] = useState([]);
   const [newsLoading, setNewsLoading] = useState(false);

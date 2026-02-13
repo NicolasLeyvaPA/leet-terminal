@@ -66,7 +66,7 @@ export const hasValidSession = async () => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     return !!session && !!session.access_token;
-  } catch (error) {
+  } catch {
     return false;
   }
 };

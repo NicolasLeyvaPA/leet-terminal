@@ -6,7 +6,6 @@
  */
 
 import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
-import { sanitizeText } from '../utils/sanitize';
 import logger from '../utils/logger';
 
 const RESEARCH_API = 'https://api.parallel.ai/v1';

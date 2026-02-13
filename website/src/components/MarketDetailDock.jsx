@@ -41,7 +41,7 @@ export const MarketDetailDock = ({ market, show, onToggle }) => {
   const keyPoints = (market.price_history || []).reduce((acc, d, i, arr) => {
     if (i < 2 || i >= arr.length - 1) return acc;
     const prev = arr[i - 1];
-    const next = arr[i + 1];
+    const _next = arr[i + 1];
     const change = Math.abs(d.price - prev.price);
     if (change > 0.05) {
       acc.push({ date: d.date, price: d.price, change: d.price - prev.price });

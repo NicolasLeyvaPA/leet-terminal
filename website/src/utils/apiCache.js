@@ -215,7 +215,7 @@ export function getCacheStats() {
   let expiredEntries = 0;
   const now = Date.now();
   
-  for (const [key, entry] of cache.entries()) {
+  for (const [_key, entry] of cache.entries()) {
     if (now > entry.expiresAt) {
       expiredEntries++;
     } else {

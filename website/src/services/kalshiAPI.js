@@ -130,7 +130,7 @@ async function fetchWithFallback(url, options = {}) {
           continue;
         }
       }
-    } catch (error) {
+    } catch {
       proxyFailures.set(proxyKey, Date.now());
     }
   }
@@ -332,7 +332,7 @@ function transformKalshiEvent(event) {
 /**
  * Calculate signal probability (heuristic)
  */
-function calculateSignalProbability(marketProb, volume24h, openInterest, market) {
+function calculateSignalProbability(marketProb, volume24h, openInterest, _market) {
   let signalProb = marketProb;
   const volumeFactor = Math.min(volume24h / 50000, 0.05);
   const oiFactor = Math.min(openInterest / 100000, 0.03);
@@ -433,14 +433,14 @@ function calculateGreeks(marketProb, endDate) {
  * Transform Kalshi orderbook
  */
 function transformKalshiOrderbook(orderbook) {
-  const bids = (orderbook.yes || []).map((level, i) => ({
+  const bids = (orderbook.yes || []).map((level, _i) => ({
     price: level[0] / 100,
     size: level[1],
     cumulative: 0,
     isReal: true,
   }));
 
-  const asks = (orderbook.no || []).map((level, i) => ({
+  const asks = (orderbook.no || []).map((level, _i) => ({
     price: 1 - level[0] / 100,
     size: level[1],
     cumulative: 0,

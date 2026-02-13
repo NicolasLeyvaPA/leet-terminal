@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { authenticateUser, signInWithOAuth, authenticateWithPhantom, authenticateWithMetaMask } from '../utils/auth';
-import { isSupabaseConfigured } from '../utils/supabase';
 import { isPhantomInstalled } from '../utils/phantom';
 import { isMetaMaskInstalled } from '../utils/metamask';
 import MetamaskIcon from '../assets/Metamask_icon.svg';
@@ -33,7 +32,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
       } else {
         setError(result.error || 'Invalid credentials');
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -57,7 +56,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
         setError(result.error || `Failed to sign in with ${provider}`);
         setOauthLoading(null);
       }
-    } catch (err) {
+    } catch {
       setError(`Failed to sign in with ${provider}`);
       setOauthLoading(null);
     }
@@ -83,7 +82,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
         setError(result.error || 'Failed to connect to Phantom wallet');
         setOauthLoading(null);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to connect to Phantom wallet');
       setOauthLoading(null);
     }

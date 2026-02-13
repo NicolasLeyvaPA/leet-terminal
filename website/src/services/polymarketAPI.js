@@ -1,6 +1,6 @@
 // Polymarket API Service - Real market data integration
 // v2.0 - With caching, rate limiting, and honest data handling
-import { sanitizeText, sanitizeUrl } from '../utils/sanitize';
+import { sanitizeText } from '../utils/sanitize';
 import { getCached, setCache, waitForRateLimit } from '../utils/apiCache';
 import logger from '../utils/logger';
 import scrapeology from '../config/scrapeology';

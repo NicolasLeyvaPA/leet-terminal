@@ -403,7 +403,7 @@ export const authenticateWithPhantom = async () => {
 
         if (signInError && signInError.message?.includes('Invalid login credentials')) {
           // User might exist with old password or not exist - try to update/create
-          const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+          const { error: updateError } = await supabase.auth.updateUser({
             password: securePassword,
           });
           
@@ -628,12 +628,10 @@ export const authenticateWithMetaMask = async () => {
           .eq('wallet_type', 'metamask')
           .single();
 
-        let signInData, signInError;
-        
-        ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: `${address}@metamask.local`,
           password: securePassword,
-        }));
+        });
 
         if (signInError && signInError.message?.includes('Invalid login credentials')) {
           const { data: newAuthUser, error: authError } = await supabase.auth.signUp({

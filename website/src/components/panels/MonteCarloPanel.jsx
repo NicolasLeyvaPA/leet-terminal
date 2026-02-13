@@ -76,14 +76,6 @@ export const MonteCarloPanel = ({ market }) => {
 
   const s = simulation.stats;
 
-  // Safe number formatting helper
-  const formatStat = (value, decimals = 1, prefix = '', suffix = '') => {
-    if (value === undefined || value === null || isNaN(value)) return 'N/A';
-    const formatted = Number(value).toFixed(decimals);
-    const sign = value >= 0 && prefix === '' ? '' : (value >= 0 ? '+' : '');
-    return `${prefix}${sign}${formatted}${suffix}`;
-  };
-
   return (
     <div className="terminal-panel h-full">
       <PanelHeader

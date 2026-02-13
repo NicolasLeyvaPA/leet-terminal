@@ -22,7 +22,7 @@ const FIB_COLORS = [
   'rgba(255,107,0,0.6)',   // 100%
 ];
 
-export const DrawingOverlay = ({ chart, tool, drawings, onAddDrawing, onClearDrawings }) => {
+export const DrawingOverlay = ({ chart, tool, drawings, onAddDrawing, onClearDrawings: _onClearDrawings }) => {
   const canvasRef = useRef(null);
   const [drawState, setDrawState] = useState({ phase: 'idle', p1: null });
   const [cursor, setCursor] = useState(null);
