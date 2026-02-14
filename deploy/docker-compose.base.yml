@@ -3,6 +3,7 @@ version: '3.8'
 services:
   db:
     image: postgres:15
+    container_name: leet-terminal-db
     restart: unless-stopped
     environment:
       - POSTGRES_USER=leet
@@ -10,14 +11,16 @@ services:
       - POSTGRES_DB=leetdb
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ../services/db/migrations/postgres_users_migration_001.sql:/docker-entrypoint-initdb.d/01_postgres_users_migration.sql:ro
     networks:
-      - leet-net
+      - internal
 
   app:
     image: leet-terminal-app:latest
+    container_name: leet-terminal-app
     build:
-      context: .
-      dockerfile: deploy/docker/Dockerfile
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.app
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -25,44 +28,93 @@ services:
     depends_on:
       - db
     networks:
-      - leet-net
+      - internal
 
   web:
     image: leet-terminal-web:latest
+    container_name: leet-terminal-web
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.web
     restart: unless-stopped
     environment:
       - NODE_ENV=production
     depends_on:
       - app
     networks:
-      - leet-net
+      - internal
 
-  nginx:
-    image: nginx:1.25-alpine
+  timescaledb:
+    image: timescale/timescaledb:latest-pg14
+    container_name: leet-terminal-timescaledb
     restart: unless-stopped
-    configs:
-      - source: nginx_conf
-        target: /etc/nginx/nginx.conf
+    environment:
+      - POSTGRES_USER=timescale_user
+      - POSTGRES_PASSWORD=timescale_pass
+      - POSTGRES_DB=news_bets_db
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ../services/db/migrations/timescaledb_migration_001.sql:/docker-entrypoint-initdb.d/01_timescaledb_migration.sql:ro
+    networks:
+      - internal
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: leet-terminal-rabbitmq
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - internal
+
+  gateway:
+    image: nginx:1.25-alpine
+    container_name: leet-terminal-gateway
+    restart: unless-stopped
+    # default config points to production backend ports
+    volumes:
+      - ./gateway.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - web
+      - app
     networks:
-      - leet-net
-      - proxy-net
-    expose:
-      - "80"
+      - internal
 
-configs:
-  nginx_conf:
-    file: ./deploy/docker/nginx.conf
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: leet-terminal-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - internal
+
+  grafana:
+    image: grafana/grafana:9.5.0
+    container_name: leet-terminal-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - internal
 
 volumes:
   db_data:
+    name: leet-terminal_db_data
+  timescale_data:
+    name: leet-terminal_timescale_data
+  rabbitmq_data:
+    name: leet-terminal_rabbitmq_data
 
 networks:
-  leet-net:
+  internal:
+    name: internal
     driver: overlay
-  proxy-net:
-    external: true

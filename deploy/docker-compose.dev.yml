@@ -6,12 +6,12 @@ services:
       service: db
     environment:
       - POSTGRES_PASSWORD=leetpass
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     networks:
-      - leet-net
+      - internal
 
   app:
     extends:
@@ -20,34 +20,92 @@ services:
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgres://leet:leetpass@db:5432/leetdb
-    ports:
-      - "3000:3000"
-    # app source mount removed; coordinator moved to services/
+    expose:
+      - "3000"
     volumes: []
-    command: npm run dev
     depends_on:
       - db
     networks:
-      - leet-net
+      - internal
 
   web:
-    extends:
-      file: docker-compose.base.yml
-      service: web
+    # Development web service: run Vite dev server in a Node container
+    image: node:20-alpine
     environment:
       - NODE_ENV=development
-    ports:
-      - "5173:80"
+    working_dir: /app/web
+    expose:
+      - "5173"
     volumes:
-      - ./web:/app/web
+      - ../web:/app/web
+      - /app/web/node_modules
+    command: sh -c "ls -la /app && ls -la /app/web || true; cat /app/web/package.json || true; npm install && npm run dev -- --host 0.0.0.0"
     depends_on:
       - app
     networks:
-      - leet-net
+      - internal
+
+  rabbitmq:
+    extends:
+      file: docker-compose.base.yml
+      service: rabbitmq
+    expose:
+      - "5672"
+      - "15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - internal
+
+  gateway:
+    extends:
+      file: docker-compose.base.yml
+      service: gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./gateway.dev.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - internal
+
+  prometheus:
+    extends:
+      file: docker-compose.base.yml
+      service: prometheus
+    expose:
+      - "9090"
+    networks:
+      - internal
+
+  grafana:
+    extends:
+      file: docker-compose.base.yml
+      service: grafana
+    expose:
+      - "3000"
+    networks:
+      - internal
+
+  timescaledb:
+    extends:
+      file: docker-compose.base.yml
+      service: timescaledb
+    expose:
+      - "5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    networks:
+      - internal
 
 volumes:
   db_data:
+    name: leet-terminal_db_data
+  timescale_data:
+    name: leet-terminal_timescale_data
+  rabbitmq_data:
+    name: leet-terminal_rabbitmq_data
 
 networks:
-  leet-net:
-    external: true
+  internal:
+    name: internal
+    driver: bridge
