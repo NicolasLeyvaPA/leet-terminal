@@ -1,5 +1,5 @@
 # TimescaleDB Docker Compose Service
-version: '3.8'
+project: leet-terminal
 services:
   timescaledb:
     image: timescale/timescaledb:latest-pg14

@@ -1,11 +1,13 @@
-version: '3.8'
+project: leet-terminal
 services:
   db:
     extends:
       file: docker-compose.base.yml
       service: db
+    env_file:
+      - .env
     environment:
-      - POSTGRES_PASSWORD=leetpass
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-leetpass}
     expose:
       - "5432"
     volumes:
@@ -17,9 +19,11 @@ services:
     extends:
       file: docker-compose.base.yml
       service: app
+    env_file:
+      - .env
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgres://leet:leetpass@db:5432/leetdb
+      - DATABASE_URL=${DATABASE_URL:-postgres://leet:leetpass@db:5432/leetdb}
     expose:
       - "3000"
     volumes: []
@@ -31,6 +35,8 @@ services:
   web:
     # Development web service: run Vite dev server in a Node container
     image: node:20-alpine
+    env_file:
+      - .env
     environment:
       - NODE_ENV=development
     working_dir: /app/web
@@ -81,6 +87,8 @@ services:
     extends:
       file: docker-compose.base.yml
       service: grafana
+    env_file:
+      - .env
     expose:
       - "3000"
     networks:
@@ -90,6 +98,8 @@ services:
     extends:
       file: docker-compose.base.yml
       service: timescaledb
+    env_file:
+      - .env
     expose:
       - "5432"
     volumes:
