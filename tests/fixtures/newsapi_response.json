@@ -1,0 +1,30 @@
+{
+  "status": "ok",
+  "totalResults": 2,
+  "articles": [
+    {
+      "source": {
+        "id": "bloomberg",
+        "name": "Bloomberg"
+      },
+      "author": "John Smith",
+      "title": "Federal Reserve Signals Potential Rate Cuts in 2024",
+      "description": "The Federal Reserve indicated it may begin cutting interest rates this year as inflation cools.",
+      "url": "https://bloomberg.com/news/fed-rate-cuts-2024",
+      "publishedAt": "2024-02-15T16:20:00Z",
+      "content": "The Federal Reserve indicated today that it may begin cutting interest rates..."
+    },
+    {
+      "source": {
+        "id": "reuters",
+        "name": "Reuters"
+      },
+      "author": "Jane Doe",
+      "title": "Crypto Markets Rally on ETF Approval News",
+      "description": "Cryptocurrency markets surged following news of additional Bitcoin ETF approvals.",
+      "url": "https://reuters.com/markets/crypto-etf-rally",
+      "publishedAt": "2024-02-15T12:00:00Z",
+      "content": "Cryptocurrency markets experienced significant gains today..."
+    }
+  ]
+}

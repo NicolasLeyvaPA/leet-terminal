@@ -9,6 +9,7 @@ type DB interface {
 	NewsRepo() NewsRepo
 	BetRepo() BetRepo
 	WalletRepo() WalletRepo
+	MarketRepo() MarketRepo // Added for market ingestion
 
 	// Ping checks availability of the underlying databases.
 	Ping(ctx context.Context) error

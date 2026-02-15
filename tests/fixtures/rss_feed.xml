@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>TechCrunch</title>
+    <link>https://techcrunch.com</link>
+    <description>The latest technology news and information on startups</description>
+    <item>
+      <title>Bitcoin Surges Past $95,000 as Crypto Rally Continues</title>
+      <link>https://techcrunch.com/2024/bitcoin-rally</link>
+      <description>Bitcoin reached new all-time highs today as institutional adoption accelerates.</description>
+      <author>Sarah Johnson</author>
+      <pubDate>Mon, 15 Feb 2024 14:30:00 GMT</pubDate>
+      <guid>https://techcrunch.com/2024/bitcoin-rally</guid>
+    </item>
+    <item>
+      <title>Prediction Markets Gain Regulatory Approval in New States</title>
+      <link>https://techcrunch.com/2024/prediction-markets-regulation</link>
+      <description>Several US states have approved prediction market platforms for legal operation.</description>
+      <author>Mike Chen</author>
+      <pubDate>Mon, 15 Feb 2024 10:15:00 GMT</pubDate>
+      <guid>https://techcrunch.com/2024/prediction-markets-regulation</guid>
+    </item>
+    <item>
+      <title>AI Startup Raises $100M for Market Prediction Platform</title>
+      <link>https://techcrunch.com/2024/ai-prediction-funding</link>
+      <description>A new AI-powered prediction market platform secured major funding from top VCs.</description>
+      <author>Emily Zhang</author>
+      <pubDate>Sun, 14 Feb 2024 18:45:00 GMT</pubDate>
+      <guid>https://techcrunch.com/2024/ai-prediction-funding</guid>
+    </item>
+  </channel>
+</rss>
+
