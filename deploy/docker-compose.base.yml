@@ -1,4 +1,3 @@
-project: leet-terminal
 services:
   db:
     image: postgres:15
