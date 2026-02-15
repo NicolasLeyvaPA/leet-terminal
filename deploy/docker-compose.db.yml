@@ -1,9 +1,7 @@
-# TimescaleDB Docker Compose Service
-version: '3.8'
 services:
   timescaledb:
     image: timescale/timescaledb:latest-pg14
-    container_name: timescaledb
+    container_name: leet-terminal-timescaledb
     environment:
       POSTGRES_USER: timescale_user
       POSTGRES_PASSWORD: timescale_pass
@@ -17,7 +15,7 @@ services:
 
   postgres:
     image: postgres:14
-    container_name: postgres_users
+    container_name: leet-terminal-postgres_users
     environment:
       POSTGRES_USER: user_admin
       POSTGRES_PASSWORD: user_pass
@@ -31,4 +29,6 @@ services:
 
 volumes:
   timescale_data:
+    name: leet-terminal_timescale_data
   postgres_data:
+    name: leet-terminal_postgres_data

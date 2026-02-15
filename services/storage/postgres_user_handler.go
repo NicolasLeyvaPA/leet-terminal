@@ -26,4 +26,3 @@ func (h *PostgresUserHandler) UpdateUser(ctx context.Context, u *User) error {
 func (h *PostgresUserHandler) DeleteUser(ctx context.Context, id int) error {
 	return h.Repo.DeleteUser(ctx, id)
 }
-
